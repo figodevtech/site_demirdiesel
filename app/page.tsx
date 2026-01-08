@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { services, testimonials } from "@/lib/data";
 import { getProducts } from "@/lib/api";
 import { ArrowRight, Star, Truck, ShieldCheck, CreditCard } from 'lucide-react';
+import { BannerCarousel } from "@/components/home/BannerCarousel";
 
 function FeatureIcon({ icon: Icon, title, desc }: { icon: any, title: string, desc: string }) {
   return (
@@ -26,42 +27,8 @@ export default async function Home() {
     <div className="flex flex-col gap-12 pb-12">
 
       {/* Hero Section */}
-      <section className="relative w-full h-[400px] md:h-[500px] flex items-center overflow-hidden">
-        {/* Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0A7AAC] to-[#3E418E] z-0" />
-
-        {/* Content */}
-        <div className="container mx-auto px-4 relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 text-white">
-          <div className="max-w-2xl space-y-6">
-            <div className="inline-block px-3 py-1 bg-white/10 backdrop-blur rounded-full text-xs font-medium tracking-wide border border-white/20">
-              Oficina Especializada & Loja de Peças
-            </div>
-            <h1 className="text-4xl md:text-6xl font-bold leading-tight">
-              Tudo para seu <br /> <span className="text-[#A6D6E1]">Veículo Diesel</span>
-            </h1>
-            <p className="text-lg md:text-xl text-white/90 max-w-xl">
-              Peças originais, acessórios e os melhores serviços de manutenção.
-              Qualidade garantida e atendimento especializado.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <Link href="/categoria/ofertas">
-                <Button size="lg" className="bg-white text-secondary hover:bg-gray-100 font-bold w-full sm:w-auto">
-                  Ver Produtos
-                </Button>
-              </Link>
-              <Link href="/servicos">
-                <Button size="lg" variant="outline" className="border-white text-secondary hover:bg-white/10 hover:text-white w-full sm:w-auto">
-                  Agendar Serviço
-                </Button>
-              </Link>
-            </div>
-          </div>
-          {/* Decorative Image/Pattern */}
-          <div className="hidden md:block w-1/3 h-full relative opacity-20">
-            {/* Abstract mechanic parts or car silhouette could go here */}
-          </div>
-        </div>
-      </section>
+      {/* Hero Section */}
+      <BannerCarousel />
 
       {/* Features Bar */}
       <div className="container mx-auto px-4 -mt-16 relative z-20">
