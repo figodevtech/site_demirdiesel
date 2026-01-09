@@ -11,7 +11,7 @@ export default async function Navbar() {
     const categories = await getCategories();
 
     return (
-        <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
+        <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/90 drop-shadow-md drop-shadow-black/25">
             {/* Top Bar */}
             <div className="bg-secondary text-secondary-foreground text-xs py-1 px-4 text-center hidden md:block">
                 <span className="font-medium">Frete Grátis</span> nas compras acima de R$ 299,00 para região Sul e Sudeste.
@@ -22,7 +22,7 @@ export default async function Navbar() {
                 <div className="flex items-center gap-2 md:gap-4">
                     <SidebarDrawer categories={categories} />
                     <Link href="/" className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-lg">
+                        <div className="w-8 h-8 rounded bg-linear-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-lg">
                             D
                         </div>
                         <span className="hidden md:inline-block font-bold text-xl tracking-tight text-secondary">

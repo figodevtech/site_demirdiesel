@@ -50,6 +50,21 @@ export function BannerCarousel() {
     const [api, setApi] = React.useState<CarouselApi>()
     const [current, setCurrent] = React.useState(0)
     const [count, setCount] = React.useState(0)
+    const [isFlashing, setIsFlashing] = React.useState(false)
+
+    // Helper to handle the flash transition
+    const handleTransition = React.useCallback((action: () => void) => {
+        if (isFlashing) return
+        setIsFlashing(true)
+        // Wait for fade to white
+        setTimeout(() => {
+            action()
+            // Wait for slide change then fade out
+            setTimeout(() => {
+                setIsFlashing(false)
+            }, 50)
+        }, 300)
+    }, [isFlashing])
 
     // Autoplay logic
     React.useEffect(() => {
@@ -64,7 +79,7 @@ export function BannerCarousel() {
 
         const intervalId = setInterval(() => {
             api.scrollNext()
-        }, 5000)
+        }, 7000)
 
         return () => {
             clearInterval(intervalId)
@@ -79,14 +94,14 @@ export function BannerCarousel() {
                 className="w-full"
                 opts={{
                     loop: true,
-                    duration: 60,
+                    duration: 40,
 
                 }}
             >
                 <CarouselContent className="ml-0">
                     {bannerData.map((item) => (
                         <CarouselItem key={item.id} className="pl-0">
-                            <div className="relative w-full h-[400px] md:h-[500px] overflow-hidden">
+                            <div className="relative w-full h-[200px] md:h-[300px] lg:h-[400px] xl:h-[600px] overflow-hidden">
                                 {/* Background Image using Next.js Image */}
                                 <div className="absolute inset-0">
                                     <Image
