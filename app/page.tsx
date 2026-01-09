@@ -14,7 +14,7 @@ function FeatureIcon({ icon: Icon, title, desc }: { icon: any, title: string, de
       </div>
       <div>
         <h4 className="font-semibold text-secondary text-sm">{title}</h4>
-        <p className="text-xs text-muted-foreground">{desc}</p>
+        <p className="text-xs text-muted-foreground ">{desc}</p>
       </div>
     </div>
   );
@@ -26,7 +26,6 @@ export default async function Home() {
   return (
     <div className="flex flex-col gap-12 pb-12">
 
-      {/* Hero Section */}
       {/* Hero Section */}
       <BannerCarousel />
 
