@@ -101,7 +101,7 @@ export function BannerCarousel() {
                 <CarouselContent className="ml-0">
                     {bannerData.map((item) => (
                         <CarouselItem key={item.id} className="pl-0">
-                            <div className="relative w-full h-[200px] md:h-[300px] lg:h-[400px] xl:h-[600px] overflow-hidden">
+                            <div className="relative w-full h-[200px] md:h-[300px] lg:h-[400px] xl:h-[500px] overflow-hidden">
                                 {/* Background Image using Next.js Image */}
                                 <div className="absolute inset-0">
                                     <Image
