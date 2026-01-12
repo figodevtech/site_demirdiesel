@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
     return (
-        <div className="flex h-[calc(100vh-64px)] items-center justify-center py-12 px-4 bg-muted/30">
+        <div className="flex min-h-[500px] items-center justify-center py-10 px-4 bg-muted/30">
             <Card className="w-full max-w-sm bg-white shadow-lg">
                 <CardHeader className="space-y-1 text-center">
                     <CardTitle className="text-2xl font-bold text-secondary">Acesse sua conta</CardTitle>

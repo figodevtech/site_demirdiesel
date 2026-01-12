@@ -7,7 +7,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function RegisterPage() {
     return (
-        <div className="flex min-h-[calc(100vh-64px)] items-center justify-center py-12 px-4 bg-muted/30">
+        <div className="flex min-h-[500px] items-center justify-center py-10 px-4 bg-muted/30">
             <Card className="w-full max-w-md bg-white shadow-lg">
                 <CardHeader className="space-y-1 text-center">
                     <CardTitle className="text-2xl font-bold text-secondary">Crie sua conta</CardTitle>

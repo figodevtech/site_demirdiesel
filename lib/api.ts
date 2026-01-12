@@ -2,18 +2,18 @@ import { supabase } from './supabase';
 import { Produto, ProdutoGrupo } from './types';
 import { slugify } from './utils';
 
-// Helper to transform DB product to Frontend Product shape if needed
-// Or just use the DB shape directly.
-// The frontend uses: id, name, price, image, brand, category, ...
+// Helper para transformar produto do DB para o formato do Frontend se necessário
+// Ou apenas usar o formato do DB diretamente.
+// O frontend usa: id, name, price, image, brand, category, ...
 
-export async function getCategories() {
+export async function buscarCategorias() {
     const { data, error } = await supabase
         .from('produtogrupo')
         .select('*')
         .eq('ativo', true);
 
     if (error) {
-        console.error('Error fetching categories:', error);
+        console.error('Erro ao buscar categorias:', error);
         return [];
     }
 
@@ -23,7 +23,7 @@ export async function getCategories() {
     }));
 }
 
-export async function getProducts(limit = 10) {
+export async function buscarProdutos(limite = 10) {
     const { data, error } = await supabase
         .from('produto')
         .select(`
@@ -31,18 +31,18 @@ export async function getProducts(limit = 10) {
       produtogrupo (nome)
     `)
         .eq('is_deleted', false)
-        .limit(limit);
+        .limit(limite);
 
     if (error) {
-        console.error('Error fetching products:', error);
+        console.error('Erro ao buscar produtos:', error);
         return [];
     }
 
-    return data.map(p => transformProduct(p));
+    return data.map(p => transformarProduto(p));
 }
 
-export async function getProductById(id: string) {
-    // Try to find by ID first
+export async function buscarProdutoPorId(id: string) {
+    // Tenta encontrar pelo ID primeiro
     const { data, error } = await supabase
         .from('produto')
         .select(`
@@ -55,18 +55,18 @@ export async function getProductById(id: string) {
 
     if (error) return null;
 
-    return transformProduct(data);
+    return transformarProduto(data);
 }
 
-export async function getProductsByCategory(slug: string) {
-    // First find category ID by slug (implied by name)
-    // Since we don't have slug in DB, we fetch all categories and find match
-    // Or request that backend adds slug. For now: fetch all categories
+export async function buscarProdutosPorCategoria(slug: string) {
+    // Primeiro encontra o ID da categoria pelo slug (implicado pelo nome)
+    // Como não temos slug no DB, buscamos todas as categorias e encontramos a correspondência
+    // Ou solicitamos que o backend adicione slug. Por enquanto: busca todas as categorias
 
-    const categories = await getCategories();
-    const category = categories.find(c => c.slug === slug);
+    const categorias = await buscarCategorias();
+    const categoria = categorias.find(c => c.slug === slug);
 
-    if (!category) return [];
+    if (!categoria) return [];
 
     const { data, error } = await supabase
         .from('produto')
@@ -74,32 +74,32 @@ export async function getProductsByCategory(slug: string) {
       *,
       produtogrupo (nome)
     `)
-        .eq('grupo_produto_id', category.id)
+        .eq('grupo_produto_id', categoria.id)
         .eq('is_deleted', false);
 
     if (error) return [];
 
-    return data.map(p => transformProduct(p));
+    return data.map(p => transformarProduto(p));
 }
 
-export async function searchProducts(query: string) {
+export async function pesquisarProdutos(termo: string) {
     const { data, error } = await supabase
         .from('produto')
         .select(`
       *,
       produtogrupo (nome)
     `)
-        .ilike('titulo', `%${query}%`)
+        .ilike('titulo', `%${termo}%`)
         .eq('is_deleted', false);
 
     if (error) return [];
 
-    return data.map(p => transformProduct(p));
+    return data.map(p => transformarProduto(p));
 }
 
-// Transformer to match the Frontend "Product" type from lib/data.ts
+// Transformador para corresponder ao tipo "Produto" do Frontend de lib/data.ts
 // (id, name, price, image, brand, category, stock, rating, shortDescription, fullDescription)
-function transformProduct(dbProduct: any) {
+function transformarProduto(dbProduct: any) {
     return {
         id: dbProduct.id.toString(),
         name: dbProduct.titulo,
@@ -108,10 +108,56 @@ function transformProduct(dbProduct: any) {
         brand: dbProduct.fabricante || 'Genérico',
         category: dbProduct.produtogrupo?.nome || 'Geral',
         stock: dbProduct.estoque || 0,
-        rating: 5, // Placeholder as DB doesn't have rating
+        rating: 5, // Placeholder pois DB não tem avaliação
         shortDescription: dbProduct.descricao || '',
         fullDescription: dbProduct.descricao || '',
         images: dbProduct.produto_imagem?.map((img: any) => img.url) || [],
-        compatibility: [] // DB doesn't have this yet
+        compatibility: [] // DB ainda não tem isso
     };
+}
+
+export async function buscarProdutosFiltrados(opcoes: {
+    categorySlug?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    sort?: string;
+} = {}) {
+    let query = supabase
+        .from('produto')
+        .select(`
+            *,
+            produtogrupo (nome)
+        `)
+        .eq('is_deleted', false);
+
+    if (opcoes.categorySlug && opcoes.categorySlug !== 'todos') {
+        // Precisa encontrar o ID da categoria primeiro pois não temos slug na relação da tabela produto diretamente (é via ID)
+        // Otimização: Em um app real, poderíamos fazer join filter, mas aqui vamos buscar a categoria primeiro
+        // Ou se tivéssemos o ID do frontend. Mas filtros geralmente usam Slugs.
+        const categorias = await buscarCategorias();
+        // Correspondência estrita?
+        const categoria = categorias.find(c => c.slug === opcoes.categorySlug);
+        if (categoria) {
+            query = query.eq('grupo_produto_id', categoria.id);
+        }
+    }
+
+    if (opcoes.minPrice !== undefined) {
+        query = query.gte('precovenda', opcoes.minPrice);
+    }
+    if (opcoes.maxPrice !== undefined && opcoes.maxPrice > 0) {
+        query = query.lte('precovenda', opcoes.maxPrice);
+    }
+    
+    // Ordenação padrão?
+    query = query.order('id', { ascending: false });
+
+    const { data, error } = await query;
+
+    if (error) {
+        console.error('Erro ao buscar produtos filtrados:', error);
+        return [];
+    }
+
+    return data.map(p => transformarProduto(p));
 }

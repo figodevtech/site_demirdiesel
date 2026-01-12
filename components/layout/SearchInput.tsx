@@ -21,7 +21,7 @@ export default function SearchInput({ className }: { className?: string }) {
             <Input
                 type="search"
                 placeholder="Busque por peças, acessórios ou serviços..."
-                className="w-full pl-10 pr-4 bg-muted/50 border-transparent focus:bg-background focus:border-primary transition-all rounded-full"
+                className="w-full pl-10 pr-4 bg-background border border-input focus:border-primary shadow-sm hover:border-primary/50 transition-all rounded-full text-foreground placeholder:text-muted-foreground/80"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
             />

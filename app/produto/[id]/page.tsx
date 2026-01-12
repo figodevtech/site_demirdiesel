@@ -1,9 +1,11 @@
-import { getProductById } from "@/lib/api";
+import { buscarProdutoPorId as getProductById } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Star, Truck, Check, ShoppingCart } from "lucide-react";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+
+import ProductActions from "@/components/product/ProductActions";
 
 export default async function ProductPage({
     params,
@@ -70,25 +72,7 @@ export default async function ProductPage({
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                        <div className="w-24">
-                            <input type="number" min="1" max="10" defaultValue="1" className="w-full p-2 border border-input rounded-md text-center" />
-                        </div>
-                        <Button size="lg" className="flex-1 text-lg gap-2 shadow-lg shadow-primary/20">
-                            <ShoppingCart size={20} /> Adicionar ao Carrinho
-                        </Button>
-                    </div>
-
-                    {/* Shipping Sim */}
-                    <div className="bg-muted/30 p-4 rounded-md space-y-3">
-                        <h4 className="font-semibold text-sm flex items-center gap-2">
-                            <Truck size={16} /> Calcular Frete e Prazo
-                        </h4>
-                        <div className="flex gap-2">
-                            <input placeholder="CEP" className="p-2 text-sm border border-input rounded flex-1" />
-                            <Button variant="outline" size="sm">Ok</Button>
-                        </div>
-                    </div>
+                    <ProductActions product={product} />
 
                     <div className="space-y-4 pt-4">
                         <h3 className="font-bold text-secondary">Descrição</h3>

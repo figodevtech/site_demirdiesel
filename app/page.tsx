@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { services, testimonials } from "@/lib/data";
-import { getProducts } from "@/lib/api";
+import { buscarProdutos } from "@/lib/api";
 import { ArrowRight, Star, Truck, ShieldCheck, CreditCard } from 'lucide-react';
 import { BannerCarousel } from "@/components/home/BannerCarousel";
 
@@ -21,7 +21,7 @@ function FeatureIcon({ icon: Icon, title, desc }: { icon: any, title: string, de
 }
 
 export default async function Home() {
-  const featuredProducts = await getProducts(8);
+  const featuredProducts = await buscarProdutos(8);
 
   return (
     <div className="flex flex-col gap-12 pb-12">

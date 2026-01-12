@@ -4,11 +4,12 @@ import { ShoppingCart, User, Package, Heart } from 'lucide-react';
 import SidebarDrawer from './SidebarDrawer';
 import SearchInput from './SearchInput';
 import { Badge } from "@/components/ui/badge";
-import { getCategories } from '@/lib/api';
+import { buscarCategorias } from '@/lib/api';
 import { slugify } from '@/lib/utils';
+import CartWidget from './CartWidget';
 
 export default async function Navbar() {
-    const categories = await getCategories();
+    const categories = await buscarCategorias();
 
     return (
         <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/90 drop-shadow-md drop-shadow-black/25">
@@ -38,9 +39,11 @@ export default async function Navbar() {
 
                 {/* Right: Actions */}
                 <div className="flex items-center gap-1 md:gap-3">
-                    <Button variant="ghost" size="icon" className="hidden sm:flex relative" aria-label="Favoritos">
-                        <Heart className="h-5 w-5" />
-                    </Button>
+                    <Link href="/favoritos">
+                        <Button variant="ghost" size="icon" className="hidden sm:flex relative" aria-label="Favoritos">
+                            <Heart className="h-5 w-5" />
+                        </Button>
+                    </Link>
 
                     <Link href="/login">
                         <Button variant="ghost" size="sm" className="hidden md:flex gap-2">
@@ -52,12 +55,7 @@ export default async function Navbar() {
                         </Button>
                     </Link>
 
-                    <Button size="icon" variant="ghost" className="relative text-primary hover:text-primary hover:bg-primary/10" aria-label="Carrinho">
-                        <ShoppingCart className="h-6 w-6" />
-                        <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-destructive text-white border-2 border-background rounded-full text-[10px]">
-                            0
-                        </Badge>
-                    </Button>
+                    <CartWidget />
                 </div>
             </div>
 
@@ -72,14 +70,13 @@ export default async function Navbar() {
                     <ul className="flex items-center gap-6 h-10 text-sm font-medium text-muted-foreground w-full overflow-x-auto no-scrollbar">
                         <li className="shrink-0"><Link href="/servicos" className="hover:text-primary transition-colors flex items-center gap-1"><Package className="h-4 w-4" /> Serviços da Oficina</Link></li>
                         <li className="h-4 w-px bg-border shrink-0"></li>
-                        {categories.slice(0, 7).map(cat => (
-                            <li key={cat.id} className="shrink-0">
-                                <Link href={`/categoria/${slugify(cat.nome)}`} className="hover:text-primary transition-colors whitespace-nowrap">
-                                    {cat.nome}
-                                </Link>
-                            </li>
-                        ))}
+                        <li className="shrink-0 mr-auto">
+                            <Link href="/produtos" className="hover:text-primary transition-colors font-semibold">
+                                Todos os Produtos
+                            </Link>
+                        </li>
                         <li className="shrink-0 ml-auto"><Link href="/ofertas" className="hover:text-primary transition-colors text-destructive">Ofertas do Dia</Link></li>
+                        <li className="shrink-0"><Link href="/contato" className="hover:text-primary transition-colors">Fale Conosco</Link></li>
                     </ul>
                 </div>
             </nav>

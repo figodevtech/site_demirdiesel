@@ -1,4 +1,4 @@
-import { getProductsByCategory } from "@/lib/api";
+import { buscarProdutosPorCategoria } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ export default async function CategoryPage({
 }) {
     const { slug } = await params;
 
-    const categoryProducts = await getProductsByCategory(slug);
+    const categoryProducts = await buscarProdutosPorCategoria(slug);
 
     const formattedTitle = slug.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase());
 
