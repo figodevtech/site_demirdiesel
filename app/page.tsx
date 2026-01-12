@@ -148,10 +148,22 @@ export default async function Home() {
                 </div>
                 <div>
                   <p className="font-semibold text-secondary">Atendimento Físico</p>
-                  <p className="text-sm text-muted-foreground">Av. das Nações, 1000 - SP</p>
+                  <p className="text-sm text-muted-foreground">R. Jorn. João José Ramalho, 33 - Costa e Silva, João Pessoa - PB</p>
                 </div>
               </div>
               {/* More contact info */}
+              <div className="w-full h-[300px] rounded-lg overflow-hidden border border-border/50 shadow-sm mt-4">
+                  <iframe 
+                    src="https://maps.google.com/maps?q=R.+Jorn.+Jo%C3%A3o+Jos%C3%A9+Ramalho,+33+-+Costa+e+Silva,+Jo%C3%A3o+Pessoa+-+PB,+58081-110&t=&z=15&ie=UTF8&iwloc=&output=embed" 
+                    width="100%" 
+                    height="100%" 
+                    style={{ border: 0 }} 
+                    allowFullScreen 
+                    loading="lazy" 
+                    referrerPolicy="no-referrer-when-downgrade"
+                    title="Localização Demir Diesel"
+                  ></iframe>
+              </div>
             </div>
           </div>
 

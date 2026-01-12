@@ -1,10 +1,28 @@
+'use client';
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/components/providers/AuthContext";
+import { useState } from "react";
+
 export default function LoginPage() {
+    const { login } = useAuth();
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const redirect = searchParams.get('redirect') || '/';
+    const [email, setEmail] = useState('');
+
+    const handleLogin = () => {
+        if (!email) return;
+        login(email, 'Usuário Teste');
+        router.push(redirect);
+    };
+
     return (
         <div className="flex min-h-[500px] items-center justify-center py-10 px-4 bg-muted/30">
             <Card className="w-full max-w-sm bg-white shadow-lg">
@@ -17,13 +35,19 @@ export default function LoginPage() {
                 <CardContent className="grid gap-4">
                     <div className="grid gap-2">
                         <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" placeholder="nome@exemplo.com" />
+                        <Input 
+                            id="email" 
+                            type="email" 
+                            placeholder="nome@exemplo.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)} 
+                        />
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="password">Senha</Label>
                         <Input id="password" type="password" />
                     </div>
-                    <Button className="w-full mt-2">Entrar</Button>
+                    <Button className="w-full mt-2" onClick={handleLogin}>Entrar</Button>
                     <div className="text-center text-xs">
                         <Link href="#" className="text-primary hover:underline">
                             Esqueceu sua senha?

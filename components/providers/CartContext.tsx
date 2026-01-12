@@ -12,25 +12,37 @@ interface CartContextType {
     items: CartItem[];
     addToCart: (product: any, quantity: number) => void;
     removeFromCart: (productId: string) => void;
+    updateQuantity: (productId: string, quantity: number) => void;
     clearCart: () => void;
     totalItems: number;
     subtotal: number;
+    shippingInfo: { cep: string, price: number, days: number } | null;
+    setShippingInfo: (info: { cep: string, price: number, days: number } | null) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
     const [items, setItems] = useState<CartItem[]>([]);
+    const [shippingInfo, setShippingInfo] = useState<{ cep: string, price: number, days: number } | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
 
     // Load from localStorage on mount
     useEffect(() => {
         const savedCart = localStorage.getItem('demirdiesel-cart');
+        const savedShipping = localStorage.getItem('demirdiesel-shipping');
         if (savedCart) {
             try {
                 setItems(JSON.parse(savedCart));
             } catch (e) {
                 console.error("Failed to parse cart:", e);
+            }
+        }
+        if (savedShipping) {
+            try {
+                setShippingInfo(JSON.parse(savedShipping));
+            } catch (e) {
+                console.error("Failed to parse shipping:", e);
             }
         }
         setIsLoaded(true);
@@ -42,6 +54,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem('demirdiesel-cart', JSON.stringify(items));
         }
     }, [items, isLoaded]);
+
+    // Save shipping info
+    useEffect(() => {
+        if (isLoaded) {
+            if (shippingInfo) {
+                localStorage.setItem('demirdiesel-shipping', JSON.stringify(shippingInfo));
+            } else {
+                localStorage.removeItem('demirdiesel-shipping');
+            }
+        }
+    }, [shippingInfo, isLoaded]);
 
     const addToCart = (product: any, quantity: number) => {
         setItems(current => {
@@ -59,6 +82,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         console.log(`Added ${quantity} x ${product.name} to cart`);
     };
 
+    const updateQuantity = (productId: string, quantity: number) => {
+        setItems(current => 
+            current.map(item => 
+                item.product.id === productId 
+                    ? { ...item, quantity: Math.max(1, quantity) }
+                    : item
+            )
+        );
+    };
+
     const removeFromCart = (productId: string) => {
         setItems(current => current.filter(item => item.product.id !== productId));
     };
@@ -71,7 +104,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const subtotal = items.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
 
     return (
-        <CartContext.Provider value={{ items, addToCart, removeFromCart, clearCart, totalItems, subtotal }}>
+        <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, clearCart, totalItems, subtotal, shippingInfo, setShippingInfo }}>
             {children}
         </CartContext.Provider>
     );

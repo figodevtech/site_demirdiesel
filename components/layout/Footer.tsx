@@ -58,7 +58,7 @@ export default function Footer() {
                             </li>
                             <li className="flex items-start gap-2">
                                 <MapPin size={16} className="text-primary mt-1" />
-                                <span>Av. das Nações, 1000<br />São Paulo - SP</span>
+                                <span>R. Jorn. João José Ramalho, 33<br />Costa e Silva, João Pessoa - PB</span>
                             </li>
                         </ul>
                     </div>

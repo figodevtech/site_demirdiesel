@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Truck, Loader2 } from "lucide-react";
+import { ShoppingCart, Truck, Loader2, Check } from "lucide-react";
 import { useCart } from "@/components/providers/CartContext";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -12,12 +13,17 @@ export default function ProductActions({ product }: { product: any }) {
     const [quantity, setQuantity] = useState(1);
     const [cep, setCep] = useState('');
     const [isSimulating, setIsSimulating] = useState(false);
+    const [isAdded, setIsAdded] = useState(false);
     const [shippingResult, setShippingResult] = useState<{ type: string, price: number, days: number }[] | null>(null);
 
     const handleAddToCart = () => {
         addToCart(product, quantity);
-        // Feedback visual or temporary state could be added here
-        alert(`Produto adicionado ao carrinho! Quantidade: ${quantity}`);
+        setIsAdded(true);
+        toast.success("Produto adicionado ao carrinho!");
+        
+        setTimeout(() => {
+            setIsAdded(false);
+        }, 2000);
     };
 
     const handleShippingSim = async () => {
@@ -60,10 +66,19 @@ export default function ProductActions({ product }: { product: any }) {
                         </div>
                         <Button 
                             size="lg" 
-                            className="flex-1 text-lg gap-2 shadow-lg shadow-primary/20"
+                            className={`flex-1 text-lg gap-2 shadow-lg transition-all duration-300 ${isAdded ? 'bg-green-600 hover:bg-green-700 shadow-green-200' : 'shadow-primary/20'}`}
                             onClick={handleAddToCart}
+                            disabled={isAdded}
                         >
-                            <ShoppingCart size={20} /> Adicionar ao Carrinho
+                            {isAdded ? (
+                                <>
+                                    <Check size={20} /> Adicionado!
+                                </>
+                            ) : (
+                                <>
+                                    <ShoppingCart size={20} /> Adicionar ao Carrinho
+                                </>
+                            )}
                         </Button>
                     </div>
                 </div>

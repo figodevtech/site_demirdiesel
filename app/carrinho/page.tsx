@@ -2,14 +2,37 @@
 
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { ShoppingCart, ArrowLeft, Trash2 } from "lucide-react";
+import { ShoppingCart, ArrowLeft, Trash2, Plus, Minus, Truck, Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 import { useCart } from "@/components/providers/CartContext";
+import { useState } from "react";
+
+import { useRouter } from "next/navigation";
 
 export default function PaginaCarrinho() {
-    const { items, removeFromCart, subtotal, totalItems } = useCart();
+    const { items, removeFromCart, updateQuantity, subtotal, totalItems, shippingInfo, setShippingInfo } = useCart();
+    const router = useRouter();
+    const [cep, setCep] = useState(shippingInfo?.cep || '');
+    const [isSimulating, setIsSimulating] = useState(false);
+
+    const handleShippingCalc = async () => {
+        if (cep.length < 8) return;
+        setIsSimulating(true);
+        // Simulate API
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Mock logic
+        const price = 25.90; // Fixed mock price
+        setShippingInfo({ cep, price, days: 5 });
+        setIsSimulating(false);
+    };
+
+    const handleCheckout = () => {
+        router.push('/checkout');
+    };
 
     return (
         <div className="container mx-auto px-4 py-8 max-w-5xl">
@@ -55,13 +78,30 @@ export default function PaginaCarrinho() {
                                             <h4 className="font-medium text-sm text-secondary truncate">{item.product.name}</h4>
                                             <p className="text-xs text-muted-foreground mb-2">Marca: {item.product.brand}</p>
                                             <div className="flex items-center justify-between">
-                                                <div className="text-sm">
-                                                    <span className="text-muted-foreground">Qtd: </span>
-                                                    <span className="font-semibold">{item.quantity}</span>
-                                                </div>
-                                                <div className="font-bold text-primary">
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.product.price * item.quantity)}
-                                                </div>
+                                            <div className="flex items-center gap-2">
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="icon" 
+                                                    className="h-8 w-8" 
+                                                    onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                                                    disabled={item.quantity <= 1}
+                                                >
+                                                    <Minus size={14} />
+                                                </Button>
+                                                <span className="font-semibold w-8 text-center">{item.quantity}</span>
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="icon" 
+                                                    className="h-8 w-8" 
+                                                    onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                                                    disabled={item.quantity >= (item.product.stock || 10)}
+                                                >
+                                                    <Plus size={14} />
+                                                </Button>
+                                            </div>
+                                            <div className="font-bold text-primary">
+                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.product.price * item.quantity)}
+                                            </div>
                                             </div>
                                         </div>
                                         <Button 
@@ -91,20 +131,52 @@ export default function PaginaCarrinho() {
                                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}
                                     </span>
                                 </div>
-                                <div className="flex justify-between text-sm">
+                                <div className="flex justify-between text-sm items-center">
                                     <span className="text-muted-foreground">Frete</span>
-                                    <span className="text-green-600">Calculado no checkout</span>
+                                    {shippingInfo ? (
+                                        <span className="font-medium">
+                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(shippingInfo.price)}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-muted-foreground">Não calculado</span>
+                                    )}
                                 </div>
+                                
+                                <div className="space-y-2 pt-2">
+                                     <label className="text-xs font-medium text-muted-foreground">Calcular Frete</label>
+                                     <div className="flex gap-2">
+                                        <Input 
+                                            placeholder="CEP" 
+                                            className="h-8 text-sm" 
+                                            value={cep} 
+                                            onChange={(e) => setCep(e.target.value)}
+                                            maxLength={9}
+                                        />
+                                        <Button 
+                                            variant="secondary" 
+                                            size="sm" 
+                                            className="h-8"
+                                            onClick={handleShippingCalc}
+                                            disabled={isSimulating}
+                                        >
+                                            {isSimulating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Truck size={14} />}
+                                        </Button>
+                                     </div>
+                                </div>
+
                                 <Separator />
                                 <div className="flex justify-between font-bold text-lg pt-2">
                                     <span>Total</span>
                                     <span className="text-primary">
-                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}
+                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal + (shippingInfo?.price || 0))}
                                     </span>
                                 </div>
                             </CardContent>
                             <CardFooter className="p-6 pt-0 flex flex-col gap-3">
-                                <Button className="w-full text-base py-6 font-bold shadow-md hover:shadow-lg transition-all">
+                                <Button 
+                                    className="w-full text-base py-6 font-bold shadow-md hover:shadow-lg transition-all"
+                                    onClick={handleCheckout}
+                                >
                                     Finalizar Compra
                                 </Button>
                                 <Link href="/produtos" className="w-full">

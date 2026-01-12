@@ -1,3 +1,5 @@
+'use client';
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,7 +7,22 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription }
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/providers/AuthContext";
+import { useState } from "react";
+
 export default function RegisterPage() {
+    const { login } = useAuth();
+    const router = useRouter();
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+
+    const handleRegister = () => {
+        if (!email || !name) return;
+        login(email, name);
+        router.push('/');
+    };
+
     return (
         <div className="flex min-h-[500px] items-center justify-center py-10 px-4 bg-muted/30">
             <Card className="w-full max-w-md bg-white shadow-lg">
@@ -20,7 +37,7 @@ export default function RegisterPage() {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="name">Nome</Label>
-                            <Input id="name" placeholder="Seu nome" />
+                            <Input id="name" placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="lastname">Sobrenome</Label>
@@ -44,7 +61,7 @@ export default function RegisterPage() {
 
                     <div className="space-y-2">
                         <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" placeholder="nome@exemplo.com" />
+                        <Input id="email" type="email" placeholder="nome@exemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} />
                     </div>
 
                     <div className="space-y-2">
@@ -57,7 +74,7 @@ export default function RegisterPage() {
                         <Input id="confirm-password" type="password" />
                     </div>
 
-                    <Button className="w-full mt-4">Criar Conta</Button>
+                    <Button className="w-full mt-4" onClick={handleRegister}>Criar Conta</Button>
                 </CardContent>
                 <CardFooter className="flex flex-col gap-2 border-t pt-6 bg-muted/10">
                     <p className="text-xs text-muted-foreground text-center">

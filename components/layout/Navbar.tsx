@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { buscarCategorias } from '@/lib/api';
 import { slugify } from '@/lib/utils';
 import CartWidget from './CartWidget';
+import UserWidget from './UserWidget';
 
 export default async function Navbar() {
     const categories = await buscarCategorias();
@@ -45,15 +46,7 @@ export default async function Navbar() {
                         </Button>
                     </Link>
 
-                    <Link href="/login">
-                        <Button variant="ghost" size="sm" className="hidden md:flex gap-2">
-                            <User className="h-5 w-5" />
-                            <div className="flex flex-col items-start text-xs text-left">
-                                <span className="opacity-70">Olá, Visitante</span>
-                                <span className="font-semibold">Entrar</span>
-                            </div>
-                        </Button>
-                    </Link>
+                    <UserWidget />
 
                     <CartWidget />
                 </div>
