@@ -20,13 +20,43 @@ export async function buscarCategorias() {
     }));
 }
 
+// Helper para buscar imagens manualmente (Mantido como fallback ou para imagens adicionais se a tabela existir)
+async function buscarImagensParaProdutos(produtos: any[]) {
+    if (!produtos.length) return {};
+    
+    // Tenta buscar da tabela produto_imagem se ela existir, caso contrário retorna vazio
+    try {
+        const ids = produtos.map(p => p.id);
+        const { data, error } = await supabase
+            .from('produto_imagem')
+            .select('produto_id, url')
+            .in('produto_id', ids);
+
+        if (error || !data) {
+            return {};
+        }
+
+        const imagensMap: Record<number, string[]> = {};
+        data.forEach((img: any) => {
+            if (!imagensMap[img.produto_id]) {
+                imagensMap[img.produto_id] = [];
+            }
+            imagensMap[img.produto_id].push(img.url);
+        });
+
+        return imagensMap;
+    } catch (e) {
+        console.warn('Erro ao buscar imagens extras ou tabela não existe.');
+        return {};
+    }
+}
+
 export async function buscarProdutos(limite = 10) {
     const { data, error } = await supabase
         .from('produto')
         .select(`
       *,
-      produtogrupo (nome),
-      produto_imagem (url)
+      produtogrupo (nome)
     `)
         .eq('exibirPdv', true)
         .limit(limite);
@@ -36,7 +66,8 @@ export async function buscarProdutos(limite = 10) {
         return [];
     }
 
-    return data.map(p => transformarProduto(p));
+    const imagensMap = await buscarImagensParaProdutos(data);
+    return data.map(p => transformarProduto(p, imagensMap[p.id] || []));
 }
 
 export async function buscarProdutoPorId(id: string) {
@@ -44,15 +75,15 @@ export async function buscarProdutoPorId(id: string) {
         .from('produto')
         .select(`
       *,
-      produtogrupo (nome),
-      produto_imagem (url)
+      produtogrupo (nome)
     `)
         .eq('id', id)
         .single();
 
     if (error) return null;
 
-    return transformarProduto(data);
+    const imagensMap = await buscarImagensParaProdutos([data]);
+    return transformarProduto(data, imagensMap[data.id] || []);
 }
 
 export async function buscarProdutosPorCategoria(slug: string) {
@@ -65,15 +96,15 @@ export async function buscarProdutosPorCategoria(slug: string) {
         .from('produto')
         .select(`
       *,
-      produtogrupo (nome),
-      produto_imagem (url)
+      produtogrupo (nome)
     `)
         .eq('grupo_produto_id', categoria.id)
         .eq('exibirPdv', true);
 
     if (error) return [];
 
-    return data.map(p => transformarProduto(p));
+    const imagensMap = await buscarImagensParaProdutos(data);
+    return data.map(p => transformarProduto(p, imagensMap[p.id] || []));
 }
 
 export async function searchProducts(termo: string) {
@@ -81,10 +112,9 @@ export async function searchProducts(termo: string) {
         .from('produto')
         .select(`
       *,
-      produtogrupo (nome),
-      produto_imagem (url)
+      produtogrupo (nome)
     `)
-        .ilike('descricao', `%${termo}%`)
+        .or(`titulo.ilike.%${termo}%,descricao.ilike.%${termo}%`)
         .eq('exibirPdv', true);
 
     if (error) {
@@ -92,26 +122,34 @@ export async function searchProducts(termo: string) {
         return [];
     }
 
-    return data.map(p => transformarProduto(p));
+    const imagensMap = await buscarImagensParaProdutos(data);
+    return data.map(p => transformarProduto(p, imagensMap[p.id] || []));
 }
 
 // Deprecated alias just in case
 export const pesquisarProdutos = searchProducts;
 
-function transformarProduto(dbProduct: any) {
-    const images = dbProduct.produto_imagem?.map((img: any) => img.url) || [];
+function transformarProduto(dbProduct: any, extraImages: string[] = []) {
+    // Prefer imgUrl from product table, fallback to first extra image
+    const mainImage = dbProduct.imgUrl || extraImages[0] || 'https://placehold.co/400x400/0A7AAC/FFFFFF?text=Sem+Foto';
+    
+    // Combine main image with extra images for gallery, filtering duplicates
+    const allImages = [mainImage, ...extraImages].filter((url, index, self) => 
+        url && url !== 'https://placehold.co/400x400/0A7AAC/FFFFFF?text=Sem+Foto' && self.indexOf(url) === index
+    );
+
     return {
         id: dbProduct.id.toString(),
-        name: dbProduct.descricao,
+        name: dbProduct.titulo || dbProduct.descricao || 'Produto sem nome', // Use titulo as primary name
         price: Number(dbProduct.precovenda),
-        image: images[0] || 'https://placehold.co/400x400/0A7AAC/FFFFFF?text=Sem+Foto',
-        brand: dbProduct.marca || 'Genérico',
+        image: mainImage,
+        brand: dbProduct.marca || dbProduct.fabricante || 'Genérico',
         category: dbProduct.produtogrupo?.nome || 'Geral',
-        stock: dbProduct.estoqueatual || 0,
+        stock: dbProduct.estoque || 0, // Schema says 'estoque', not 'estoqueatual'
         rating: 5,
-        shortDescription: dbProduct.descricao || '',
-        fullDescription: dbProduct.descricao || '',
-        images: images,
+        shortDescription: dbProduct.descricao || dbProduct.titulo || '',
+        fullDescription: dbProduct.descricao || dbProduct.descricaoMarketplace || '',
+        images: allImages.length > 0 ? allImages : [mainImage],
         compatibility: []
     };
 }
@@ -126,10 +164,9 @@ export async function buscarProdutosFiltrados(opcoes: {
         .from('produto')
         .select(`
             *,
-            produtogrupo (nome),
-            produto_imagem (url)
-        `)
-        .eq('exibirPdv', true);
+            produtogrupo (nome)
+        `);
+        // Filter removed: 'ativo' column missing on live DB
 
     if (opcoes.categorySlug && opcoes.categorySlug !== 'todos') {
         const categorias = await buscarCategorias();
@@ -139,10 +176,10 @@ export async function buscarProdutosFiltrados(opcoes: {
         }
     }
 
-    if (opcoes.minPrice !== undefined) {
+    if (opcoes.minPrice !== undefined && !isNaN(opcoes.minPrice)) {
         query = query.gte('precovenda', opcoes.minPrice);
     }
-    if (opcoes.maxPrice !== undefined && opcoes.maxPrice > 0) {
+    if (opcoes.maxPrice !== undefined && opcoes.maxPrice > 0 && !isNaN(opcoes.maxPrice)) {
         query = query.lte('precovenda', opcoes.maxPrice);
     }
 
@@ -151,9 +188,10 @@ export async function buscarProdutosFiltrados(opcoes: {
     const { data, error } = await query;
 
     if (error) {
-        console.error('Erro ao buscar produtos filtrados:', error);
+        console.error('Erro ao buscar produtos filtrados (Detalhes):', JSON.stringify(error, null, 2));
         return [];
     }
 
-    return data.map(p => transformarProduto(p));
+    const imagensMap = await buscarImagensParaProdutos(data);
+    return data.map(p => transformarProduto(p, imagensMap[p.id] || []));
 }

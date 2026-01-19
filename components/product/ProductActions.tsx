@@ -51,36 +51,45 @@ export default function ProductActions({ product }: { product: any }) {
         <div className="space-y-6">
             <div className="flex flex-col gap-4">
                 <div className="space-y-2">
-                    <Label htmlFor="quantity" className="text-sm font-medium">Quantidade</Label>
-                    <div className="flex items-center gap-4">
-                        <div className="w-24">
-                           <Input 
-                                id="quantity"
-                                type="number" 
-                                min="1" 
-                                max={product.stock || 10} 
-                                value={quantity}
-                                onChange={(e) => setQuantity(Number(e.target.value))}
-                                className="w-full text-center" 
-                            />
+                    {product.stock > 0 ? (
+                        <>
+                            <Label htmlFor="quantity" className="text-sm font-medium">Quantidade</Label>
+                            <div className="flex items-center gap-4">
+                                <div className="w-24">
+                                    <Input 
+                                        id="quantity"
+                                        type="number" 
+                                        min="1" 
+                                        max={product.stock || 10} 
+                                        value={quantity}
+                                        onChange={(e) => setQuantity(Number(e.target.value))}
+                                        className="w-full text-center" 
+                                    />
+                                </div>
+                                <Button 
+                                    size="lg" 
+                                    className={`flex-1 text-lg gap-2 shadow-lg transition-all duration-300 ${isAdded ? 'bg-green-600 hover:bg-green-700 shadow-green-200' : 'shadow-primary/20'}`}
+                                    onClick={handleAddToCart}
+                                    disabled={isAdded}
+                                >
+                                    {isAdded ? (
+                                        <>
+                                            <Check size={20} /> Adicionado!
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ShoppingCart size={20} /> Adicionar ao Carrinho
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="p-4 bg-muted text-muted-foreground rounded-md text-center border border-border/50">
+                            <p className="font-semibold text-red-500">Produto Indisponível</p>
+                            <p className="text-sm">Avise-me quando chegar (Funcionalidade em breve)</p>
                         </div>
-                        <Button 
-                            size="lg" 
-                            className={`flex-1 text-lg gap-2 shadow-lg transition-all duration-300 ${isAdded ? 'bg-green-600 hover:bg-green-700 shadow-green-200' : 'shadow-primary/20'}`}
-                            onClick={handleAddToCart}
-                            disabled={isAdded}
-                        >
-                            {isAdded ? (
-                                <>
-                                    <Check size={20} /> Adicionado!
-                                </>
-                            ) : (
-                                <>
-                                    <ShoppingCart size={20} /> Adicionar ao Carrinho
-                                </>
-                            )}
-                        </Button>
-                    </div>
+                    )}
                 </div>
             </div>
 

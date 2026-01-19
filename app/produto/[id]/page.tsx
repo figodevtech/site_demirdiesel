@@ -56,9 +56,15 @@ export default async function ProductPage({
                                 <span className="ml-1 text-secondary font-medium">{product.rating}</span>
                             </div>
                             <span className="text-muted-foreground">Cod: #{product.id}</span>
-                            <span className="text-green-600 font-medium flex items-center gap-1">
-                                <Check size={14} /> Em estoque ({product.stock})
-                            </span>
+                            {product.stock > 0 ? (
+                                <span className="text-green-600 font-medium flex items-center gap-1">
+                                    <Check size={14} /> Em estoque ({product.stock})
+                                </span>
+                            ) : (
+                                <span className="text-red-600 font-medium flex items-center gap-1">
+                                    Indisponível
+                                </span>
+                            )}
                         </div>
                     </div>
 
