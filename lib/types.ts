@@ -1,14 +1,19 @@
 export interface Produto {
     id: number;
-    titulo: string;
+    codigo: string;
+    codigobarras: string | null;
+    descricao: string; // Used as name
+    grupoid: number | null;
+    unidademedidaid: number | null;
     precovenda: number;
-    estoque: number;
-    descricao: string | null;
-    imgUrl: string | null;
-    grupo_produto_id: number;
-    brand?: string; // Not in DB dump, might need fallback
-    // Computed for frontend
-    categoryName?: string;
+    precocusto: number | null;
+    estoqueatual: number;
+    estoqueminimo: number;
+    exibirPdv: boolean;
+    ncm: string | null;
+    marca: string | null;
+    localizacao: string | null;
+    grupo_produto_id: number | null; // FK to produtogrupo
 }
 
 export interface ProdutoGrupo {
@@ -16,14 +21,12 @@ export interface ProdutoGrupo {
     nome: string;
     descricao: string | null;
     ativo: boolean;
-    // slug?: string; // Not in DB, will need to generate slug from nome
 }
 
 export interface ProdutoImagem {
     id: number;
     produto_id: number;
     url: string;
-    ordem: number;
 }
 
 export interface Database {

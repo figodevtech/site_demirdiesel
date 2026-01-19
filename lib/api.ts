@@ -1,10 +1,7 @@
 import { supabase } from './supabase';
 import { Produto, ProdutoGrupo } from './types';
 import { slugify } from './utils';
-
-// Helper para transformar produto do DB para o formato do Frontend se necessário
-// Ou apenas usar o formato do DB diretamente.
-// O frontend usa: id, name, price, image, brand, category, ...
+// Note: Produto type now matches DB schema (descricao, marca, etc.)
 
 export async function buscarCategorias() {
     const { data, error } = await supabase
@@ -28,9 +25,10 @@ export async function buscarProdutos(limite = 10) {
         .from('produto')
         .select(`
       *,
-      produtogrupo (nome)
+      produtogrupo (nome),
+      produto_imagem (url)
     `)
-        .eq('is_deleted', false)
+        .eq('exibirPdv', true)
         .limit(limite);
 
     if (error) {
@@ -42,7 +40,6 @@ export async function buscarProdutos(limite = 10) {
 }
 
 export async function buscarProdutoPorId(id: string) {
-    // Tenta encontrar pelo ID primeiro
     const { data, error } = await supabase
         .from('produto')
         .select(`
@@ -59,12 +56,8 @@ export async function buscarProdutoPorId(id: string) {
 }
 
 export async function buscarProdutosPorCategoria(slug: string) {
-    // Primeiro encontra o ID da categoria pelo slug (implicado pelo nome)
-    // Como não temos slug no DB, buscamos todas as categorias e encontramos a correspondência
-    // Ou solicitamos que o backend adicione slug. Por enquanto: busca todas as categorias
-
     const categorias = await buscarCategorias();
-    const categoria = categorias.find(c => c.slug === slug);
+    const categoria = categorias.find((c: any) => c.slug === slug);
 
     if (!categoria) return [];
 
@@ -72,47 +65,54 @@ export async function buscarProdutosPorCategoria(slug: string) {
         .from('produto')
         .select(`
       *,
-      produtogrupo (nome)
+      produtogrupo (nome),
+      produto_imagem (url)
     `)
         .eq('grupo_produto_id', categoria.id)
-        .eq('is_deleted', false);
+        .eq('exibirPdv', true);
 
     if (error) return [];
 
     return data.map(p => transformarProduto(p));
 }
 
-export async function pesquisarProdutos(termo: string) {
+export async function searchProducts(termo: string) {
     const { data, error } = await supabase
         .from('produto')
         .select(`
       *,
-      produtogrupo (nome)
+      produtogrupo (nome),
+      produto_imagem (url)
     `)
-        .ilike('titulo', `%${termo}%`)
-        .eq('is_deleted', false);
+        .ilike('descricao', `%${termo}%`)
+        .eq('exibirPdv', true);
 
-    if (error) return [];
+    if (error) {
+        console.error('Erro ao pesquisar produtos:', error);
+        return [];
+    }
 
     return data.map(p => transformarProduto(p));
 }
 
-// Transformador para corresponder ao tipo "Produto" do Frontend de lib/data.ts
-// (id, name, price, image, brand, category, stock, rating, shortDescription, fullDescription)
+// Deprecated alias just in case
+export const pesquisarProdutos = searchProducts;
+
 function transformarProduto(dbProduct: any) {
+    const images = dbProduct.produto_imagem?.map((img: any) => img.url) || [];
     return {
         id: dbProduct.id.toString(),
-        name: dbProduct.titulo,
+        name: dbProduct.descricao,
         price: Number(dbProduct.precovenda),
-        image: dbProduct.imgUrl || 'https://placehold.co/400x400/0A7AAC/FFFFFF?text=Sem+Foto',
-        brand: dbProduct.fabricante || 'Genérico',
+        image: images[0] || 'https://placehold.co/400x400/0A7AAC/FFFFFF?text=Sem+Foto',
+        brand: dbProduct.marca || 'Genérico',
         category: dbProduct.produtogrupo?.nome || 'Geral',
-        stock: dbProduct.estoque || 0,
-        rating: 5, // Placeholder pois DB não tem avaliação
+        stock: dbProduct.estoqueatual || 0,
+        rating: 5,
         shortDescription: dbProduct.descricao || '',
         fullDescription: dbProduct.descricao || '',
-        images: dbProduct.produto_imagem?.map((img: any) => img.url) || [],
-        compatibility: [] // DB ainda não tem isso
+        images: images,
+        compatibility: []
     };
 }
 
@@ -126,17 +126,14 @@ export async function buscarProdutosFiltrados(opcoes: {
         .from('produto')
         .select(`
             *,
-            produtogrupo (nome)
+            produtogrupo (nome),
+            produto_imagem (url)
         `)
-        .eq('is_deleted', false);
+        .eq('exibirPdv', true);
 
     if (opcoes.categorySlug && opcoes.categorySlug !== 'todos') {
-        // Precisa encontrar o ID da categoria primeiro pois não temos slug na relação da tabela produto diretamente (é via ID)
-        // Otimização: Em um app real, poderíamos fazer join filter, mas aqui vamos buscar a categoria primeiro
-        // Ou se tivéssemos o ID do frontend. Mas filtros geralmente usam Slugs.
         const categorias = await buscarCategorias();
-        // Correspondência estrita?
-        const categoria = categorias.find(c => c.slug === opcoes.categorySlug);
+        const categoria = categorias.find((c: any) => c.slug === opcoes.categorySlug);
         if (categoria) {
             query = query.eq('grupo_produto_id', categoria.id);
         }
@@ -148,8 +145,7 @@ export async function buscarProdutosFiltrados(opcoes: {
     if (opcoes.maxPrice !== undefined && opcoes.maxPrice > 0) {
         query = query.lte('precovenda', opcoes.maxPrice);
     }
-    
-    // Ordenação padrão?
+
     query = query.order('id', { ascending: false });
 
     const { data, error } = await query;
