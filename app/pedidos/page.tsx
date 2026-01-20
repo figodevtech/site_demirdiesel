@@ -23,6 +23,29 @@ export default function PedidosPage() {
                 router.push('/login');
             } else if (profile?.id) {
                 fetchOrders();
+
+                // Setup Realtime for live updates
+                console.log("DEBUG: Setting up Realtime for Orders page...");
+                const channel = supabase
+                    .channel('schema-db-changes')
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: 'UPDATE',
+                            schema: 'public',
+                            table: 'pedido',
+                            filter: `cliente_id=eq.${profile.id}`
+                        },
+                        (payload) => {
+                            console.log("DEBUG: Order update detected via Realtime:", payload);
+                            fetchOrders(); // Refresh the list when an update happens
+                        }
+                    )
+                    .subscribe();
+
+                return () => {
+                    supabase.removeChannel(channel);
+                };
             } else {
                 setLoading(false);
             }
@@ -83,7 +106,8 @@ export default function PedidosPage() {
         }
     };
 
-    if (authLoading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
+    // We no longer return early here to avoid unmounting the background during focus changes
+    // if (authLoading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
 
     return (
         <div className="container mx-auto py-10 px-4">
@@ -91,8 +115,11 @@ export default function PedidosPage() {
                 <Package className="text-primary" /> Meus Pedidos
             </h1>
 
-            {loading ? (
-                <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>
+            {(loading || authLoading) && orders.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <Loader2 className="animate-spin h-10 w-10 text-primary" />
+                    <p className="text-muted-foreground animate-pulse">Sincronizando seus pedidos...</p>
+                </div>
             ) : orders.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground border rounded-lg bg-muted/5 flex flex-col items-center">
                     <Package size={48} className="mb-4 opacity-20" />
