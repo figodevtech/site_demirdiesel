@@ -5,6 +5,7 @@ import { services, testimonials } from "@/lib/data";
 import { buscarProdutos } from "@/lib/api";
 import { ArrowRight, Star, Truck, ShieldCheck, CreditCard } from 'lucide-react';
 import { BannerCarousel } from "@/components/home/BannerCarousel";
+import { ProductCard } from "@/components/product/ProductCard";
 
 function FeatureIcon({ icon: Icon, title, desc }: { icon: any, title: string, desc: string }) {
   return (
@@ -78,32 +79,7 @@ export default async function Home() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
             {featuredProducts.map((product) => (
-              <Link key={product.id} href={`/produto/${product.id}`}>
-                <Card className="h-full hover:shadow-xl transition-all duration-300 group border-border/50 bg-white overflow-hidden">
-                  <div className="aspect-square relative bg-white flex items-center justify-center p-4">
-                    <div className="w-full h-full bg-gray-100 rounded-md relative overflow-hidden">
-                      <img src={product.image} alt={product.name} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
-
-                      <div className="absolute bottom-2 right-2 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                        <Button size="icon" className="h-8 w-8 rounded-full shadow-lg">
-                          <ArrowRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{product.category}</p>
-                    <h3 className="font-semibold text-secondary line-clamp-2 h-10 mb-2 group-hover:text-primary transition-colors">
-                      {product.name}
-                    </h3>
-                    <div className="flex items-center justify-between mt-4">
-                      <span className="text-lg font-bold text-primary">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         </div>

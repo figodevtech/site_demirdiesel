@@ -3,17 +3,39 @@
 import { Button } from "@/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { useCart } from "@/components/providers/CartContext";
 import { useEffect } from "react";
 import confetti from 'canvas-confetti';
 
 export default function SucessoPage() {
+    const { clearCart } = useCart();
+
     useEffect(() => {
+        // 0. Clear cart immediately
+        clearCart();
+        
+        // 1. Fire confetti
         confetti({
             particleCount: 150,
             spread: 70,
             origin: { y: 0.6 },
             colors: ['#ef4444', '#171717'] // Primary and secondary colors
         });
+
+        // 2. Notify opener window (Checkout page)
+        console.log("DEBUG: Checking window.opener...", !!window.opener);
+        if (window.opener) {
+            console.log("DEBUG: Notifying main window about success...");
+            window.opener.postMessage('payment_success', '*');
+            
+            // Optional: Close popup after a short delay so user sees success message
+            setTimeout(() => {
+                console.log("DEBUG: Closing popup window...");
+                window.close();
+            }, 5000); // 5s for better visibility during testing
+        } else {
+            console.warn("DEBUG: No window.opener found! Are you in a primary tab?");
+        }
     }, []);
 
     return (
@@ -27,13 +49,20 @@ export default function SucessoPage() {
                 Obrigado pela sua compra. Enviamos um email com os detalhes do seu pedido e o código de rastreio.
             </p>
 
-            <div className="flex gap-4">
-                <Link href="/pedidos">
-                    <Button variant="outline" size="lg">Ver Meus Pedidos</Button>
-                </Link>
-                <Link href="/">
-                    <Button size="lg" className="px-8">Voltar para Loja</Button>
-                </Link>
+            <div className="flex flex-col gap-4">
+                <div className="flex gap-4">
+                    <Link href="/pedidos">
+                        <Button variant="outline" size="lg">Ver Meus Pedidos</Button>
+                    </Link>
+                    <Link href="/">
+                        <Button size="lg" className="px-8">Voltar para Loja</Button>
+                    </Link>
+                </div>
+                {window.opener && (
+                    <p className="text-xs text-muted-foreground animate-pulse">
+                        Esta janela deve fechar automaticamente e atualizar seu pedido...
+                    </p>
+                )}
             </div>
         </div>
     );
