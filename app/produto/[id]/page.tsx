@@ -25,7 +25,7 @@ export default async function ProductPage({
                 {/* Gallery */}
                 <div className="space-y-4">
                     <div className="aspect-square bg-white border border-border/50 rounded-lg flex items-center justify-center p-8 relative overflow-hidden">
-                        <img src={product.image} alt={product.name} className="object-contain w-full h-full max-h-[500px]" />
+                        <img src={product.image} alt={product.name} className="object-contain w-full h-full max-h-125" />
                     </div>
                     {product.images.length > 0 && (
                         <div className="grid grid-cols-4 gap-4">

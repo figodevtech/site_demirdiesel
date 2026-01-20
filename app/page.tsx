@@ -128,7 +128,7 @@ export default async function Home() {
                 </div>
               </div>
               {/* More contact info */}
-              <div className="w-full h-[300px] rounded-lg overflow-hidden border border-border/50 shadow-sm mt-4">
+              <div className="w-full h-75 rounded-lg overflow-hidden border border-border/50 shadow-sm mt-4">
                   <iframe 
                     src="https://maps.google.com/maps?q=R.+Jorn.+Jo%C3%A3o+Jos%C3%A9+Ramalho,+33+-+Costa+e+Silva,+Jo%C3%A3o+Pessoa+-+PB,+58081-110&t=&z=15&ie=UTF8&iwloc=&output=embed" 
                     width="100%" 
