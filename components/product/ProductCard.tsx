@@ -38,11 +38,11 @@ export function ProductCard({ product }: ProductCardProps) {
                              <Button 
                                 size="icon" 
                                 variant="secondary"
-                                className={`h-8 w-8 rounded-full shadow-sm ${isInWishlist(product.id) ? 'text-red-500 bg-red-50 hover:bg-red-100' : 'bg-white hover:bg-gray-100'}`}
+                                className={`h-8 w-8 rounded-full shadow-sm ${isInWishlist(product.id) ? 'text-white bg-red-500 hover:bg-red-700 hover:cursor-pointer' : ' text-red-500 bg-red-100 hover:text-white hover:bg-red-500 hover:cursor-pointer'}`}
                                 onClick={handleToggleWishlist}
                                 disabled={wishlistLoading}
                             >
-                                <Heart size={16} className={isInWishlist(product.id) ? "fill-current" : ""} />
+                                <Heart size={16} className={isInWishlist(product.id) ? "fill-current" : "hover:fill-current"} />
                             </Button>
                         </div>
                     </div>

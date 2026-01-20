@@ -44,7 +44,7 @@ export default async function ProductsPage({
                             <SlidersHorizontal size={16} /> Filtros
                         </Button>
                     </SheetTrigger>
-                    <SheetContent side="left" className="w-[300px]">
+                    <SheetContent side="left" className="w-75">
                         <div className="py-6">
                             <h2 className="font-bold text-lg mb-6">Filtros</h2>
                             <ProductFilters categories={categories} />
