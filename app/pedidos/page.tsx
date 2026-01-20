@@ -23,6 +23,29 @@ export default function PedidosPage() {
                 router.push('/login');
             } else if (profile?.id) {
                 fetchOrders();
+
+                // Setup Realtime for live updates
+                console.log("DEBUG: Setting up Realtime for Orders page...");
+                const channel = supabase
+                    .channel('schema-db-changes')
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: 'UPDATE',
+                            schema: 'public',
+                            table: 'pedido',
+                            filter: `cliente_id=eq.${profile.id}`
+                        },
+                        (payload) => {
+                            console.log("DEBUG: Order update detected via Realtime:", payload);
+                            fetchOrders(); // Refresh the list when an update happens
+                        }
+                    )
+                    .subscribe();
+
+                return () => {
+                    supabase.removeChannel(channel);
+                };
             } else {
                 setLoading(false);
             }
