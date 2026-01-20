@@ -16,33 +16,17 @@ import { slugify } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
+import { useAuth } from "@/components/providers/AuthContext";
+
 interface SidebarProps {
     categories: ProdutoGrupo[];
 }
 
 export default function SidebarDrawer({ categories }: SidebarProps) {
     const [open, setOpen] = useState(false);
-    const [user, setUser] = useState<any>(null); // Use existing auth type if available or any
+    const { user, profile, signOut } = useAuth();
 
-    // Simulate checking auth or check supabase if configured
-    // Since login page is skeletal, this defaults to null (not logged in)
-    // To test, one would need to implement actual login
-    // For now, it meets the requirement: "só devem aparecer se o usuario estiver logado"
-    /*
-    useEffect(() => {
-        const getUser = async () => {
-             const { data: { user } } = await supabase.auth.getUser();
-             setUser(user);
-        }
-        getUser();
-    }, []);
-    */
-    // NOTE: Uncomment specific logic if supabase is fully set up with auth. 
-    // Given the User Request, I will default to showing nothing if not logged in.
-    
-    // However, since I cannot verify if the user IS logged in without a working login flow, 
-    // I will leave the `user` as null, which effectively hides it. 
-    // If the user WANTS to see it, they need to log in (per request).
+    const displayName = profile?.nomerazaosocial || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Cliente';
 
     return (
         <Sheet open={open} onOpenChange={setOpen}>
@@ -52,7 +36,6 @@ export default function SidebarDrawer({ categories }: SidebarProps) {
                 </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-[300px] sm:w-[350px] flex flex-col p-0" title="Menu Principal">
-                {/* Helper for acessibility title if needed, or VisuallyHidden */}
                 <div className="sr-only">Menu de Navegação</div>
 
                 <SheetHeader className="p-6 border-b border-border bg-sidebar-accent/50">
@@ -63,10 +46,10 @@ export default function SidebarDrawer({ categories }: SidebarProps) {
                         <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
                             <User size={20} />
                         </div>
-                        <div className="flex flex-col">
+                        <div className="flex flex-col text-left">
                             {user ? (
                                 <>
-                                    <span className="font-medium text-sm">Olá, {user.email?.split('@')[0]}</span>
+                                    <span className="font-medium text-sm truncate max-w-[200px]">Olá, {displayName}</span>
                                     <span className="text-xs text-muted-foreground">Bem-vindo de volta</span>
                                 </>
                             ) : (
@@ -97,9 +80,6 @@ export default function SidebarDrawer({ categories }: SidebarProps) {
                                     </Link>
                                     <Link href="/enderecos" onClick={() => setOpen(false)} className="flex items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors">
                                         <MapPin size={16} /> Endereços
-                                    </Link>
-                                    <Link href="/pagamento" onClick={() => setOpen(false)} className="flex items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors">
-                                        <CreditCard size={16} /> Formas de Pagamento
                                     </Link>
                                     <Link href="/favoritos" onClick={() => setOpen(false)} className="flex items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors">
                                         <Heart size={16} /> Lista de Desejos
@@ -149,7 +129,7 @@ export default function SidebarDrawer({ categories }: SidebarProps) {
                 <div className="p-4 border-t border-border mt-auto">
                     {user && (
                         <Button variant="ghost" className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => {
-                             // Sign out logic
+                             signOut();
                              setOpen(false)
                         }}>
                              <LogOut size={16} className="mr-2" /> Sair

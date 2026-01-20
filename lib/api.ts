@@ -140,7 +140,7 @@ function transformarProduto(dbProduct: any, extraImages: string[] = []) {
 
     return {
         id: dbProduct.id.toString(),
-        name: dbProduct.titulo || dbProduct.descricao || 'Produto sem nome', // Use titulo as primary name
+        name: dbProduct.tituloMarketplace || dbProduct.titulo || dbProduct.descricao || 'Produto sem nome', // Prioritize tituloMarketplace
         price: Number(dbProduct.precovenda),
         image: mainImage,
         brand: dbProduct.marca || dbProduct.fabricante || 'Genérico',

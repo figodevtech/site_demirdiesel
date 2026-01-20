@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function UserWidget() {
-    const { user, logout } = useAuth();
+    const { user, profile, signOut } = useAuth();
 
     if (!user) {
         return (
@@ -30,15 +30,20 @@ export default function UserWidget() {
         );
     }
 
+    // Fallback name logic
+    const displayName = profile?.nomerazaosocial || user.user_metadata?.name || user.email || 'Cliente';
+    const initial = displayName.charAt(0).toUpperCase();
+    const firstName = displayName.split(' ')[0];
+
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="hidden md:flex gap-2 text-primary hover:text-primary hover:bg-primary/10">
                     <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                        {user.name.charAt(0).toUpperCase()}
+                        {initial}
                     </div>
                     <div className="flex flex-col items-start text-xs text-left">
-                        <span className="opacity-70">Olá, {user.name.split(' ')[0]}</span>
+                        <span className="opacity-70">Olá, {firstName}</span>
                         <span className="font-semibold">Minha Conta</span>
                     </div>
                 </Button>
@@ -52,8 +57,14 @@ export default function UserWidget() {
                 <DropdownMenuItem asChild>
                     <Link href="/pedidos" className="cursor-pointer">Meus Pedidos</Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <Link href="/favoritos" className="cursor-pointer">Favoritos</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <Link href="/enderecos" className="cursor-pointer">Endereços</Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout} className="text-destructive cursor-pointer">
+                <DropdownMenuItem onClick={() => signOut()} className="text-destructive cursor-pointer">
                     <LogOut className="mr-2 h-4 w-4" />
                     Sair
                 </DropdownMenuItem>

@@ -2,14 +2,16 @@
 
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Truck, Loader2, Check } from "lucide-react";
+import { ShoppingCart, Truck, Loader2, Check, Heart } from "lucide-react";
 import { useCart } from "@/components/providers/CartContext";
+import { useWishlist } from "@/lib/hooks/useWishlist";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function ProductActions({ product }: { product: any }) {
     const { addToCart } = useCart();
+    const { toggleWishlist, isInWishlist, loading: wishlistLoading } = useWishlist();
     const [quantity, setQuantity] = useState(1);
     const [cep, setCep] = useState('');
     const [isSimulating, setIsSimulating] = useState(false);
@@ -81,6 +83,15 @@ export default function ProductActions({ product }: { product: any }) {
                                             <ShoppingCart size={20} /> Adicionar ao Carrinho
                                         </>
                                     )}
+                                </Button>
+                                <Button 
+                                    size="lg" 
+                                    variant="outline"
+                                    className={`w-14 px-0 border-2 ${isInWishlist(product.id) ? 'bg-red-50 border-red-200 text-red-500 hover:bg-red-100 hover:text-red-600 hover:border-red-300' : 'hover:bg-muted'}`}
+                                    onClick={() => toggleWishlist(product.id)}
+                                    disabled={wishlistLoading}
+                                >
+                                    {wishlistLoading ? <Loader2 className="animate-spin" size={20} /> : <Heart size={20} className={isInWishlist(product.id) ? "fill-current" : ""} />}
                                 </Button>
                             </div>
                         </>
