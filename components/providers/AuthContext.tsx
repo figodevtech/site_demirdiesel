@@ -19,6 +19,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<any | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const lastUserId = React.useRef<string | null>(null);
+    const lastProfile = React.useRef<any | null>(null);
     const router = useRouter();
 
     const fetchProfile = useCallback(async (userId: string) => {
@@ -38,8 +40,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     console.error('Erro ao buscar perfil do cliente:', error);
                 }
                 setProfile(null);
+                lastProfile.current = null;
             } else {
                 setProfile(data);
+                lastProfile.current = data;
             }
         } catch (error) {
             console.error('Erro inesperado ao buscar perfil:', error);
@@ -54,44 +58,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
-        const initializeAuth = async () => {
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                const currentUser = session?.user ?? null;
-                setUser(currentUser);
-                
-                if (currentUser) {
-                    await fetchProfile(currentUser.id);
-                }
-            } catch (error) {
-                console.error("Auth init error:", error);
-            } finally {
+        let mounted = true;
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log("Auth Event:", event);
+            if (!mounted) return;
+
+            const currentUser = session?.user ?? null;
+
+            if (event === 'SIGNED_OUT') {
+                lastUserId.current = null;
+                lastProfile.current = null;
+                setUser(null);
+                setProfile(null);
                 setIsLoading(false);
+                router.push('/');
+                router.refresh();
+                return;
             }
 
-            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-                console.log("Auth Event:", event);
-                const currentUser = session?.user ?? null;
-                setUser(currentUser);
+            if (currentUser) {
+                const isNewUser = currentUser.id !== lastUserId.current;
                 
-                if (event === 'SIGNED_IN' && currentUser) {
-                    setIsLoading(true); // Re-trigger loading while we fetch new profile
+                if (isNewUser) {
+                    console.log("DEBUG: Actual New User. Fetching...");
+                    lastUserId.current = currentUser.id;
+                    setUser(currentUser);
+                    setIsLoading(true);
                     await fetchProfile(currentUser.id);
-                    setIsLoading(false);
-                    router.refresh();
-                } else if (event === 'SIGNED_OUT') {
-                    setProfile(null);
-                    router.push('/');
-                    router.refresh();
+                    if (mounted) setIsLoading(false);
+                } else {
+                    // Same user ID, just refresh the object reference without triggering global loading
+                    setUser(currentUser);
+                    if (!lastProfile.current) {
+                        await fetchProfile(currentUser.id);
+                    }
                 }
-            });
+            } else {
+                if (mounted) setIsLoading(false);
+            }
+        });
 
-            return () => {
-                subscription.unsubscribe();
-            };
+        // Handle initial load
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (mounted && session?.user && !lastUserId.current) {
+                const u = session.user;
+                lastUserId.current = u.id;
+                setUser(u);
+                fetchProfile(u.id).finally(() => {
+                    if (mounted) setIsLoading(false);
+                });
+            } else if (mounted && !session?.user) {
+                setIsLoading(false);
+            }
+        });
+
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
         };
-
-        initializeAuth();
     }, [fetchProfile, router]);
 
     const signOut = async () => {

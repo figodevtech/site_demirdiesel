@@ -30,6 +30,8 @@ export default function FavoritosPage() {
         }
     }, [user?.id, profile?.id, authLoading, router]);
 
+    // if (authLoading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
+
     const fetchFavorites = async () => {
         setLoading(true);
         try {
@@ -78,8 +80,11 @@ export default function FavoritosPage() {
                 <span className="text-sm text-muted-foreground">({favorites.length} itens)</span>
              </div>
             
-            {loading ? (
-                <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>
+            {(loading || authLoading) && favorites.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <Loader2 className="animate-spin h-10 w-10 text-primary" />
+                    <p className="text-muted-foreground animate-pulse">Sincronizando seus favoritos...</p>
+                </div>
             ) : favorites.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground border rounded-lg bg-muted/10">
                     Sua lista de desejos está vazia.

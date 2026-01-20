@@ -83,7 +83,8 @@ export default function PedidosPage() {
         }
     };
 
-    if (authLoading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
+    // We no longer return early here to avoid unmounting the background during focus changes
+    // if (authLoading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
 
     return (
         <div className="container mx-auto py-10 px-4">
@@ -91,8 +92,11 @@ export default function PedidosPage() {
                 <Package className="text-primary" /> Meus Pedidos
             </h1>
 
-            {loading ? (
-                <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>
+            {(loading || authLoading) && orders.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <Loader2 className="animate-spin h-10 w-10 text-primary" />
+                    <p className="text-muted-foreground animate-pulse">Sincronizando seus pedidos...</p>
+                </div>
             ) : orders.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground border rounded-lg bg-muted/5 flex flex-col items-center">
                     <Package size={48} className="mb-4 opacity-20" />
