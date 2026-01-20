@@ -27,14 +27,18 @@ export async function POST(request: Request) {
 
         // 2. Map Pagar.me status to site status
         let newStatus = 'PENDENTE';
-        if (eventType === 'order.paid' || status === 'paid') {
+        const normalizedStatus = status?.toLowerCase();
+        
+        if (eventType === 'order.paid' || normalizedStatus === 'paid' || normalizedStatus === 'captured') {
             newStatus = 'PAGO';
-        } else if (eventType === 'order.canceled' || status === 'canceled' || status === 'failed') {
+        } else if (normalizedStatus === 'authorized') {
+            newStatus = 'AUTORIZADO';
+        } else if (eventType === 'order.canceled' || normalizedStatus === 'canceled' || normalizedStatus === 'failed') {
             newStatus = 'CANCELADO';
         }
 
         // 3. Update DB using admin client (bypass RLS)
-        console.log(`DEBUG: Updating Order #${orderId} to status: ${newStatus}`);
+        console.log(`DEBUG: Updating Order #${orderId} to status: ${newStatus} (Original Pagar.me status: ${status})`);
         
         const { error } = await supabaseAdmin
             .from('pedido')

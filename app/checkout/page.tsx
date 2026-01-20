@@ -208,6 +208,44 @@ export default function CheckoutPage() {
         }
     };
 
+    // Realtime confirmation
+    useEffect(() => {
+        if (!currentOrderId || !isWaitingPayment) return;
+
+        console.log("DEBUG: Setting up Realtime subscription for order:", currentOrderId);
+
+        const channel = supabase
+            .channel(`order_status_${currentOrderId}`)
+            .on(
+                'postgres_changes', 
+                { 
+                    event: 'UPDATE', 
+                    schema: 'public', 
+                    table: 'pedido',
+                    filter: `id=eq.${currentOrderId}`
+                }, 
+                (payload) => {
+                    console.log("DEBUG: Realtime Update Received:", payload.new);
+                    const newStatus = payload.new.status?.toUpperCase();
+                    
+                    if (newStatus === 'PAGO' || newStatus === 'AUTORIZADO') {
+                        console.log("DEBUG: Status is PAID! Redirecting...");
+                        toast.success("Pagamento confirmado!");
+                        clearCart();
+                        router.push('/sucesso');
+                    }
+                }
+            )
+            .subscribe((status) => {
+                console.log("DEBUG: Realtime Subscription Status:", status);
+            });
+
+        return () => {
+            console.log("DEBUG: Cleaning up Realtime subscription");
+            supabase.removeChannel(channel);
+        };
+    }, [currentOrderId, isWaitingPayment, clearCart, router]);
+
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
             // Log for debugging
