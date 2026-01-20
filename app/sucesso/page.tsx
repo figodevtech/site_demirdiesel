@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useCart } from "@/components/providers/CartContext";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import confetti from 'canvas-confetti';
 
 export default function SucessoPage() {
     const { clearCart } = useCart();
+
+    const [hasOpener, setHasOpener] = useState(false);
 
     useEffect(() => {
         // 0. Clear cart immediately
@@ -23,20 +25,17 @@ export default function SucessoPage() {
         });
 
         // 2. Notify opener window (Checkout page)
-        console.log("DEBUG: Checking window.opener...", !!window.opener);
-        if (window.opener) {
+        if (typeof window !== 'undefined' && window.opener) {
+            setHasOpener(true);
             console.log("DEBUG: Notifying main window about success...");
             window.opener.postMessage('payment_success', '*');
             
             // Optional: Close popup after a short delay so user sees success message
             setTimeout(() => {
-                console.log("DEBUG: Closing popup window...");
                 window.close();
             }, 5000); // 5s for better visibility during testing
-        } else {
-            console.warn("DEBUG: No window.opener found! Are you in a primary tab?");
         }
-    }, []);
+    }, [clearCart]);
 
     return (
         <div className="min-h-[70vh] flex flex-col items-center justify-center p-4 text-center">
@@ -58,7 +57,7 @@ export default function SucessoPage() {
                         <Button size="lg" className="px-8">Voltar para Loja</Button>
                     </Link>
                 </div>
-                {window.opener && (
+                {hasOpener && (
                     <p className="text-xs text-muted-foreground animate-pulse">
                         Esta janela deve fechar automaticamente e atualizar seu pedido...
                     </p>
