@@ -237,7 +237,7 @@ export default function CheckoutPage() {
                 shippingAmount: shippingPrice,
                 customerId: profile.id,
                 customerName: profile.nomerazaosocial || user?.user_metadata?.name || 'Cliente',
-                customerEmail: user?.email || '',
+                customerEmail: user?.email,
                 customerDocument: profile.cpfcnpj || '',
                 customerPhone: profile.telefone || '',
                 address: selectedAddress
