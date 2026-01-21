@@ -38,9 +38,9 @@ export default function Footer() {
                         <ul className="space-y-2 text-sm opacity-90">
                             <li><Link href="/conta" className="hover:text-primary hover:underline">Minha Conta</Link></li>
                             <li><Link href="/pedidos" className="hover:text-primary hover:underline">Meus Pedidos</Link></li>
-                            <li><Link href="/politica-privacidade" className="hover:text-primary hover:underline">Política de Privacidade</Link></li>
-                            <li><Link href="/trocas" className="hover:text-primary hover:underline">Trocas e Devoluções</Link></li>
-                            <li><Link href="/faq" className="hover:text-primary hover:underline">Dúvidas Frequentes</Link></li>
+                            <li><Link href="/politica-de-privacidade" className="hover:text-primary hover:underline">Política de Privacidade</Link></li>
+                            <li><Link href="/trocas-e-devolucoes" className="hover:text-primary hover:underline">Trocas e Devoluções</Link></li>
+                            <li><Link href="/duvidas-frequentes" className="hover:text-primary hover:underline">Dúvidas Frequentes</Link></li>
                         </ul>
                     </div>
 
@@ -50,7 +50,7 @@ export default function Footer() {
                         <ul className="space-y-3 text-sm opacity-90">
                             <li className="flex items-center gap-2">
                                 <Phone size={16} className="text-primary" />
-                                <span>(11) 99999-9999</span>
+                                <span>(00) 00000-0000</span>
                             </li>
                             <li className="flex items-center gap-2">
                                 <Mail size={16} className="text-primary" />
