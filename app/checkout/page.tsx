@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthContext';
 import { useCart } from '@/components/providers/CartContext';
@@ -176,6 +177,7 @@ export default function CheckoutPage() {
     const [isWaitingPayment, setIsWaitingPayment] = useState(false);
     const [currentOrderId, setCurrentOrderId] = useState<number | null>(null);
     const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+    const redirectingRef = useRef(false);
 
     const checkOrderStatus = async () => {
         if (!currentOrderId) return;
@@ -232,7 +234,14 @@ export default function CheckoutPage() {
                         console.log("DEBUG: Status is PAID! Redirecting...");
                         toast.success("Pagamento confirmado!");
                         clearCart();
-                        router.push('/sucesso');
+                        if (!redirectingRef.current) {
+                            redirectingRef.current = true;
+                            if (typeof window !== 'undefined') {
+                                window.location.assign('/sucesso');
+                            } else {
+                                router.push('/sucesso');
+                            }
+                        }
                     }
                 }
             )
