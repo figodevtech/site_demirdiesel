@@ -9,7 +9,7 @@ export function slugify(text: string) {
   return text
     .toString()
     .toLowerCase()
-    .normalize('NFD') // Remove accents
+    .normalize('NFD') // Remove acentos
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .replace(/\s+/g, '-')

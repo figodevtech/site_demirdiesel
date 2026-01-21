@@ -19,7 +19,7 @@ export default function RegisterPage() {
     const { refreshProfile } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
 
-    // Form States
+    // Estados do formulário
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -29,7 +29,7 @@ export default function RegisterPage() {
     const [phone, setPhone] = useState('');
 
     const handleRegister = async () => {
-        // Validações Básicas
+        // Validações básicas
         if (!name || !email || !password || !cpfCnpj || !phone) {
             toast.error("Preencha todos os campos obrigatórios.");
             return;
@@ -61,7 +61,7 @@ export default function RegisterPage() {
 
             if (authError) throw authError;
 
-            // Verificar se temos uma sessão (Se Email Confirm estiver ligado, session será null)
+            // Verifica se temos sessão (se Email Confirm estiver ligado, session será null)
             if (!authData.session) {
                 console.log("Usuário criado, mas sem sessão ativa. Provavelmente requer confirmação de email.");
                 toast.success("Conta criada! Verifique seu email para confirmar o cadastro antes de entrar.");
@@ -80,19 +80,19 @@ export default function RegisterPage() {
                     cpfcnpj: cleanCpfCnpj(cpfCnpj),
                     email: email,
                     telefone: phone,
-                    cidade: 'Não Informado', // Default values para satisfazer NOT NULL
+                    cidade: 'Não Informado', // valores padrão para satisfazer NOT NULL
                     estado: 'NI'
                 });
 
                 if (dbError) {
                     console.error("Erro no insert cliente:", JSON.stringify(dbError));
                     // Se falhar o insert mas criou o auth, o usuário fica num estado inconsistente.
-                    // Idealmente deveríamos deletar o auth user ou tratar isso.
+                    // Ideal seria remover o auth user ou tratar isso.
                     // Para MVP, apenas avisamos.
                     toast.error(`Erro ao criar perfil: ${dbError.message || JSON.stringify(dbError)}`);
                 } else {
                     toast.success("Conta criada com sucesso! Faça login para continuar.");
-                    await refreshProfile(); // Forçar atualização do contexto
+                    await refreshProfile(); // força atualização do contexto
                     router.push('/login');
                 }
             }

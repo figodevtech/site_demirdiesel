@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 import { Loader2, Package, Calendar, DollarSign, CheckCircle2 } from 'lucide-react';
-import { format } from 'date-fns'; // Would need date-fns, otherwise standard JS Date
+import { format } from 'date-fns'; // Necessita date-fns; caso contrário usar Date padrão
 
 export default function PedidosPage() {
     const { user, profile, isLoading: authLoading } = useAuth();

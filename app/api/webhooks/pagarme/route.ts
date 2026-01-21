@@ -152,14 +152,14 @@ export async function POST(request: Request) {
             data?.amount ||
             data?.paid_amount;
 
-        // Charges metadata can carry the order reference when the root metadata is empty
+        // As cobranças podem trazer o metadata quando o metadata raiz está vazio
         if (!orderId) {
             const charges = orderNode?.charges || data?.charges;
             const chargeMeta = charges?.[0]?.metadata || charges?.[0]?.last_transaction?.metadata;
             orderId = chargeMeta?.orderId || chargeMeta?.order_id;
         }
 
-        // As a last resort, fetch the order from Pagar.me to extract metadata/orderId
+        // Último recurso: buscar a ordem no Pagar.me para tentar extrair metadata/orderId
         let fetchedOrder: any = null;
         if (!orderId && pagarmeOrderRef) {
             fetchedOrder = await fetchOrderFromPagarme(pagarmeOrderRef);
@@ -170,7 +170,7 @@ export async function POST(request: Request) {
             }
         }
 
-        // Heuristic fallback: match by customer + amount when metadata is missing
+        // Heurística 1: casar por cliente + valor quando o metadata estiver ausente
         if (!orderId) {
             const derivedAmountCents = amountCents || fetchedOrder?.amount || fetchedOrder?.paid_amount || fetchedOrder?.total_amount;
             const derivedCustomer = customerId || fetchedOrder?.customer_id || fetchedOrder?.customer?.id;
@@ -186,7 +186,7 @@ export async function POST(request: Request) {
             }
         }
 
-        // Secondary fallback: match by amount only (recent, status pendente)
+        // Heurística 2: casar apenas pelo valor (recentes e status pendente)
         if (!orderId) {
             const derivedAmountCents = amountCents || fetchedOrder?.amount || fetchedOrder?.paid_amount || fetchedOrder?.total_amount;
             if (derivedAmountCents) {
@@ -226,7 +226,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Order ID format not supported' }, { status: 200 });
         }
 
-        // Small guardrail to avoid unexpected mass updates
+        // Trava rápida para evitar update indevido
         if (orderFilter === undefined || orderFilter === null) {
             console.warn("DEBUG: Order filter is undefined/null. Aborting update.");
             return NextResponse.json({ message: 'Order filter missing' }, { status: 200 });

@@ -34,10 +34,10 @@ export default function ProductActions({ product }: { product: any }) {
         setIsSimulating(true);
         setShippingResult(null);
 
-        // Simulate API delay
+        // Simula latência da API
         await new Promise(resolve => setTimeout(resolve, 1500));
 
-        // Mock results
+        // Resultados mockados
         setShippingResult([
             { type: 'PAC', price: 25.90, days: 7 },
             { type: 'SEDEX', price: 45.50, days: 3 },

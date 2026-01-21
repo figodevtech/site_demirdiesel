@@ -52,21 +52,21 @@ export function BannerCarousel() {
     const [count, setCount] = React.useState(0)
     const [isFlashing, setIsFlashing] = React.useState(false)
 
-    // Helper to handle the flash transition
+    // Helper para lidar com a transição de flash
     const handleTransition = React.useCallback((action: () => void) => {
         if (isFlashing) return
         setIsFlashing(true)
-        // Wait for fade to white
+        // Aguarda o fade para branco
         setTimeout(() => {
             action()
-            // Wait for slide change then fade out
+            // Aguarda troca do slide e faz o fade out
             setTimeout(() => {
                 setIsFlashing(false)
             }, 50)
         }, 300)
     }, [isFlashing])
 
-    // Autoplay logic
+    // Lógica de autoplay
     React.useEffect(() => {
         if (!api) return
 

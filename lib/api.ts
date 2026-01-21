@@ -1,7 +1,7 @@
-import { supabase } from './supabase';
+﻿import { supabase } from './supabase';
 import { Produto, ProdutoGrupo } from './types';
 import { slugify } from './utils';
-// Note: Produto type now matches DB schema (descricao, marca, etc.)
+// Nota: o tipo Produto segue o schema do BD (descricao, marca etc.)
 
 export async function buscarCategorias() {
     const { data, error } = await supabase
@@ -20,11 +20,11 @@ export async function buscarCategorias() {
     }));
 }
 
-// Helper para buscar imagens manualmente (Mantido como fallback ou para imagens adicionais se a tabela existir)
+// Helper para buscar imagens manualmente (mantido como fallback ou para imagens adicionais se a tabela existir)
 async function buscarImagensParaProdutos(produtos: any[]) {
     if (!produtos.length) return {};
     
-    // Tenta buscar da tabela produto_imagem se ela existir, caso contrário retorna vazio
+    // Tenta buscar da tabela produto_imagem se ela existir; caso contrário, retorna vazio
     try {
         const ids = produtos.map(p => p.id);
         const { data, error } = await supabase
@@ -126,26 +126,26 @@ export async function searchProducts(termo: string) {
     return data.map(p => transformarProduto(p, imagensMap[p.id] || []));
 }
 
-// Deprecated alias just in case
+// Apelido mantido por compatibilidade
 export const pesquisarProdutos = searchProducts;
 
 function transformarProduto(dbProduct: any, extraImages: string[] = []) {
-    // Prefer imgUrl from product table, fallback to first extra image
+    // Prefere imgUrl da tabela produto; senão, usa a primeira imagem extra
     const mainImage = dbProduct.imgUrl || extraImages[0] || 'https://placehold.co/400x400/0A7AAC/FFFFFF?text=Sem+Foto';
     
-    // Combine main image with extra images for gallery, filtering duplicates
+    // Combina imagem principal com extras para galeria, filtrando duplicadas
     const allImages = [mainImage, ...extraImages].filter((url, index, self) => 
         url && url !== 'https://placehold.co/400x400/0A7AAC/FFFFFF?text=Sem+Foto' && self.indexOf(url) === index
     );
 
     return {
         id: dbProduct.id.toString(),
-        name: dbProduct.tituloMarketplace || dbProduct.titulo || dbProduct.descricao || 'Produto sem nome', // Prioritize tituloMarketplace
+        name: dbProduct.tituloMarketplace || dbProduct.titulo || dbProduct.descricao || 'Produto sem nome', // prioriza tituloMarketplace
         price: Number(dbProduct.precovenda),
         image: mainImage,
         brand: dbProduct.marca || dbProduct.fabricante || 'Genérico',
         category: dbProduct.produtogrupo?.nome || 'Geral',
-        stock: dbProduct.estoque || 0, // Schema says 'estoque', not 'estoqueatual'
+        stock: dbProduct.estoque || 0, // schema usa 'estoque', não 'estoqueatual'
         rating: 5,
         shortDescription: dbProduct.descricao || dbProduct.titulo || '',
         fullDescription: dbProduct.descricao || dbProduct.descricaoMarketplace || '',
@@ -166,7 +166,7 @@ export async function buscarProdutosFiltrados(opcoes: {
             *,
             produtogrupo (nome)
         `);
-        // Filter removed: 'ativo' column missing on live DB
+        // Filtro removido: coluna 'ativo' não existe no BD atual
 
     if (opcoes.categorySlug && opcoes.categorySlug !== 'todos') {
         const categorias = await buscarCategorias();
