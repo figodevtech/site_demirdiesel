@@ -32,8 +32,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .single();
 
             if (error) {
-                // PGRST116 = JSON object requested, multiple (or no) rows returned
-                // Ignorar erro se o perfil ainda não existir (race condition do cadastro)
+                // PGRST116 = solicitado objeto JSON, veio múltipla (ou nenhuma) linha
+                // Ignora erro se o perfil ainda não existir (race condition do cadastro)
                 if (error.code === 'PGRST116') {
                     console.log('Perfil de cliente não encontrado (pode ser um novo cadastro).');
                 } else {
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     await fetchProfile(currentUser.id);
                     if (mounted) setIsLoading(false);
                 } else {
-                    // Same user ID, just refresh the object reference without triggering global loading
+                    // Mesmo user ID, apenas atualiza a referência sem disparar loading global
                     setUser(currentUser);
                     if (!lastProfile.current) {
                         await fetchProfile(currentUser.id);
@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         });
 
-        // Handle initial load
+        // Trata carregamento inicial
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (mounted && session?.user && !lastUserId.current) {
                 const u = session.user;

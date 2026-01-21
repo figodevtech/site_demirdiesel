@@ -2,7 +2,7 @@ export interface Produto {
     id: number;
     codigo: string;
     codigobarras: string | null;
-    descricao: string; // Used as name
+    descricao: string; // usado como nome
     grupoid: number | null;
     unidademedidaid: number | null;
     precovenda: number;
@@ -13,7 +13,7 @@ export interface Produto {
     ncm: string | null;
     marca: string | null;
     localizacao: string | null;
-    grupo_produto_id: number | null; // FK to produtogrupo
+    grupo_produto_id: number | null; // FK para produtogrupo
 }
 
 export interface ProdutoGrupo {

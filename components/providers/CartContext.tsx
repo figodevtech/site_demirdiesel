@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 
 export type CartItem = {
-    product: any; // Using any for flexibility based on current types
+    product: any; // usando any para flexibilidade com os tipos atuais
     quantity: number;
 };
 
@@ -27,7 +27,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const [shippingInfo, setShippingInfo] = useState<{ cep: string, price: number, days: number } | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
 
-    // Load from localStorage on mount
+    // Carrega do localStorage ao montar
     useEffect(() => {
         const savedCart = localStorage.getItem('demirdiesel-cart');
         const savedShipping = localStorage.getItem('demirdiesel-shipping');
@@ -48,14 +48,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setIsLoaded(true);
     }, []);
 
-    // Save to localStorage whenever items change (after initial load)
+    // Salva no localStorage sempre que items mudar (após o carregamento inicial)
     useEffect(() => {
         if (isLoaded) {
             localStorage.setItem('demirdiesel-cart', JSON.stringify(items));
         }
     }, [items, isLoaded]);
 
-    // Save shipping info
+    // Salva info de frete
     useEffect(() => {
         if (isLoaded) {
             if (shippingInfo) {
@@ -78,7 +78,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             }
             return [...current, { product, quantity }];
         });
-        // We can add a toast notification here later if we have a toaster
+        // Podemos adicionar um toast aqui depois, se houver
         console.log(`Added ${quantity} x ${product.name} to cart`);
     };
 

@@ -34,7 +34,7 @@ export function ProductFilters({ categories }: ProductFiltersProps) {
     const alternarCategoria = (slug: string) => {
         const params = new URLSearchParams(searchParams.toString());
         if (categoriaAtual === slug) {
-            params.delete('category'); // Desmarcar
+            params.delete('category'); // desmarcar
         } else {
             params.set('category', slug);
         }

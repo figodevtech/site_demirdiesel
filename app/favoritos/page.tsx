@@ -30,6 +30,7 @@ export default function FavoritosPage() {
         }
     }, [user?.id, profile?.id, authLoading, router]);
 
+    // Se quiser, pode mostrar um loading enquanto autentica:
     // if (authLoading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
 
     const fetchFavorites = async () => {
