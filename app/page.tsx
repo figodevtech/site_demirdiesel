@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { services, testimonials } from "@/lib/data";
@@ -6,6 +6,7 @@ import { buscarProdutos } from "@/lib/api";
 import { ArrowRight, Star, Truck, ShieldCheck, CreditCard } from 'lucide-react';
 import { BannerCarousel } from "@/components/home/BannerCarousel";
 import { ProductCard } from "@/components/product/ProductCard";
+import { ContactForm } from "@/components/home/ContactForm";
 
 function FeatureIcon({ icon: Icon, title, desc }: { icon: any, title: string, desc: string }) {
   return (
@@ -123,22 +124,21 @@ export default async function Home() {
                   <Truck className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="font-semibold text-secondary">Atendimento Físico</p>
+                  <p className="font-semibold text-secondary">Atendimento físico</p>
                   <p className="text-sm text-muted-foreground">R. Jorn. João José Ramalho, 33 - Costa e Silva, João Pessoa - PB</p>
                 </div>
               </div>
-              {/* More contact info */}
               <div className="w-full h-75 rounded-lg overflow-hidden border border-border/50 shadow-sm mt-4">
-                  <iframe 
-                    src="https://maps.google.com/maps?q=R.+Jorn.+Jo%C3%A3o+Jos%C3%A9+Ramalho,+33+-+Costa+e+Silva,+Jo%C3%A3o+Pessoa+-+PB,+58081-110&t=&z=15&ie=UTF8&iwloc=&output=embed" 
-                    width="100%" 
-                    height="100%" 
-                    style={{ border: 0 }} 
-                    allowFullScreen 
-                    loading="lazy" 
-                    referrerPolicy="no-referrer-when-downgrade"
-                    title="Localização Demir Diesel"
-                  ></iframe>
+                <iframe
+                  src="https://maps.google.com/maps?q=R.+Jorn.+Jo%C3%A3o+Jos%C3%A9+Ramalho,+33+-+Costa+e+Silva,+Jo%C3%A3o+Pessoa+-+PB,+58081-110&t=&z=15&ie=UTF8&iwloc=&output=embed"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  title="Localização Demir Diesel"
+                ></iframe>
               </div>
             </div>
           </div>
@@ -146,21 +146,7 @@ export default async function Home() {
           <Card className="bg-white shadow-lg border-border/50">
             <CardContent className="p-6 space-y-4">
               <h3 className="font-bold text-lg mb-2">Envie uma mensagem</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-medium">Nome</label>
-                  <input className="w-full p-2 rounded-md border border-input text-sm" placeholder="Seu nome" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-medium">Telefone</label>
-                  <input className="w-full p-2 rounded-md border border-input text-sm" placeholder="(11) 99999-9999" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-medium">Mensagem</label>
-                <textarea className="w-full p-2 rounded-md border border-input text-sm h-24 resize-none" placeholder="Como podemos ajudar?" />
-              </div>
-              <Button className="w-full font-semibold">Enviar Mensagem</Button>
+              <ContactForm />
             </CardContent>
           </Card>
         </div>

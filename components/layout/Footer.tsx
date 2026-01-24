@@ -1,7 +1,10 @@
-import Link from 'next/link';
-import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from 'lucide-react';
+﻿import Link from "next/link";
+import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from "lucide-react";
+import { buscarCategorias } from "@/lib/api";
 
-export default function Footer() {
+export default async function Footer() {
+    const categorias = (await buscarCategorias()).slice(0, 5);
+
     return (
         <footer className="bg-secondary text-secondary-foreground pt-12 pb-6">
             <div className="container mx-auto px-4">
@@ -24,11 +27,13 @@ export default function Footer() {
                     <div>
                         <h4 className="font-semibold mb-4 text-lg">Categorias</h4>
                         <ul className="space-y-2 text-sm opacity-90">
-                            <li><Link href="/categoria/oleos-e-fluidos" className="hover:text-primary hover:underline">Óleos e Fluídos</Link></li>
-                            <li><Link href="/categoria/filtros" className="hover:text-primary hover:underline">Filtros</Link></li>
-                            <li><Link href="/categoria/freios" className="hover:text-primary hover:underline">Freios</Link></li>
-                            <li><Link href="/categoria/suspensao" className="hover:text-primary hover:underline">Suspensão</Link></li>
-                            <li><Link href="/categoria/eletrica" className="hover:text-primary hover:underline">Elétrica</Link></li>
+                            {(categorias.length ? categorias : []).map((cat) => (
+                                <li key={cat.id}>
+                                    <Link href={`/produtos?category=${cat.slug}`} className="hover:text-primary hover:underline">
+                                        {cat.nome}
+                                    </Link>
+                                </li>
+                            ))}
                         </ul>
                     </div>
 

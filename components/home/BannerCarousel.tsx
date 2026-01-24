@@ -101,16 +101,16 @@ export function BannerCarousel() {
                 <CarouselContent className="ml-0">
                     {bannerData.map((item) => (
                         <CarouselItem key={item.id} className="pl-0">
-                            <div className="relative w-full h-[150px] sm:h-[200px] md:h-[300px] lg:h-[400px] xl:h-[600px] overflow-hidden">
+<div className="relative w-full aspect-16/5 overflow-hidden">
                                 {/* Background Image using Next.js Image */}
                                 <div className="absolute inset-0">
                                     <Image
-                                        src={item.image}
-                                        alt={item.title || "Banner"}
-                                        fill
-                                        className="w-full"
-                                        priority={item.id === 1}
-                                    />
+  src={item.image}
+  alt={item.title || "Banner"}
+  fill
+  className="object-contain object-center"
+  priority={item.id === 1}
+/>
                                     {/* <div className="absolute inset-0 bg-gradient-to-r from-[#0A7AAC]/80 to-[#3E418E]/60 mix-blend-multiply" /> */}
                                     {/* <div className="absolute inset-0 bg-black/20" /> */}
                                 </div>
