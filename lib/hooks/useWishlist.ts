@@ -26,7 +26,7 @@ export function useWishlist() {
         if (error) {
             console.error('Error fetching wishlist:', error);
         } else {
-             // Ensure we store as numbers
+             // Garante armazenamento como números
             setWishlistIds(data.map(item => Number(item.produto_id)));
         }
     };
@@ -37,7 +37,7 @@ export function useWishlist() {
             return;
         }
 
-        // Convert to number for consistency with DB and State
+        // Converte para número para manter consistência com BD e estado
         const idAsNumber = Number(produtoId);
         if (isNaN(idAsNumber)) {
             console.error("Invalid product ID:", produtoId);
@@ -67,10 +67,10 @@ export function useWishlist() {
                     });
                 
                 if (error) {
-                    // Check for duplicate key violation just in case
-                    if (error.code === '23505') { // Unique violation
+                    // Verifica violação de chave duplicada por precaução
+                    if (error.code === '23505') { // violação de unique
                          toast.success("Já está nos favoritos!");
-                         // Sync state
+                         // Sincroniza estado
                          if (!wishlistIds.includes(idAsNumber)) {
                              setWishlistIds(prev => [...prev, idAsNumber]);
                          }

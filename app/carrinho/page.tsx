@@ -21,11 +21,11 @@ export default function PaginaCarrinho() {
     const handleShippingCalc = async () => {
         if (cep.length < 8) return;
         setIsSimulating(true);
-        // Simulate API
+        // Simula API
         await new Promise(resolve => setTimeout(resolve, 1500));
         
-        // Mock logic
-        const price = 25.90; // Fixed mock price
+        // Lógica mock
+        const price = 25.90; // preço mock fixo
         setShippingInfo({ cep, price, days: 5 });
         setIsSimulating(false);
     };

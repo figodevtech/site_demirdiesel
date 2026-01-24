@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const RAW_KEY = process.env.PAGARME_SECRET_KEY || process.env.PAGARME_API_KEY || '';
 const PAGARME_API_KEY = RAW_KEY.trim().replace(/^["']|["']$/g, '');
@@ -69,6 +70,65 @@ function resolveStatus(eventType?: string, status?: string) {
     return 'PENDENTE';
 }
 
+async function findOrderByCustomerAndAmount(customerId?: number, amountCents?: number) {
+    if (!customerId || !amountCents) return null;
+
+    try {
+        const windowStart = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+        const { data, error } = await supabaseAdmin
+            .from('pedido')
+            .select('id,total,status,data_pedido')
+            .eq('cliente_id', customerId)
+            .gte('data_pedido', windowStart)
+            .order('data_pedido', { ascending: false });
+
+        if (error) {
+            console.warn("DEBUG: Fallback lookup failed", error);
+            return null;
+        }
+
+        const targetCents = Math.round(amountCents);
+        const candidate = (data || []).find(row => {
+            const rowCents = Math.round((row.total || 0) * 100);
+            return Math.abs(rowCents - targetCents) <= 100; // allow R$1 tolerance
+        });
+
+        return candidate?.id || null;
+    } catch (err) {
+        console.warn("DEBUG: Error during fallback order lookup", err);
+        return null;
+    }
+}
+
+async function findOrderByAmount(amountCents?: number) {
+    if (!amountCents) return null;
+
+    try {
+        const windowStart = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+        const { data, error } = await supabaseAdmin
+            .from('pedido')
+            .select('id,total,status,data_pedido')
+            .gte('data_pedido', windowStart)
+            .order('data_pedido', { ascending: false });
+
+        if (error) {
+            console.warn("DEBUG: Fallback lookup (amount only) failed", error);
+            return null;
+        }
+
+        const targetCents = Math.round(amountCents);
+        const candidate = (data || []).find(row => {
+            const rowCents = Math.round((row.total || 0) * 100);
+            return Math.abs(rowCents - targetCents) <= 100 && (row.status || '').toUpperCase() === 'PENDENTE';
+        });
+
+        return candidate?.id || null;
+    } catch (err) {
+        console.warn("DEBUG: Error during fallback order lookup (amount only)", err);
+        return null;
+    }
+}
+
 export async function POST(request: Request) {
     try {
         const payload = await parsePayload(request);
@@ -80,17 +140,26 @@ export async function POST(request: Request) {
         const metadata = orderNode?.metadata || data?.metadata || payload.metadata || {};
 
         let orderId = metadata?.orderId || metadata?.order_id || metadata?.orderID;
-        const pagarmeOrderRef = orderNode?.id || orderNode?.code || data?.id || data?.code;
+        const pagarmeOrderRef = orderNode?.id || orderNode?.code || data?.id || data?.code || payload.data?.order_code;
         const statusFromPayload = orderNode?.status || data?.status || payload.status;
+        const customerId = metadata?.customerId || metadata?.customer_id;
+        const amountCents =
+            orderNode?.amount ||
+            orderNode?.amount_total ||
+            orderNode?.paid_amount ||
+            orderNode?.total_amount ||
+            orderNode?.amount_with_taxes ||
+            data?.amount ||
+            data?.paid_amount;
 
-        // Charges metadata can carry the order reference when the root metadata is empty
+        // As cobranças podem trazer o metadata quando o metadata raiz está vazio
         if (!orderId) {
             const charges = orderNode?.charges || data?.charges;
             const chargeMeta = charges?.[0]?.metadata || charges?.[0]?.last_transaction?.metadata;
             orderId = chargeMeta?.orderId || chargeMeta?.order_id;
         }
 
-        // As a last resort, fetch the order from Pagar.me to extract metadata/orderId
+        // Último recurso: buscar a ordem no Pagar.me para tentar extrair metadata/orderId
         let fetchedOrder: any = null;
         if (!orderId && pagarmeOrderRef) {
             fetchedOrder = await fetchOrderFromPagarme(pagarmeOrderRef);
@@ -98,6 +167,34 @@ export async function POST(request: Request) {
             orderId = fetchedMeta.orderId || fetchedMeta.order_id;
             if (!orderId && fetchedOrder?.code && /^\d+$/.test(String(fetchedOrder.code))) {
                 orderId = fetchedOrder.code;
+            }
+        }
+
+        // Heurística 1: casar por cliente + valor quando o metadata estiver ausente
+        if (!orderId) {
+            const derivedAmountCents = amountCents || fetchedOrder?.amount || fetchedOrder?.paid_amount || fetchedOrder?.total_amount;
+            const derivedCustomer = customerId || fetchedOrder?.customer_id || fetchedOrder?.customer?.id;
+            const numericCustomer = Number(derivedCustomer);
+            const customerFilter = !Number.isNaN(numericCustomer) ? numericCustomer : undefined;
+
+            if (customerFilter && derivedAmountCents) {
+                const matched = await findOrderByCustomerAndAmount(customerFilter, derivedAmountCents);
+                if (matched) {
+                    console.log(`DEBUG: Fallback matched local order ${matched} using customer + amount`);
+                    orderId = matched;
+                }
+            }
+        }
+
+        // Heurística 2: casar apenas pelo valor (recentes e status pendente)
+        if (!orderId) {
+            const derivedAmountCents = amountCents || fetchedOrder?.amount || fetchedOrder?.paid_amount || fetchedOrder?.total_amount;
+            if (derivedAmountCents) {
+                const matched = await findOrderByAmount(derivedAmountCents);
+                if (matched) {
+                    console.log(`DEBUG: Fallback matched local order ${matched} using amount only`);
+                    orderId = matched;
+                }
             }
         }
 
@@ -129,6 +226,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Order ID format not supported' }, { status: 200 });
         }
 
+        // Trava rápida para evitar update indevido
+        if (orderFilter === undefined || orderFilter === null) {
+            console.warn("DEBUG: Order filter is undefined/null. Aborting update.");
+            return NextResponse.json({ message: 'Order filter missing' }, { status: 200 });
+        }
+
         if (!HAS_SERVICE_ROLE) {
             console.warn("DEBUG: SUPABASE_SERVICE_ROLE_KEY is missing. Webhook update may be blocked by RLS.");
         }
@@ -144,7 +247,7 @@ export async function POST(request: Request) {
 
         if (error) {
             console.error("DEBUG: Error updating order via webhook:", error);
-            return NextResponse.json({ error: 'DB Update failed' }, { status: 500 });
+            return NextResponse.json({ error: 'DB Update failed' }, { status: 200 });
         }
 
         if (!updatedRows || updatedRows.length === 0) {
@@ -155,6 +258,6 @@ export async function POST(request: Request) {
 
     } catch (error: any) {
         console.error("Webhook Error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: error.message }, { status: 200 });
     }
 }

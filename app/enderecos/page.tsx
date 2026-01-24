@@ -19,7 +19,7 @@ export default function EnderecosPage() {
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     
-    // Form State
+    // Estado do formulário
     const [editingId, setEditingId] = useState<number | null>(null);
     const [cep, setCep] = useState('');
     const [logradouro, setLogradouro] = useState('');

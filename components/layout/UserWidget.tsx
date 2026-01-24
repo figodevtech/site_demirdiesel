@@ -30,7 +30,7 @@ export default function UserWidget() {
         );
     }
 
-    // Fallback name logic
+    // Lógica de fallback para nome
     const displayName = profile?.nomerazaosocial || user.user_metadata?.name || user.email || 'Cliente';
     const initial = displayName.charAt(0).toUpperCase();
     const firstName = displayName.split(' ')[0];

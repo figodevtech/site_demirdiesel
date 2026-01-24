@@ -69,7 +69,7 @@ export default async function Navbar() {
                             </Link>
                         </li>
                         <li className="shrink-0 ml-auto"><Link href="/ofertas" className="hover:text-primary transition-colors text-destructive">Ofertas do Dia</Link></li>
-                        <li className="shrink-0"><Link href="/contato" className="hover:text-primary transition-colors">Fale Conosco</Link></li>
+                        <li className="shrink-0"><Link href="/fale-conosco" className="hover:text-primary transition-colors">Fale Conosco</Link></li>
                     </ul>
                 </div>
             </nav>

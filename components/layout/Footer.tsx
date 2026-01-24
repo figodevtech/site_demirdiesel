@@ -1,7 +1,10 @@
-import Link from 'next/link';
-import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from 'lucide-react';
+﻿import Link from "next/link";
+import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from "lucide-react";
+import { buscarCategorias } from "@/lib/api";
 
-export default function Footer() {
+export default async function Footer() {
+    const categorias = (await buscarCategorias()).slice(0, 5);
+
     return (
         <footer className="bg-secondary text-secondary-foreground pt-12 pb-6">
             <div className="container mx-auto px-4">
@@ -24,11 +27,13 @@ export default function Footer() {
                     <div>
                         <h4 className="font-semibold mb-4 text-lg">Categorias</h4>
                         <ul className="space-y-2 text-sm opacity-90">
-                            <li><Link href="/categoria/oleos-e-fluidos" className="hover:text-primary hover:underline">Óleos e Fluídos</Link></li>
-                            <li><Link href="/categoria/filtros" className="hover:text-primary hover:underline">Filtros</Link></li>
-                            <li><Link href="/categoria/freios" className="hover:text-primary hover:underline">Freios</Link></li>
-                            <li><Link href="/categoria/suspensao" className="hover:text-primary hover:underline">Suspensão</Link></li>
-                            <li><Link href="/categoria/eletrica" className="hover:text-primary hover:underline">Elétrica</Link></li>
+                            {(categorias.length ? categorias : []).map((cat) => (
+                                <li key={cat.id}>
+                                    <Link href={`/produtos?category=${cat.slug}`} className="hover:text-primary hover:underline">
+                                        {cat.nome}
+                                    </Link>
+                                </li>
+                            ))}
                         </ul>
                     </div>
 
@@ -38,9 +43,9 @@ export default function Footer() {
                         <ul className="space-y-2 text-sm opacity-90">
                             <li><Link href="/conta" className="hover:text-primary hover:underline">Minha Conta</Link></li>
                             <li><Link href="/pedidos" className="hover:text-primary hover:underline">Meus Pedidos</Link></li>
-                            <li><Link href="/politica-privacidade" className="hover:text-primary hover:underline">Política de Privacidade</Link></li>
-                            <li><Link href="/trocas" className="hover:text-primary hover:underline">Trocas e Devoluções</Link></li>
-                            <li><Link href="/faq" className="hover:text-primary hover:underline">Dúvidas Frequentes</Link></li>
+                            <li><Link href="/politica-de-privacidade" className="hover:text-primary hover:underline">Política de Privacidade</Link></li>
+                            <li><Link href="/trocas-e-devolucoes" className="hover:text-primary hover:underline">Trocas e Devoluções</Link></li>
+                            <li><Link href="/duvidas-frequentes" className="hover:text-primary hover:underline">Dúvidas Frequentes</Link></li>
                         </ul>
                     </div>
 
@@ -50,7 +55,7 @@ export default function Footer() {
                         <ul className="space-y-3 text-sm opacity-90">
                             <li className="flex items-center gap-2">
                                 <Phone size={16} className="text-primary" />
-                                <span>(11) 99999-9999</span>
+                                <span>(00) 00000-0000</span>
                             </li>
                             <li className="flex items-center gap-2">
                                 <Mail size={16} className="text-primary" />

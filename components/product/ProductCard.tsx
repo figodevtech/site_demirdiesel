@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 
 interface ProductCardProps {
-    product: any; // Ideally use proper type
+    product: any; // ideal seria tipar corretamente
 }
 
 export function ProductCard({ product }: ProductCardProps) {
