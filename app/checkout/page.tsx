@@ -161,21 +161,21 @@ export default function CheckoutPage() {
         setIsCheckingStatus(true);
         try {
             const { data } = await supabase
-                .from('pedido')
+                .from('venda')
                 .select('status')
                 .eq('id', currentOrderId)
                 .single();
 
-            if (data && (data.status === 'PAGO' || data.status === 'AUTORIZADO' || data.status === 'PENDENTE')) {
-                if (data.status !== 'PENDENTE') {
-                    setPaymentStatus('paid');
-                    if (!clearedRef.current) {
-                        clearedRef.current = true;
-                        clearCart();
-                    }
-                } else {
-                    toast.info('Pedido registrado, pagamento pendente.');
+            const s = data?.status?.toUpperCase();
+            if (s === 'PAGO' || s === 'AUTORIZADO') {
+                setPaymentStatus('paid');
+                setIsWaitingPayment(false);
+                if (!clearedRef.current) {
+                    clearedRef.current = true;
+                    clearCart();
                 }
+            } else if (s === 'PENDENTE') {
+                toast.info('Pedido registrado, pagamento pendente.');
             }
         } catch (err) {
             console.error('Error polling order status:', err);
@@ -191,12 +191,13 @@ export default function CheckoutPage() {
             .channel(`order_status_${currentOrderId}`)
             .on(
                 'postgres_changes', 
-                { event: 'UPDATE', schema: 'public', table: 'pedido', filter: `id=eq.${currentOrderId}` },
+                { event: 'UPDATE', schema: 'public', table: 'venda', filter: `id=eq.${currentOrderId}` },
                 (payload) => {
                     const newStatus = payload.new.status?.toUpperCase();
                     if (newStatus === 'PAGO' || newStatus === 'AUTORIZADO') {
                         toast.success('Pagamento confirmado!');
                         setPaymentStatus('paid');
+                        setIsWaitingPayment(false);
                         if (!clearedRef.current) {
                             clearedRef.current = true;
                             clearCart();
@@ -213,6 +214,7 @@ export default function CheckoutPage() {
         const handleMessage = (event: MessageEvent) => {
             if (event.data === 'payment_success') {
                 setPaymentStatus('paid');
+                setIsWaitingPayment(false);
                 if (!clearedRef.current) {
                     clearedRef.current = true;
                     clearCart();
@@ -222,6 +224,15 @@ export default function CheckoutPage() {
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
     }, [clearCart]);
+
+    // Polling automático enquanto aguarda pagamento
+    useEffect(() => {
+        if (!isWaitingPayment || !currentOrderId) return;
+        const id = setInterval(() => {
+            checkOrderStatus();
+        }, 5000);
+        return () => clearInterval(id);
+    }, [isWaitingPayment, currentOrderId]);
 
     const handleCheckout = async () => {
         if (!selectedAddressId) {

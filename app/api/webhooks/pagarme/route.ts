@@ -76,11 +76,11 @@ async function findOrderByCustomerAndAmount(customerId?: number, amountCents?: n
     try {
         const windowStart = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
         const { data, error } = await supabaseAdmin
-            .from('pedido')
-            .select('id,total,status,data_pedido')
-            .eq('cliente_id', customerId)
-            .gte('data_pedido', windowStart)
-            .order('data_pedido', { ascending: false });
+            .from('venda')
+            .select('id,valortotal,status,createdat,datavenda')
+            .eq('clienteid', customerId)
+            .gte('createdat', windowStart)
+            .order('createdat', { ascending: false });
 
         if (error) {
             console.warn("DEBUG: Fallback lookup failed", error);
@@ -89,7 +89,7 @@ async function findOrderByCustomerAndAmount(customerId?: number, amountCents?: n
 
         const targetCents = Math.round(amountCents);
         const candidate = (data || []).find(row => {
-            const rowCents = Math.round((row.total || 0) * 100);
+            const rowCents = Math.round((row.valortotal || 0) * 100);
             return Math.abs(rowCents - targetCents) <= 100; // allow R$1 tolerance
         });
 
@@ -106,10 +106,10 @@ async function findOrderByAmount(amountCents?: number) {
     try {
         const windowStart = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
         const { data, error } = await supabaseAdmin
-            .from('pedido')
-            .select('id,total,status,data_pedido')
-            .gte('data_pedido', windowStart)
-            .order('data_pedido', { ascending: false });
+            .from('venda')
+            .select('id,valortotal,status,createdat,datavenda')
+            .gte('createdat', windowStart)
+            .order('createdat', { ascending: false });
 
         if (error) {
             console.warn("DEBUG: Fallback lookup (amount only) failed", error);
@@ -118,8 +118,9 @@ async function findOrderByAmount(amountCents?: number) {
 
         const targetCents = Math.round(amountCents);
         const candidate = (data || []).find(row => {
-            const rowCents = Math.round((row.total || 0) * 100);
-            return Math.abs(rowCents - targetCents) <= 100 && (row.status || '').toUpperCase() === 'PENDENTE';
+            const rowCents = Math.round((row.valortotal || 0) * 100);
+            const s = (row.status || '').toUpperCase();
+            return Math.abs(rowCents - targetCents) <= 100 && (s === 'PENDENTE' || s === 'PAGAMENTO');
         });
 
         return candidate?.id || null;
@@ -131,6 +132,10 @@ async function findOrderByAmount(amountCents?: number) {
 
 export async function POST(request: Request) {
     try {
+        if (!HAS_SERVICE_ROLE) {
+            console.warn("DEBUG: SUPABASE_SERVICE_ROLE_KEY ausente; usando client anon. Garanta que RLS esteja desabilitado ou permita update em 'venda'.");
+        }
+
         const payload = await parsePayload(request);
         console.log("DEBUG: Pagar.me Webhook Received:", JSON.stringify(payload, null, 2));
 
@@ -236,14 +241,27 @@ export async function POST(request: Request) {
             console.warn("DEBUG: SUPABASE_SERVICE_ROLE_KEY is missing. Webhook update may be blocked by RLS.");
         }
 
-        const { data: updatedRows, error } = await supabaseAdmin
-            .from('pedido')
-            .update({
-                status: newStatus,
-                forma_pagamento: paymentMethod
-            })
-            .eq('id', orderFilter)
-            .select('id');
+        const tryUpdate = async (statusToSet: string) => {
+            return supabaseAdmin
+                .from('venda')
+                .update({ status: statusToSet })
+                .eq('id', orderFilter)
+                .select('id');
+        };
+
+        let { data: updatedRows, error } = await tryUpdate(newStatus);
+
+        // Fallback: se o enum não tiver o status novo, tenta equivalentes antigos
+        if (error && error.code === '22P02') {
+            const fallback =
+                newStatus === 'PAGO' ? 'PAGO' :
+                newStatus === 'PENDENTE' ? 'PENDENTE' :
+                newStatus === 'CANCELADO' ? 'CANCELADO' :
+                newStatus === 'AUTORIZADO' ? 'AUTORIZADO' :
+                newStatus;
+            console.warn(`DEBUG: Enum reject for status ${newStatus}, trying fallback ${fallback}`);
+            ({ data: updatedRows, error } = await tryUpdate(fallback));
+        }
 
         if (error) {
             console.error("DEBUG: Error updating order via webhook:", error);

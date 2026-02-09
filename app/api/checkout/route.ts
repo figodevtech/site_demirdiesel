@@ -59,15 +59,20 @@ export async function POST(request: Request) {
 
         // --- SAVE TO DATABASE START ---
         console.log("Attempting to save order to DB for customer:", customerId);
+        const nowIso = new Date().toISOString();
         const { data: orderData, error: orderError } = await supabaseAdmin
-            .from('pedido')
+            .from('venda')
             .insert({
-                cliente_id: customerId,
+                clienteid: customerId,
                 status: 'PENDENTE',
-                total: (totalAmount) / 100,
-                data_pedido: new Date().toISOString(),
+                valortotal: totalAmount / 100,
+                sub_total: totalAmount / 100,
+                datavenda: nowIso,
+                createdat: nowIso,
+                updatedat: nowIso,
                 forma_pagamento: 'Pagar.me',
-                endereco_entrega_snapshot: address
+                endereco_entrega_snapshot: address,
+                canal: 'ONLINE'
             })
             .select()
             .single();
@@ -77,14 +82,17 @@ export async function POST(request: Request) {
         } else if (orderData) {
             console.log("Order created successfully with ID:", orderData.id);
             const orderItems = items.map((item: any) => ({
-                pedido_id: orderData.id,
-                produto_id: Number(item.product.id),
+                venda_id: orderData.id,
+                produtoid: Number(item.product.id),
                 quantidade: item.quantity,
-                preco_unitario: item.product.price
+                sub_total: item.product.price * item.quantity,
+                valor_total: item.product.price * item.quantity,
+                valor_desconto: 0,
+                tipo_desconto: null
             }));
 
             const { error: itemsError } = await supabaseAdmin
-                .from('item_pedido')
+                .from('vendaproduto')
                 .insert(orderItems);
             
             if (itemsError) {
