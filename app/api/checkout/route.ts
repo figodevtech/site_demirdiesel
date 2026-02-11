@@ -70,6 +70,7 @@ export async function POST(request: Request) {
                 datavenda: nowIso,
                 createdat: nowIso,
                 updatedat: nowIso,
+                // será atualizado pelo webhook com o método escolhido (pix/boleto/cartão)
                 forma_pagamento: 'Pagar.me',
                 endereco_entrega_snapshot: address,
                 canal: 'ONLINE'

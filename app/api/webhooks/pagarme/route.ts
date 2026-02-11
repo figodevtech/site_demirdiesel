@@ -70,6 +70,122 @@ function resolveStatus(eventType?: string, status?: string) {
     return 'PENDENTE';
 }
 
+function normalizePaymentMethod(pm: any) {
+    const s = String(pm ?? '').trim().toLowerCase();
+    if (!s) return null;
+    if (s === 'pix') return 'Pix';
+    if (s === 'boleto') return 'Boleto';
+    if (s === 'credit_card') return 'Cartão de crédito';
+    if (s === 'debit_card') return 'Cartão de débito';
+    // fallback: mantém o valor original (para novos métodos)
+    return String(pm);
+}
+
+function isPaidStatus(status?: string | null) {
+    const s = String(status ?? '').trim().toUpperCase();
+    return s === 'PAGO' || s === 'FINALIZADA';
+}
+
+async function baixarEstoqueVenda(vendaId: number) {
+    const { data: itens, error: itensErr } = await supabaseAdmin
+        .from('vendaproduto')
+        .select('produtoid, quantidade')
+        .eq('venda_id', vendaId);
+
+    if (itensErr) {
+        console.error('[webhook] Erro ao buscar itens da venda para baixa de estoque:', itensErr);
+        return { ok: false as const, error: itensErr.message };
+    }
+
+    const nowIso = new Date().toISOString();
+
+    for (const it of itens ?? []) {
+        const produtoId = Number((it as any).produtoid);
+        const qtd = Math.max(0, Number((it as any).quantidade) || 0);
+        if (!produtoId || !qtd) continue;
+
+        const { data: prod, error: prodErr } = await supabaseAdmin
+            .from('produto')
+            .select('id, estoque')
+            .eq('id', produtoId)
+            .single();
+
+        if (prodErr) {
+            console.error(`[webhook] Erro ao buscar produto ${produtoId} para baixa de estoque:`, prodErr);
+            continue;
+        }
+
+        const estoqueAtual = Number((prod as any).estoque ?? 0);
+        const novoEstoque = Math.max(0, estoqueAtual - qtd);
+
+        const { error: updErr } = await supabaseAdmin
+            .from('produto')
+            .update({ estoque: novoEstoque, updatedat: nowIso })
+            .eq('id', produtoId);
+
+        if (updErr) {
+            console.error(`[webhook] Erro ao atualizar estoque do produto ${produtoId}:`, updErr);
+        }
+    }
+
+    return { ok: true as const };
+}
+
+async function baixarEstoqueVendaRpc(vendaId: number) {
+    // Caminho preferencial: RPC atomica no banco (idempotente).
+    // Requer que a funcao `fn_baixar_estoque_venda(p_venda_id int)` exista no Postgres.
+    const { error } = await supabaseAdmin.rpc('fn_baixar_estoque_venda', { p_venda_id: vendaId });
+    if (!error) return { ok: true as const };
+
+    // Se a RPC ainda nao existe no banco, faz fallback (nao-atomico) para nao quebrar o webhook.
+    console.warn('[webhook] RPC fn_baixar_estoque_venda falhou; usando fallback no Node:', error);
+    return baixarEstoqueVenda(vendaId);
+}
+
+async function estornarEstoqueVendaRpc(vendaId: number) {
+    // Requer que a funcao `fn_estornar_estoque_venda(p_venda_id int)` exista no Postgres.
+    const { error } = await supabaseAdmin.rpc('fn_estornar_estoque_venda', { p_venda_id: vendaId });
+    if (!error) return { ok: true as const };
+
+    // Fallback: se nao tiver RPC, tenta reverter com base nos itens atuais da venda.
+    console.warn('[webhook] RPC fn_estornar_estoque_venda falhou; usando fallback no Node:', error);
+
+    const { data: itens, error: itensErr } = await supabaseAdmin
+        .from('vendaproduto')
+        .select('produtoid, quantidade')
+        .eq('venda_id', vendaId);
+
+    if (itensErr) return { ok: false as const, error: itensErr.message };
+
+    const nowIso = new Date().toISOString();
+    for (const it of itens ?? []) {
+        const produtoId = Number((it as any).produtoid);
+        const qtd = Math.max(0, Number((it as any).quantidade) || 0);
+        if (!produtoId || !qtd) continue;
+
+        const { data: prod, error: prodErr } = await supabaseAdmin
+            .from('produto')
+            .select('id, estoque')
+            .eq('id', produtoId)
+            .single();
+        if (prodErr) continue;
+
+        const estoqueAtual = Number((prod as any).estoque ?? 0);
+        const novoEstoque = estoqueAtual + qtd;
+
+        const { error: updErr } = await supabaseAdmin
+            .from('produto')
+            .update({ estoque: novoEstoque, updatedat: nowIso })
+            .eq('id', produtoId);
+
+        if (updErr) {
+            console.error(`[webhook] Erro ao estornar estoque do produto ${produtoId}:`, updErr);
+        }
+    }
+
+    return { ok: true as const };
+}
+
 async function findOrderByCustomerAndAmount(customerId?: number, amountCents?: number) {
     if (!customerId || !amountCents) return null;
 
@@ -219,7 +335,8 @@ export async function POST(request: Request) {
             || data?.charges?.[0]?.last_transaction
             || fetchedOrder?.charges?.[0]?.last_transaction;
 
-        const paymentMethod = paymentSource?.payment_method || 'Pagar.me';
+        const paymentMethodRaw = paymentSource?.payment_method || null;
+        const paymentMethod = normalizePaymentMethod(paymentMethodRaw) || 'Pagar.me';
         const newStatus = resolveStatus(eventType, statusFromPayload || fetchedOrder?.status);
 
         const numericOrderId = Number(orderId);
@@ -244,10 +361,34 @@ export async function POST(request: Request) {
         const tryUpdate = async (statusToSet: string) => {
             return supabaseAdmin
                 .from('venda')
-                .update({ status: statusToSet })
+                .update({ status: statusToSet, updatedat: new Date().toISOString() })
                 .eq('id', orderFilter)
-                .select('id');
+                .neq('status', statusToSet)
+                .select('id,status');
         };
+
+        const { data: before, error: beforeErr } = await supabaseAdmin
+            .from('venda')
+            .select('id,status,forma_pagamento')
+            .eq('id', orderFilter)
+            .maybeSingle();
+
+        if (beforeErr) {
+            console.warn('DEBUG: Unable to read current order status before update:', beforeErr);
+        }
+
+        const paidBefore = isPaidStatus((before as any)?.status ?? null);
+        const beforePayment = String((before as any)?.forma_pagamento ?? '').trim();
+
+        // Atualiza forma_pagamento com o método escolhido no checkout do Pagar.me
+        // (mesmo se o status não mudou, para corrigir vendas antigas).
+        if (paymentMethod && paymentMethod !== 'Pagar.me' && paymentMethod !== beforePayment) {
+            const { error: payErr } = await supabaseAdmin
+                .from('venda')
+                .update({ forma_pagamento: paymentMethod, updatedat: new Date().toISOString() })
+                .eq('id', orderFilter);
+            if (payErr) console.warn('DEBUG: Failed to update forma_pagamento:', payErr);
+        }
 
         let { data: updatedRows, error } = await tryUpdate(newStatus);
 
@@ -270,9 +411,29 @@ export async function POST(request: Request) {
 
         if (!updatedRows || updatedRows.length === 0) {
             console.warn(`DEBUG: No order updated for ID=${orderFilter}. Check if the ID matches your local table.`);
+            // Mesmo se nao atualizou (ex.: webhook repetido), ainda podemos precisar baixar estoque.
         }
 
-        return NextResponse.json({ received: true, orderId: orderFilter, status: newStatus });
+        // Baixa de estoque: somente quando transiciona para PAGO pela primeira vez.
+        // A RPC garante idempotencia, entao podemos chamar sempre que o status for pago.
+        if (isPaidStatus(newStatus) && orderFilterIsNumeric) {
+            const vendaId = Number(orderFilter);
+            const res = await baixarEstoqueVendaRpc(vendaId);
+            if (!res.ok) {
+                console.error('[webhook] baixa de estoque falhou:', res.error);
+            }
+        }
+
+        // Estorno de estoque: quando status vira CANCELADO.
+        if (newStatus === 'CANCELADO' && orderFilterIsNumeric) {
+            const vendaId = Number(orderFilter);
+            const res = await estornarEstoqueVendaRpc(vendaId);
+            if (!res.ok) {
+                console.error('[webhook] estorno de estoque falhou:', (res as any).error);
+            }
+        }
+
+        return NextResponse.json({ received: true, orderId: orderFilter, status: newStatus, paymentMethod });
 
     } catch (error: any) {
         console.error("Webhook Error:", error);
