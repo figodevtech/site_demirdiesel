@@ -86,7 +86,9 @@ export default function PedidosPage() {
         .from("venda")
         .select("*")
         .eq("clienteid", profile.id)
-        .order("createdat", { ascending: false });
+        // mais recentes primeiro: prioriza datavenda e cai para createdat
+        .order("datavenda", { ascending: false, nullsFirst: false })
+        .order("createdat", { ascending: false, nullsFirst: false });
       if (error) {
         console.error("Erro ao buscar pedidos:", JSON.stringify(error, null, 2));
         setOrders([]);
@@ -108,7 +110,7 @@ export default function PedidosPage() {
         .in("venda_id", data?.map((o) => o.id) || []);
 
       const ordersWithItems =
-        data?.map((order) => ({
+        (data ?? []).map((order: any) => ({
           ...order,
           items: itemsData?.filter((i) => i.venda_id === order.id) || [],
         })) || [];
@@ -229,9 +231,9 @@ export default function PedidosPage() {
       ) : (
         <div className="space-y-4">
           {orders.map((order) => {
-          const statusInfo = getStatusInfo(order);
-          const isExpanded = selectedOrderId === order.id;
-
+            const statusInfo = getStatusInfo(order);
+            const isExpanded = selectedOrderId === order.id;
+ 
             return (
               <Card
                 key={order.id}
@@ -274,7 +276,7 @@ export default function PedidosPage() {
                         Acompanhamento do Pedido
                       </h4>
                       <div className="relative flex justify-between max-w-2xl mx-auto">
-                        <div className="absolute top-4 left-0 right-0 h-1 bg-muted -z-0">
+                        <div className="absolute top-4 left-0 right-0 h-1 bg-muted z-0">
                           <div
                             className="h-full bg-primary transition-all duration-1000"
                             style={{ width: `${Math.max(0, (statusInfo.step / 4) * 100)}%` }}
