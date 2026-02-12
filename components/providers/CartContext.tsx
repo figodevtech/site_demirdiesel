@@ -67,28 +67,62 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }, [shippingInfo, isLoaded]);
 
     const addToCart = (product: any, quantity: number) => {
+        const stock = Number(product?.stock ?? 0);
+        const q = Math.max(1, Number(quantity) || 1);
+
         setItems(current => {
             const existing = current.find(item => item.product.id === product.id);
-            if (existing) {
-                return current.map(item => 
-                    item.product.id === product.id 
-                        ? { ...item, quantity: item.quantity + quantity }
-                        : item
-                );
+            const existingQty = existing ? Number(existing.quantity) || 0 : 0;
+
+            if (Number.isFinite(stock) && stock > 0) {
+                const canAdd = Math.max(0, stock - existingQty);
+                const willAdd = Math.min(q, canAdd);
+
+                if (willAdd <= 0) {
+                    toast.error('Quantidade indisponível em estoque.');
+                    return current;
+                }
+
+                if (willAdd < q) {
+                    toast.warning(`Apenas ${canAdd} unidade(s) disponível(is) em estoque.`);
+                }
+
+                if (existing) {
+                    return current.map(item =>
+                        item.product.id === product.id
+                            ? { ...item, quantity: existingQty + willAdd }
+                            : item
+                    );
+                }
+
+                return [...current, { product, quantity: willAdd }];
             }
-            return [...current, { product, quantity }];
+
+            toast.error('Produto sem estoque.');
+            return current;
         });
-        // Podemos adicionar um toast aqui depois, se houver
-        console.log(`Added ${quantity} x ${product.name} to cart`);
     };
 
     const updateQuantity = (productId: string, quantity: number) => {
-        setItems(current => 
-            current.map(item => 
-                item.product.id === productId 
-                    ? { ...item, quantity: Math.max(1, quantity) }
-                    : item
-            )
+        const q = Math.max(1, Number(quantity) || 1);
+        setItems(current =>
+            current.flatMap(item => {
+                if (item.product.id !== productId) return [item];
+
+                const stock = Number(item.product?.stock ?? 0);
+                if (Number.isFinite(stock) && stock <= 0) {
+                    toast.error('Produto sem estoque.');
+                    return [];
+                }
+
+                if (Number.isFinite(stock) && stock > 0) {
+                    const clamped = Math.min(q, stock);
+                    if (clamped < q) toast.warning(`Estoque máximo: ${stock}.`);
+                    return [{ ...item, quantity: clamped }];
+                }
+
+                return [{ ...item, quantity: q }];
+            })
         );
     };
 

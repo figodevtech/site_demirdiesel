@@ -62,9 +62,13 @@ export default function ProductActions({ product }: { product: any }) {
                                         id="quantity"
                                         type="number" 
                                         min="1" 
-                                        max={product.stock || 10} 
+                                        max={product.stock} 
                                         value={quantity}
-                                        onChange={(e) => setQuantity(Number(e.target.value))}
+                                        onChange={(e) => {
+                                            const v = Math.max(1, Number(e.target.value) || 1);
+                                            const max = Number(product.stock) || 1;
+                                            setQuantity(Math.min(v, max));
+                                        }}
                                         className="w-full text-center" 
                                     />
                                 </div>
