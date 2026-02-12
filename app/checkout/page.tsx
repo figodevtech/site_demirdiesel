@@ -169,13 +169,10 @@ export default function CheckoutPage() {
             const s = data?.status?.toUpperCase();
             if (s === 'PAGO' || s === 'AUTORIZADO') {
                 setPaymentStatus('paid');
-                setIsWaitingPayment(false);
                 if (!clearedRef.current) {
                     clearedRef.current = true;
                     clearCart();
                 }
-            } else if (s === 'PENDENTE') {
-                toast.info('Pedido registrado, pagamento pendente.');
             }
         } catch (err) {
             console.error('Error polling order status:', err);
@@ -186,7 +183,7 @@ export default function CheckoutPage() {
 
     // Atualização em tempo real (Supabase)
     useEffect(() => {
-        if (!currentOrderId || !isWaitingPayment) return;
+        if (!currentOrderId || !isWaitingPayment || paymentStatus === 'paid') return;
         const channel = supabase
             .channel(`order_status_${currentOrderId}`)
             .on(
@@ -195,9 +192,7 @@ export default function CheckoutPage() {
                 (payload) => {
                     const newStatus = payload.new.status?.toUpperCase();
                     if (newStatus === 'PAGO' || newStatus === 'AUTORIZADO') {
-                        toast.success('Pagamento confirmado!');
                         setPaymentStatus('paid');
-                        setIsWaitingPayment(false);
                         if (!clearedRef.current) {
                             clearedRef.current = true;
                             clearCart();
@@ -207,14 +202,13 @@ export default function CheckoutPage() {
             )
             .subscribe();
         return () => { supabase.removeChannel(channel); };
-    }, [currentOrderId, isWaitingPayment, clearCart]);
+    }, [currentOrderId, isWaitingPayment, paymentStatus, clearCart]);
 
     // Mensagem enviada pelo popup
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
             if (event.data === 'payment_success') {
                 setPaymentStatus('paid');
-                setIsWaitingPayment(false);
                 if (!clearedRef.current) {
                     clearedRef.current = true;
                     clearCart();
@@ -227,12 +221,12 @@ export default function CheckoutPage() {
 
     // Polling automático enquanto aguarda pagamento
     useEffect(() => {
-        if (!isWaitingPayment || !currentOrderId) return;
+        if (!isWaitingPayment || !currentOrderId || paymentStatus === 'paid') return;
         const id = setInterval(() => {
             checkOrderStatus();
         }, 5000);
         return () => clearInterval(id);
-    }, [isWaitingPayment, currentOrderId]);
+    }, [isWaitingPayment, currentOrderId, paymentStatus]);
 
     const handleCheckout = async () => {
         if (!selectedAddressId) {
@@ -289,7 +283,8 @@ export default function CheckoutPage() {
     };
 
     // Tela de aguardando/confirmado
-    if (isWaitingPayment && paymentUrl) {
+    const showPaymentScreen = (isWaitingPayment && !!paymentUrl) || paymentStatus === 'paid';
+    if (showPaymentScreen) {
         const paid = paymentStatus === 'paid';
         return (
             <div className="container mx-auto px-4 py-16 max-w-2xl text-center">
@@ -310,7 +305,7 @@ export default function CheckoutPage() {
                         )}
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        {!paid && (
+                        {!paid && paymentUrl && (
                             <Button variant="outline" onClick={() => window.open(paymentUrl, 'PagarMeCheckout')} className="gap-2 w-full">
                                 <Plus size={16} /> Abrir janela novamente
                             </Button>
