@@ -8,86 +8,116 @@ import { notFound } from "next/navigation";
 import ProductActions from "@/components/product/ProductActions";
 
 export default async function ProductPage({
-    params,
+  params,
 }: {
-    params: Promise<{ id: string }>;
+  params: Promise<{ id: string }>;
 }) {
-    const { id } = await params;
-    const product = await getProductById(id);
+  const { id } = await params;
+  const product = await getProductById(id);
 
-    if (!product) {
-        notFound();
-    }
+  if (!product) {
+    notFound();
+  }
 
-    return (
-        <div className="container mx-auto px-4 py-8">
-            <div className="grid md:grid-cols-2 gap-12">
-                {/* Gallery */}
-                <div className="space-y-4">
-                    <div className="aspect-square bg-white border border-border/50 rounded-lg flex items-center justify-center p-8 relative overflow-hidden">
-                        <img src={product.image} alt={product.name} className="object-contain w-full h-full max-h-125" />
-                    </div>
-                    {product.images.length > 0 && (
-                        <div className="grid grid-cols-4 gap-4">
-                            {product.images.map((img: string, idx: number) => (
-                                <div key={idx} className="aspect-square bg-white border border-border/50 rounded-md cursor-pointer hover:border-primary overflow-hidden p-2">
-                                    <img src={img} alt="" className="w-full h-full object-contain" />
-                                </div>
-                            ))}
-                        </div>
-                    )}
+  return (
+    <div className="container mx-auto px-10 py-8">
+      <div className="grid md:grid-cols-2 gap-12">
+        {/* Gallery */}
+        <div className="space-y-4">
+          <div className="aspect-square bg-white border border-border/50 rounded-lg flex items-center justify-center p-8 relative overflow-hidden">
+            <img
+              src={product.image}
+              alt={product.name}
+              className="object-contain w-full h-full max-h-125"
+            />
+          </div>
+          {product.images.length > 0 && (
+            <div className="grid grid-cols-4 gap-4">
+              {product.images.map((img: string, idx: number) => (
+                <div
+                  key={idx}
+                  className="aspect-square bg-white border border-border/50 rounded-md cursor-pointer hover:border-primary overflow-hidden p-2"
+                >
+                  <img
+                    src={img}
+                    alt=""
+                    className="w-full h-full object-contain"
+                  />
                 </div>
-
-                {/* Info */}
-                <div className="space-y-6">
-                    <div>
-                        <div className="flex items-center gap-2 mb-2">
-                            <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-muted cursor-default">
-                                {product.category}
-                            </Badge>
-                            <Badge variant="outline" className="text-primary border-primary">
-                                {product.brand}
-                            </Badge>
-                        </div>
-                        <h1 className="text-3xl font-bold text-secondary mb-2">{product.name}</h1>
-                        <div className="flex items-center gap-4 text-sm">
-                            <div className="flex text-yellow-500">
-                                <Star className="fill-current w-4 h-4" />
-                                <span className="ml-1 text-secondary font-medium">{product.rating}</span>
-                            </div>
-                            <span className="text-muted-foreground">Cod: #{product.id}</span>
-                            {product.stock > 0 ? (
-                                <span className="text-green-600 font-medium flex items-center gap-1">
-                                    <Check size={14} /> Em estoque ({product.stock})
-                                </span>
-                            ) : (
-                                <span className="text-red-600 font-medium flex items-center gap-1">
-                                    Indisponível
-                                </span>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="space-y-1 py-4 border-t border-b border-border/50">
-                        <p className="text-xs text-muted-foreground">Preço à vista com 5% de desconto</p>
-                        <div className="text-4xl font-bold text-primary">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)}
-                        </div>
-                        <p className="text-sm opacity-80">
-                            ou <span className="font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)}</span> em até 3x sem juros
-                        </p>
-                    </div>
-
-                    <ProductActions product={product} />
-
-                    <div className="space-y-4 pt-4">
-                        <h3 className="font-bold text-secondary">Descrição</h3>
-                        <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                            {product.fullDescription}
-                        </p>
-                    </div>
-                </div>
+              ))}
             </div>
+          )}
         </div>
-    );
+
+        {/* Info */}
+        <div className="space-y-6">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Badge
+                variant="secondary"
+                className="bg-muted text-muted-foreground hover:bg-muted cursor-default"
+              >
+                {product.category}
+              </Badge>
+              <Badge variant="outline" className="text-primary border-primary">
+                {product.brand}
+              </Badge>
+            </div>
+            <h1 className="text-3xl font-bold text-secondary mb-2">
+              {product.name}
+            </h1>
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex text-yellow-500">
+                <Star className="fill-current w-4 h-4" />
+                <span className="ml-1 text-secondary font-medium">
+                  {product.rating}
+                </span>
+              </div>
+              <span className="text-muted-foreground">Cod: #{product.id}</span>
+              {product.stock > 0 ? (
+                <span className="text-green-600 font-medium flex items-center gap-1">
+                  <Check size={14} /> Em estoque ({product.stock})
+                </span>
+              ) : (
+                <span className="text-red-600 font-medium flex items-center gap-1">
+                  Indisponível
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1 py-4 border-t border-b border-border/50">
+            <p className="text-xs text-muted-foreground">
+              Preço à vista com 5% de desconto
+            </p>
+            <div className="text-4xl font-bold text-primary">
+              {new Intl.NumberFormat("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              }).format(product.price)}
+            </div>
+            <p className="text-sm opacity-80">
+              ou{" "}
+              <span className="font-semibold">
+                {new Intl.NumberFormat("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                }).format(product.price)}
+              </span>{" "}
+              em até 3x sem juros
+            </p>
+          </div>
+
+          <ProductActions product={product} />
+
+          <div className="space-y-4 pt-4">
+            <h3 className="font-bold text-secondary">Descrição</h3>
+            <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+              {product.fullDescription}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

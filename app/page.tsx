@@ -1,14 +1,23 @@
-﻿import Link from 'next/link';
+﻿import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { services, testimonials } from "@/lib/data";
-import { buscarProdutos } from "@/lib/api";
-import { ArrowRight, Star, Truck, ShieldCheck, CreditCard } from 'lucide-react';
+import { buscarProdutos, buscarProdutosDestaque } from "@/lib/api";
+import { ArrowRight, Star, Truck, ShieldCheck, CreditCard } from "lucide-react";
 import { BannerCarousel } from "@/components/home/BannerCarousel";
 import { ProductCard } from "@/components/product/ProductCard";
 import { ContactForm } from "@/components/home/ContactForm";
+import ProductCardV2 from "@/components/product/ProductCardV2";
 
-function FeatureIcon({ icon: Icon, title, desc }: { icon: any, title: string, desc: string }) {
+function FeatureIcon({
+  icon: Icon,
+  title,
+  desc,
+}: {
+  icon: any;
+  title: string;
+  desc: string;
+}) {
   return (
     <div className="flex items-center gap-4 p-4 rounded-lg bg-white shadow-sm border border-border/50">
       <div className="p-3 rounded-full bg-accent/30 text-primary">
@@ -23,20 +32,31 @@ function FeatureIcon({ icon: Icon, title, desc }: { icon: any, title: string, de
 }
 
 export default async function Home() {
-  const featuredProducts = await buscarProdutos(8);
+  const featuredProducts = await buscarProdutosDestaque(8);
 
   return (
     <div className="flex flex-col gap-12 pb-12">
-
       {/* Hero Section */}
       <BannerCarousel />
 
       {/* Features Bar */}
       <div className="container mx-auto px-4 -mt-16 relative z-20">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FeatureIcon icon={Truck} title="Frete para todo Brasil" desc="Consulte condições de envio" />
-          <FeatureIcon icon={ShieldCheck} title="Garantia Estendida" desc="Em peças e serviços" />
-          <FeatureIcon icon={CreditCard} title="Parcele em até 12x" desc="Cartões de crédito" />
+          <FeatureIcon
+            icon={Truck}
+            title="Frete para todo Brasil"
+            desc="Consulte condições de envio"
+          />
+          <FeatureIcon
+            icon={ShieldCheck}
+            title="Garantia Estendida"
+            desc="Em peças e serviços"
+          />
+          <FeatureIcon
+            icon={CreditCard}
+            title="Parcele em até 12x"
+            desc="Cartões de crédito"
+          />
         </div>
       </div>
 
@@ -44,20 +64,29 @@ export default async function Home() {
       <section className="container mx-auto px-4 space-y-8">
         <div className="text-center space-y-2">
           <h2 className="text-3xl font-bold text-secondary">Nossos Serviços</h2>
-          <p className="text-muted-foreground">Soluções completas para manutenção do seu veículo</p>
+          <p className="text-muted-foreground">
+            Soluções completas para manutenção do seu veículo
+          </p>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {services.map((service, idx) => (
-            <Card key={service.id} className="hover:shadow-lg transition-shadow border-border/60 hover:border-primary/50 group cursor-pointer bg-white">
+            <Card
+              key={service.id}
+              className="hover:shadow-lg transition-shadow border-border/60 hover:border-primary/50 group cursor-pointer bg-white"
+            >
               <CardContent className="p-6 flex flex-col items-center text-center gap-4 h-full">
                 <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
                   {/* Placeholder Icon based on ID/Name or just generic */}
                   <ShieldCheck size={24} />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-secondary">{service.title}</h3>
-                  <p className="text-xs text-muted-foreground mt-2">{service.description}</p>
+                  <h3 className="font-semibold text-secondary">
+                    {service.title}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {service.description}
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -70,17 +99,25 @@ export default async function Home() {
         <div className="container mx-auto px-4 space-y-8">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-3xl font-bold text-secondary">Destaques da Loja</h2>
-              <p className="text-muted-foreground">Os produtos mais procurados da semana</p>
+              <h2 className="text-3xl font-bold text-secondary">
+                Destaques da Loja
+              </h2>
+              <p className="text-muted-foreground">
+                Os produtos mais procurados da semana
+              </p>
             </div>
             <Link href="/categoria/todos">
-              <Button variant="link" className="text-primary">Ver todos <ArrowRight className="ml-2 h-4 w-4" /></Button>
+              <Button variant="link" className="text-primary">
+                Ver todos <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
             {featuredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <Link key={product.id} href={`/produto/${product.id}`}>
+                <ProductCardV2 product={product} />
+              </Link>
             ))}
           </div>
         </div>
@@ -88,17 +125,27 @@ export default async function Home() {
 
       {/* Testimonials */}
       <section className="container mx-auto px-4">
-        <h2 className="text-2xl font-bold text-center text-secondary mb-10">O que dizem nossos clientes</h2>
+        <h2 className="text-2xl font-bold text-center text-secondary mb-10">
+          O que dizem nossos clientes
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {testimonials.map((t) => (
             <Card key={t.id} className="bg-white border-none shadow-sm">
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center gap-1 text-yellow-400">
                   {[...Array(5)].map((_, i) => (
-                    <Star key={i} size={16} className={i < t.rating ? "fill-current" : "text-gray-300"} />
+                    <Star
+                      key={i}
+                      size={16}
+                      className={
+                        i < t.rating ? "fill-current" : "text-gray-300"
+                      }
+                    />
                   ))}
                 </div>
-                <p className="text-muted-foreground text-sm italic">"{t.text}"</p>
+                <p className="text-muted-foreground text-sm italic">
+                  "{t.text}"
+                </p>
                 <div className="flex items-center gap-3 pt-2">
                   <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
                     {t.name.substring(0, 2)}
@@ -115,8 +162,13 @@ export default async function Home() {
       <section className="bg-primary/5 py-12">
         <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
           <div className="space-y-4">
-            <h2 className="text-3xl font-bold text-secondary">Precisa de ajuda?</h2>
-            <p className="text-muted-foreground">Entre em contato para orçamentos, agendamentos ou dúvidas sobre peças.</p>
+            <h2 className="text-3xl font-bold text-secondary">
+              Precisa de ajuda?
+            </h2>
+            <p className="text-muted-foreground">
+              Entre em contato para orçamentos, agendamentos ou dúvidas sobre
+              peças.
+            </p>
 
             <div className="space-y-4 pt-4">
               <div className="flex items-center gap-3">
@@ -124,8 +176,13 @@ export default async function Home() {
                   <Truck className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="font-semibold text-secondary">Atendimento físico</p>
-                  <p className="text-sm text-muted-foreground">R. Jorn. João José Ramalho, 33 - Costa e Silva, João Pessoa - PB</p>
+                  <p className="font-semibold text-secondary">
+                    Atendimento físico
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    R. Jorn. João José Ramalho, 33 - Costa e Silva, João Pessoa
+                    - PB
+                  </p>
                 </div>
               </div>
               <div className="w-full h-75 rounded-lg overflow-hidden border border-border/50 shadow-sm mt-4">
@@ -151,7 +208,6 @@ export default async function Home() {
           </Card>
         </div>
       </section>
-
     </div>
   );
 }
