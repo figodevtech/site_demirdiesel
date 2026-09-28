@@ -14,16 +14,12 @@ import {
 } from "@/components/ui/carousel"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import banner1 from '@/public/banners/banner_1.png'
-import banner2 from '@/public/banners/banner_2.png'
-import banner3 from '@/public/banners/banner_3.png'
-
 const bannerData = [
     {
         id: 1,
         title: null,
         description: null,
-        image: banner1,
+        image: '/banners/banner_1.png',
         cta: null,
         link: null,
     },
@@ -31,7 +27,7 @@ const bannerData = [
         id: 2,
         title: null,
         description: null,
-        image: banner2,
+        image: '/banners/banner_2.png',
         cta: null,
         link: null,
     },
@@ -39,11 +35,10 @@ const bannerData = [
         id: 3,
         title: null,
         description: null,
-        image: banner3,
+        image: '/banners/banner_3.png',
         cta: null,
         link: null,
     },
-
 ]
 
 export function BannerCarousel() {

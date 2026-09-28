@@ -1,202 +1,275 @@
-'use client';
+"use client";
 
+import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Lock, Mail, User, Phone, FileText, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Loader2 } from "lucide-react";
 import { formatCpfCnpj, cleanCpfCnpj, formatPhone } from "@/lib/auth-utils";
 import { useAuth } from "@/components/providers/AuthContext";
 
 export default function RegisterPage() {
-    const router = useRouter();
-    const { refreshProfile } = useAuth();
-    const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const { refreshProfile } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
 
-    // Estados do formulário
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [tipoPessoa, setTipoPessoa] = useState('FISICA');
-    const [cpfCnpj, setCpfCnpj] = useState('');
-    const [phone, setPhone] = useState('');
+  // Form State
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [tipoPessoa, setTipoPessoa] = useState<"FISICA" | "JURIDICA">("FISICA");
+  const [cpfCnpj, setCpfCnpj] = useState("");
+  const [phone, setPhone] = useState("");
 
-    const handleRegister = async () => {
-        // Validações básicas
-        if (!name || !email || !password || !cpfCnpj || !phone) {
-            toast.error("Preencha todos os campos obrigatórios.");
-            return;
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!name || !email || !password || !cpfCnpj || !phone) {
+      toast.warning("Preencha todos os campos obrigatórios.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast.error("As senhas não conferem.");
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error("A senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // 1. Criar usuário no Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+          },
+        },
+      });
+
+      if (authError) throw authError;
+
+      if (!authData.session && !authData.user) {
+        toast.success("Conta criada! Verifique seu e-mail para confirmar seu cadastro.");
+        router.push("/login");
+        return;
+      }
+
+      if (authData.user) {
+        // 2. Criar perfil na tabela cliente
+        const { error: dbError } = await supabase.from("cliente").insert({
+          user_id: authData.user.id,
+          nomerazaosocial: name,
+          tipopessoa: tipoPessoa,
+          cpfcnpj: cleanCpfCnpj(cpfCnpj),
+          email,
+          telefone: phone,
+          cidade: "Não Informado",
+          estado: "PB",
+        });
+
+        if (dbError) {
+          console.error("Erro no cadastro cliente:", dbError);
         }
 
-        if (password !== confirmPassword) {
-            toast.error("As senhas não conferem.");
-            return;
-        }
+        toast.success("Cadastro concluído com sucesso!");
+        await refreshProfile();
+        router.push("/conta");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Erro ao realizar cadastro.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-        if (password.length < 6) {
-            toast.error("A senha deve ter pelo menos 6 caracteres.");
-            return;
-        }
-
-        setIsLoading(true);
-
-        try {
-            // 1. Criar usuário no Auth
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: {
-                        name: name
-                    }
-                }
-            });
-
-            if (authError) throw authError;
-
-            // Verifica se temos sessão (se Email Confirm estiver ligado, session será null)
-            if (!authData.session) {
-                console.log("Usuário criado, mas sem sessão ativa. Provavelmente requer confirmação de email.");
-                toast.success("Conta criada! Verifique seu email para confirmar o cadastro antes de entrar.");
-                router.push('/login');
-                return;
-            }
-
-            if (authData.user) {
-                console.log("Sessão ativa detectada. Tentando criar perfil...");
-                
-                // 2. Criar registro na tabela cliente
-                const { error: dbError } = await supabase.from('cliente').insert({
-                    user_id: authData.user.id,
-                    nomerazaosocial: name,
-                    tipopessoa: tipoPessoa,
-                    cpfcnpj: cleanCpfCnpj(cpfCnpj),
-                    email: email,
-                    telefone: phone,
-                    cidade: 'Não Informado', // valores padrão para satisfazer NOT NULL
-                    estado: 'NI'
-                });
-
-                if (dbError) {
-                    console.error("Erro no insert cliente:", JSON.stringify(dbError));
-                    // Se falhar o insert mas criou o auth, o usuário fica num estado inconsistente.
-                    // Ideal seria remover o auth user ou tratar isso.
-                    // Para MVP, apenas avisamos.
-                    toast.error(`Erro ao criar perfil: ${dbError.message || JSON.stringify(dbError)}`);
-                } else {
-                    toast.success("Conta criada com sucesso! Faça login para continuar.");
-                    await refreshProfile(); // força atualização do contexto
-                    router.push('/login');
-                }
-            }
-        } catch (error: any) {
-            console.error("Erro no registro:", JSON.stringify(error));
-            toast.error(error.message || "Erro ao criar conta.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    return (
-        <div className="flex min-h-[600px] items-center justify-center py-10 px-4 bg-muted/30">
-            <Card className="w-full max-w-lg bg-white shadow-lg">
-                <CardHeader className="space-y-1 text-center">
-                    <CardTitle className="text-2xl font-bold text-secondary">Crie sua conta</CardTitle>
-                    <CardDescription>
-                        Preencha os dados abaixo para se cadastrar
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4">
-
-                    <div className="space-y-2">
-                        <Label>Tipo de Cliente</Label>
-                        <RadioGroup 
-                            defaultValue="FISICA" 
-                            className="flex gap-4"
-                            onValueChange={setTipoPessoa}
-                        >
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="FISICA" id="pf" />
-                                <Label htmlFor="pf">Pessoa Física</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="JURIDICA" id="pj" />
-                                <Label htmlFor="pj">Empresa</Label>
-                            </div>
-                        </RadioGroup>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="name">Nome Completo / Razão Social</Label>
-                        <Input 
-                            id="name" 
-                            placeholder="Seu nome ou nome da empresa" 
-                            value={name} 
-                            onChange={(e) => setName(e.target.value)} 
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="doc">{tipoPessoa === 'FISICA' ? 'CPF' : 'CNPJ'}</Label>
-                            <Input 
-                                id="doc" 
-                                placeholder={tipoPessoa === 'FISICA' ? '000.000.000-00' : '00.000.000/0000-00'}
-                                value={cpfCnpj}
-                                onChange={(e) => setCpfCnpj(formatCpfCnpj(e.target.value))}
-                                maxLength={18}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="phone">Telefone / Celular</Label>
-                            <Input 
-                                id="phone" 
-                                placeholder="(00) 00000-0000" 
-                                value={phone}
-                                onChange={(e) => setPhone(formatPhone(e.target.value))}
-                                maxLength={15}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" placeholder="nome@exemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="password">Senha</Label>
-                            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="confirm-password">Confirmar Senha</Label>
-                            <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
-                        </div>
-                    </div>
-
-                    <Button className="w-full mt-4" onClick={handleRegister} disabled={isLoading}>
-                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Criar Conta
-                    </Button>
-                </CardContent>
-                <CardFooter className="flex flex-col gap-2 border-t pt-6 bg-muted/10">
-                    <p className="text-xs text-muted-foreground text-center">
-                        Já possui conta?{" "}
-                        <Link href="/login" className="text-primary hover:underline font-semibold">
-                            Faça login
-                        </Link>
-                    </p>
-                </CardFooter>
-            </Card>
+  return (
+    <div className="min-h-[85vh] flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-lg bg-card rounded-3xl border border-border/80 p-8 shadow-xl">
+        <div className="text-center mb-8">
+          <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-xl mx-auto mb-4 border border-slate-800 shadow-sm">
+            <span className="text-primary">D</span>
+          </div>
+          <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
+            Criar Conta na Demir Diesel
+          </h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            Cadastre-se para faturar pedidos, salvar orçamentos e agilizar suas compras
+          </p>
         </div>
-    );
+
+        <form onSubmit={handleRegister} className="space-y-4">
+          {/* Tipo de Pessoa Toggle */}
+          <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 mb-2">
+            <button
+              type="button"
+              onClick={() => setTipoPessoa("FISICA")}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                tipoPessoa === "FISICA"
+                  ? "bg-white dark:bg-slate-900 text-foreground shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Pessoa Física (CPF)
+            </button>
+            <button
+              type="button"
+              onClick={() => setTipoPessoa("JURIDICA")}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                tipoPessoa === "JURIDICA"
+                  ? "bg-white dark:bg-slate-900 text-foreground shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Pessoa Jurídica (CNPJ)
+            </button>
+          </div>
+
+          {/* Nome / Razão Social */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              {tipoPessoa === "FISICA" ? "Nome Completo*" : "Razão Social / Nome da Empresa*"}
+            </Label>
+            <div className="relative">
+              <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={tipoPessoa === "FISICA" ? "Ex: Carlos Eduardo Silva" : "Ex: Auto Peças & Transportes Ltda"}
+                className="pl-9 h-10 text-xs rounded-xl"
+                required
+              />
+            </div>
+          </div>
+
+          {/* CPF / CNPJ e Telefone */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                {tipoPessoa === "FISICA" ? "CPF*" : "CNPJ*"}
+              </Label>
+              <div className="relative">
+                <FileText className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Input
+                  value={cpfCnpj}
+                  onChange={(e) => setCpfCnpj(formatCpfCnpj(e.target.value))}
+                  placeholder={tipoPessoa === "FISICA" ? "000.000.000-00" : "00.000.000/0000-00"}
+                  className="pl-9 h-10 text-xs font-mono rounded-xl"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Telefone / WhatsApp*
+              </Label>
+              <div className="relative">
+                <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Input
+                  value={phone}
+                  onChange={(e) => setPhone(formatPhone(e.target.value))}
+                  placeholder="(00) 00000-0000"
+                  className="pl-9 h-10 text-xs font-mono rounded-xl"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* E-mail */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              E-mail para Login*
+            </Label>
+            <div className="relative">
+              <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Input
+                type="email"
+                placeholder="seuemail@exemplo.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="pl-9 h-10 text-xs rounded-xl"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Senhas */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Senha*
+              </Label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Input
+                  type="password"
+                  placeholder="Mínimo 6 dígitos"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-9 h-10 text-xs rounded-xl"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Confirmar Senha*
+              </Label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Input
+                  type="password"
+                  placeholder="Repita a senha"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="pl-9 h-10 text-xs rounded-xl"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <Button
+            type="submit"
+            disabled={isLoading}
+            className="w-full h-11 rounded-xl text-xs font-bold gap-2 bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20 mt-4"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Criando Cadastro...
+              </>
+            ) : (
+              <>
+                <span>Concluir Cadastro</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </Button>
+        </form>
+
+        <div className="mt-8 pt-6 border-t border-border/60 text-center">
+          <p className="text-xs text-muted-foreground">
+            Já possui uma conta?{" "}
+            <Link href="/login" className="text-primary font-bold hover:underline">
+              Fazer Login
+            </Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }

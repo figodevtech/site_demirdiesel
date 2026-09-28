@@ -1,510 +1,668 @@
-﻿'use client';
+"use client";
 
-import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/components/providers/AuthContext';
-import { useCart } from '@/components/providers/CartContext';
+import React, { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useAuth } from "@/components/providers/AuthContext";
+import { useCart } from "@/components/providers/CartContext";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { CheckCircle2, CreditCard, Loader2, ShieldCheck, MapPin, Plus, Truck } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { toast } from 'sonner';
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import {
+  ShieldCheck,
+  MapPin,
+  Plus,
+  Truck,
+  CheckCircle2,
+  Loader2,
+  ExternalLink,
+  Lock,
+  ArrowLeft,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export default function CheckoutPage() {
-    const { user, profile, isLoading: authLoading } = useAuth();
-    const { items, subtotal, clearCart } = useCart();
-    const router = useRouter();
+  const { user, profile, isLoading: authLoading } = useAuth();
+  const { items, subtotal, clearCart } = useCart();
+  const router = useRouter();
 
-    // Endereço
-    const [addresses, setAddresses] = useState<any[]>([]);
-    const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
-    const [loadingAddresses, setLoadingAddresses] = useState(true);
-    const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false);
-    const [cep, setCep] = useState('');
-    const [logradouro, setLogradouro] = useState('');
-    const [numero, setNumero] = useState('');
-    const [complemento, setComplemento] = useState('');
-    const [bairro, setBairro] = useState('');
-    const [cidade, setCidade] = useState('');
-    const [estado, setEstado] = useState('');
-    const [savingAddress, setSavingAddress] = useState(false);
+  // Endereço
+  const [addresses, setAddresses] = useState<any[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+  const [loadingAddresses, setLoadingAddresses] = useState(true);
+  const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false);
+  const [cep, setCep] = useState("");
+  const [logradouro, setLogradouro] = useState("");
+  const [numero, setNumero] = useState("");
+  const [complemento, setComplemento] = useState("");
+  const [bairro, setBairro] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [estado, setEstado] = useState("");
+  const [savingAddress, setSavingAddress] = useState(false);
 
-    // Pedido
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [shippingPrice, setShippingPrice] = useState<number | null>(null);
-    const [calculatingShipping, setCalculatingShipping] = useState(false);
+  // Pedido e Frete
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [shippingPrice, setShippingPrice] = useState<number | null>(null);
+  const [calculatingShipping, setCalculatingShipping] = useState(false);
 
-    // Pagamento
-    const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
-    const [isWaitingPayment, setIsWaitingPayment] = useState(false);
-    const [currentOrderId, setCurrentOrderId] = useState<number | null>(null);
-    const [isCheckingStatus, setIsCheckingStatus] = useState(false);
-    const [paymentStatus, setPaymentStatus] = useState<'pending' | 'paid'>('pending');
-    const clearedRef = useRef(false);
+  // Pagamento
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [isWaitingPayment, setIsWaitingPayment] = useState(false);
+  const [currentOrderId, setCurrentOrderId] = useState<number | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid">("pending");
+  const clearedRef = useRef(false);
 
-    // Autenticação inicial
-    useEffect(() => {
-        if (!authLoading) {
-            if (!user) {
-                router.push('/login?redirect=/checkout');
-            } else if (profile?.id) {
-                fetchAddresses();
-            }
+  const formatCurrency = (val: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
+
+  // Autenticação inicial
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        router.push("/login?redirect=/checkout");
+      } else if (profile?.id) {
+        fetchAddresses();
+      }
+    }
+  }, [user?.id, profile?.id, authLoading, router]);
+
+  const calculateShipping = async (cepValue: string) => {
+    if (!cepValue) return;
+    setCalculatingShipping(true);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    setShippingPrice(38.5);
+    setCalculatingShipping(false);
+  };
+
+  useEffect(() => {
+    if (selectedAddressId && addresses.length > 0) {
+      const addr = addresses.find((a) => a.id === selectedAddressId);
+      if (addr) calculateShipping(addr.cep);
+    }
+  }, [selectedAddressId, addresses]);
+
+  const fetchAddresses = async () => {
+    if (!profile?.id) return;
+    setLoadingAddresses(true);
+    try {
+      const { data, error } = await supabase
+        .from("cliente_endereco")
+        .select("*")
+        .eq("cliente_id", profile.id)
+        .order("id", { ascending: true });
+
+      if (error) throw error;
+      setAddresses(data || []);
+      if (data && data.length > 0 && !selectedAddressId) {
+        setSelectedAddressId(data[0].id);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao carregar endereços.");
+    } finally {
+      setLoadingAddresses(false);
+    }
+  };
+
+  const handleCepBlur = async () => {
+    const cleanCep = cep.replace(/\D/g, "");
+    if (cleanCep.length >= 8) {
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+        const data = await res.json();
+        if (!data.erro) {
+          setLogradouro(data.logradouro || "");
+          setBairro(data.bairro || "");
+          setCidade(data.localidade || "");
+          setEstado(data.uf || "");
         }
-    }, [user?.id, profile?.id, authLoading, router]);
+      } catch (error) {
+        console.error("Erro ao buscar CEP", error);
+      }
+    }
+  };
 
-    const calculateShipping = async (cepValue: string) => {
-        if (!cepValue) return;
-        setCalculatingShipping(true);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setShippingPrice(29.90);
-        setCalculatingShipping(false);
-    };
-
-    useEffect(() => {
-        if (selectedAddressId && addresses.length > 0) {
-            const addr = addresses.find(a => a.id === selectedAddressId);
-            if (addr) calculateShipping(addr.cep);
-        }
-    }, [selectedAddressId, addresses]);
-
-    const fetchAddresses = async () => {
-        setLoadingAddresses(true);
-        const { data, error } = await supabase
-            .from('cliente_endereco')
-            .select('*')
-            .eq('cliente_id', profile.id)
-            .order('id', { ascending: true });
-        if (error) {
-            console.error(error);
-            toast.error('Erro ao carregar enderecos.');
-        } else {
-            setAddresses(data || []);
-            if (data && data.length > 0 && !selectedAddressId) {
-                setSelectedAddressId(data[0].id);
-            }
-        }
-        setLoadingAddresses(false);
-    };
-
-    const handleCepBlur = async () => {
-        if (cep.length >= 8) {
-            const cleanCep = cep.replace(/\D/g, '');
-            try {
-                const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-                const data = await res.json();
-                if (!data.erro) {
-                    setLogradouro(data.logradouro);
-                    setBairro(data.bairro);
-                    setCidade(data.localidade);
-                    setEstado(data.uf);
-                }
-            } catch (error) {
-                console.error('Erro ao buscar CEP', error);
-            }
-        }
-    };
-
-    const handleSaveAddress = async () => {
-        if (!cep || !logradouro || !numero || !bairro || !cidade || !estado) {
-            toast.warning('Preencha os campos obrigatorios.');
-            return;
-        }
-
-        setSavingAddress(true);
-        try {
-            const addressData = {
-                cliente_id: profile.id,
-                cep,
-                logradouro,
-                numero,
-                complemento,
-                bairro,
-                cidade,
-                estado
-            };
-
-            const { data, error } = await supabase
-                .from('cliente_endereco')
-                .insert(addressData)
-                .select()
-                .single();
-
-            if (error) throw error;
-
-            toast.success('Endereco adicionado!');
-            setIsAddressDialogOpen(false);
-            await fetchAddresses();
-            setSelectedAddressId(data.id);
-            setCep('');
-            setLogradouro('');
-            setNumero('');
-            setComplemento('');
-            setBairro('');
-            setCidade('');
-            setEstado('');
-        } catch (error) {
-            console.error(error);
-            toast.error('Erro ao salvar endereco.');
-        } finally {
-            setSavingAddress(false);
-        }
-    };
-
-    const checkOrderStatus = async () => {
-        if (!currentOrderId) return;
-        setIsCheckingStatus(true);
-        try {
-            const { data } = await supabase
-                .from('venda')
-                .select('status')
-                .eq('id', currentOrderId)
-                .single();
-
-            const s = data?.status?.toUpperCase();
-            if (s === 'PAGO' || s === 'AUTORIZADO') {
-                setPaymentStatus('paid');
-                if (!clearedRef.current) {
-                    clearedRef.current = true;
-                    clearCart();
-                }
-            }
-        } catch (err) {
-            console.error('Error polling order status:', err);
-        } finally {
-            setIsCheckingStatus(false);
-        }
-    };
-
-    // Atualização em tempo real (Supabase)
-    useEffect(() => {
-        if (!currentOrderId || !isWaitingPayment || paymentStatus === 'paid') return;
-        const channel = supabase
-            .channel(`order_status_${currentOrderId}`)
-            .on(
-                'postgres_changes', 
-                { event: 'UPDATE', schema: 'public', table: 'venda', filter: `id=eq.${currentOrderId}` },
-                (payload) => {
-                    const newStatus = payload.new.status?.toUpperCase();
-                    if (newStatus === 'PAGO' || newStatus === 'AUTORIZADO') {
-                        setPaymentStatus('paid');
-                        if (!clearedRef.current) {
-                            clearedRef.current = true;
-                            clearCart();
-                        }
-                    }
-                }
-            )
-            .subscribe();
-        return () => { supabase.removeChannel(channel); };
-    }, [currentOrderId, isWaitingPayment, paymentStatus, clearCart]);
-
-    // Mensagem enviada pelo popup
-    useEffect(() => {
-        const handleMessage = (event: MessageEvent) => {
-            if (event.data === 'payment_success') {
-                setPaymentStatus('paid');
-                if (!clearedRef.current) {
-                    clearedRef.current = true;
-                    clearCart();
-                }
-            }
-        };
-        window.addEventListener('message', handleMessage);
-        return () => window.removeEventListener('message', handleMessage);
-    }, [clearCart]);
-
-    // Polling automático enquanto aguarda pagamento
-    useEffect(() => {
-        if (!isWaitingPayment || !currentOrderId || paymentStatus === 'paid') return;
-        const id = setInterval(() => {
-            checkOrderStatus();
-        }, 5000);
-        return () => clearInterval(id);
-    }, [isWaitingPayment, currentOrderId, paymentStatus]);
-
-    const handleCheckout = async () => {
-        if (!selectedAddressId) {
-            toast.error('Selecione um endereco de entrega.');
-            return;
-        }
-
-        setIsProcessing(true);
-        try {
-            const selectedAddress = addresses.find(a => a.id === selectedAddressId);
-            const checkoutData = {
-                items,
-                shippingAmount: shippingPrice,
-                customerId: profile.id,
-                customerName: profile.nomerazaosocial || user?.user_metadata?.name || 'Cliente',
-                customerEmail: user?.email,
-                customerDocument: profile.cpfcnpj || '',
-                customerPhone: profile.telefone || '',
-                address: selectedAddress
-            };
-
-            const response = await fetch('/api/checkout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(checkoutData)
-            });
-
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Erro ao processar checkout');
-
-            if (result.url) {
-                setPaymentUrl(result.url);
-                setCurrentOrderId(result.orderId);
-                setIsWaitingPayment(true);
-                setPaymentStatus('pending');
-
-                const width = 600;
-                const height = 800;
-                const left = (window.innerWidth / 2) - (width / 2);
-                const top = (window.innerHeight / 2) - (height / 2);
-                const popup = window.open(result.url, 'PagarMeCheckout', `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=yes`);
-                if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-                    toast.warning('O bloqueador de popups impediu a abertura automatica. Clique no botao abaixo.');
-                }
-            } else {
-                toast.error('Erro: URL de pagamento nao retornada.');
-            }
-        } catch (error: any) {
-            console.error('Checkout Error:', error);
-            toast.error(error.message || 'Erro ao iniciar pagamento.');
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
-    // Tela de aguardando/confirmado
-    const showPaymentScreen = (isWaitingPayment && !!paymentUrl) || paymentStatus === 'paid';
-    if (showPaymentScreen) {
-        const paid = paymentStatus === 'paid';
-        return (
-            <div className="container mx-auto px-4 py-16 max-w-2xl text-center">
-                <Card className="border-primary/20 shadow-xl">
-                    <CardHeader>
-                        {paid ? (
-                            <>
-                                <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-4" />
-                                <CardTitle className="text-2xl">Pagamento confirmado</CardTitle>
-                                <CardDescription>Seu pedido foi aprovado.</CardDescription>
-                            </>
-                        ) : (
-                            <>
-                                <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto mb-4" />
-                                <CardTitle className="text-2xl">Aguardando pagamento</CardTitle>
-                                <CardDescription>Complete o pagamento na outra janela.</CardDescription>
-                            </>
-                        )}
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        {!paid && paymentUrl && (
-                            <Button variant="outline" onClick={() => window.open(paymentUrl, 'PagarMeCheckout')} className="gap-2 w-full">
-                                <Plus size={16} /> Abrir janela novamente
-                            </Button>
-                        )}
-                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                            {!paid && (
-                                <Button onClick={checkOrderStatus} disabled={isCheckingStatus} className="gap-2">
-                                    {isCheckingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck size={18} />}
-                                    Verificar pagamento
-                                </Button>
-                            )}
-                            <Button variant={paid ? 'default' : 'outline'} onClick={() => router.push('/pedidos')} className="gap-2">
-                                <CheckCircle2 size={18} /> Ver meus pedidos
-                            </Button>
-                            <Button variant="ghost" onClick={() => router.push('/')}>Voltar para loja</Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-        );
+  const handleSaveAddress = async () => {
+    if (!cep || !logradouro || !numero || !bairro || !cidade || !estado) {
+      toast.warning("Preencha todos os campos obrigatórios do endereço.");
+      return;
     }
 
+    setSavingAddress(true);
+    try {
+      const addressData = {
+        cliente_id: profile.id,
+        cep,
+        logradouro,
+        numero,
+        complemento,
+        bairro,
+        cidade,
+        estado,
+      };
+
+      const { data, error } = await supabase
+        .from("cliente_endereco")
+        .insert(addressData)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success("Endereço adicionado com sucesso!");
+      setIsAddressDialogOpen(false);
+      await fetchAddresses();
+      setSelectedAddressId(data.id);
+
+      setCep("");
+      setLogradouro("");
+      setNumero("");
+      setComplemento("");
+      setBairro("");
+      setCidade("");
+      setEstado("");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao salvar endereço.");
+    } finally {
+      setSavingAddress(false);
+    }
+  };
+
+  const checkOrderStatus = async () => {
+    if (!currentOrderId) return;
+    try {
+      const { data } = await supabase
+        .from("venda")
+        .select("status")
+        .eq("id", currentOrderId)
+        .single();
+
+      const s = data?.status?.toUpperCase();
+      if (s === "PAGO" || s === "AUTORIZADO") {
+        setPaymentStatus("paid");
+        if (!clearedRef.current) {
+          clearedRef.current = true;
+          clearCart();
+        }
+      }
+    } catch (err) {
+      console.error("Polling order error:", err);
+    }
+  };
+
+  // Tempo real via Supabase
+  useEffect(() => {
+    if (!currentOrderId || !isWaitingPayment || paymentStatus === "paid") return;
+    const channel = supabase
+      .channel(`order_status_${currentOrderId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "venda", filter: `id=eq.${currentOrderId}` },
+        (payload) => {
+          const newStatus = payload.new.status?.toUpperCase();
+          if (newStatus === "PAGO" || newStatus === "AUTORIZADO") {
+            setPaymentStatus("paid");
+            if (!clearedRef.current) {
+              clearedRef.current = true;
+              clearCart();
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentOrderId, isWaitingPayment, paymentStatus, clearCart]);
+
+  // Mensagem enviada pelo popup
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data === "payment_success") {
+        setPaymentStatus("paid");
+        if (!clearedRef.current) {
+          clearedRef.current = true;
+          clearCart();
+        }
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [clearCart]);
+
+  // Polling automático
+  useEffect(() => {
+    if (!isWaitingPayment || !currentOrderId || paymentStatus === "paid") return;
+    const id = setInterval(() => {
+      checkOrderStatus();
+    }, 4000);
+    return () => clearInterval(id);
+  }, [isWaitingPayment, currentOrderId, paymentStatus]);
+
+  const handleCheckout = async () => {
+    if (!selectedAddressId) {
+      toast.error("Selecione um endereço de entrega.");
+      return;
+    }
+
+    if (items.length === 0) {
+      toast.error("Seu carrinho está vazio.");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const selectedAddress = addresses.find((a) => a.id === selectedAddressId);
+      const checkoutData = {
+        items,
+        shippingAmount: shippingPrice || 0,
+        customerId: profile.id,
+        customerName: profile.nomerazaosocial || user?.user_metadata?.name || "Cliente",
+        customerEmail: user?.email,
+        customerDocument: profile.cpfcnpj || "",
+        customerPhone: profile.telefone || "",
+        address: selectedAddress,
+      };
+
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(checkoutData),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Erro ao processar checkout");
+
+      if (result.url) {
+        setPaymentUrl(result.url);
+        setIsWaitingPayment(true);
+        if (result.orderId) {
+          setCurrentOrderId(result.orderId);
+        }
+
+        // Abre em janela modal/popup amigável
+        const width = 600;
+        const height = 750;
+        const left = window.screen.width / 2 - width / 2;
+        const top = window.screen.height / 2 - height / 2;
+        window.open(
+          result.url,
+          "PagarMeCheckout",
+          `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes`
+        );
+      } else {
+        throw new Error("URL de pagamento não retornada.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Erro ao processar o pagamento.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const finalTotal = subtotal + (shippingPrice || 0);
+
+  // Tela de Pagamento Aprovado
+  if (paymentStatus === "paid") {
     return (
-        <div className="container mx-auto px-4 py-8 max-w-6xl">
-            <h1 className="text-3xl font-bold text-secondary mb-8">Finalizar Pedido</h1>
-            
-            <div className="grid md:grid-cols-3 gap-8">
-                <div className="md:col-span-2 space-y-6">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between pb-4">
-                            <div className="flex items-center gap-2">
-                                <MapPin className="text-primary h-5 w-5" />
-                                <CardTitle className="text-lg">Endereco de Entrega</CardTitle>
-                            </div>
-                            <Dialog open={isAddressDialogOpen} onOpenChange={setIsAddressDialogOpen}>
-                                <DialogTrigger asChild>
-                                    <Button variant="outline" size="sm" className="gap-2">
-                                        <Plus size={16} /> Novo Endereco
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>Adicionar Novo Endereco</DialogTitle>
-                                    </DialogHeader>
-                                    <div className="grid gap-4 py-4">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label>CEP</Label>
-                                                <Input value={cep} onChange={e => setCep(e.target.value)} onBlur={handleCepBlur} placeholder="00000-000" />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label>Estado (UF)</Label>
-                                                <Input value={estado} onChange={e => setEstado(e.target.value)} maxLength={2} />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Cidade</Label>
-                                            <Input value={cidade} onChange={e => setCidade(e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Bairro</Label>
-                                            <Input value={bairro} onChange={e => setBairro(e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Logradouro</Label>
-                                            <Input value={logradouro} onChange={e => setLogradouro(e.target.value)} />
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-4">
-                                            <div className="space-y-2">
-                                                <Label>Numero</Label>
-                                                <Input value={numero} onChange={e => setNumero(e.target.value)} />
-                                            </div>
-                                            <div className="col-span-2 space-y-2">
-                                                <Label>Complemento</Label>
-                                                <Input value={complemento} onChange={e => setComplemento(e.target.value)} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <DialogFooter>
-                                        <Button onClick={handleSaveAddress} disabled={savingAddress}>
-                                            {savingAddress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar Endereco"}
-                                        </Button>
-                                    </DialogFooter>
-                                </DialogContent>
-                            </Dialog>
-                        </CardHeader>
-                        <CardContent>
-                            {loadingAddresses ? (
-                                <div className="flex justify-center p-4"><Loader2 className="animate-spin text-primary" /></div>
-                            ) : addresses.length === 0 ? (
-                                <div className="text-center py-6 text-muted-foreground bg-muted/20 rounded-lg">
-                                    Nenhum endereco cadastrado. Adicione um para continuar.
-                                </div>
-                            ) : (
-                                <RadioGroup value={selectedAddressId?.toString()} onValueChange={(val) => setSelectedAddressId(Number(val))}>
-                                    <div className="grid gap-4">
-                                        {addresses.map((addr) => (
-                                            <div key={addr.id} className={`flex items-start space-x-2 border rounded-lg p-4 cursor-pointer transition-colors ${selectedAddressId === addr.id ? 'border-primary bg-primary/5' : 'border-border'}`} onClick={() => setSelectedAddressId(addr.id)}>
-                                                <RadioGroupItem value={addr.id.toString()} id={`addr-${addr.id}`} className="mt-1" />
-                                                <div className="grid gap-1.5 leading-none">
-                                                    <Label htmlFor={`addr-${addr.id}`} className="font-semibold cursor-pointer">
-                                                        {addr.logradouro}, {addr.numero}
-                                                    </Label>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        {addr.bairro} - {addr.cidade}/{addr.estado}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">CEP: {addr.cep}</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </RadioGroup>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="flex flex-row items-center gap-2 pb-4">
-                            <CreditCard className="text-primary h-5 w-5" />
-                            <CardTitle className="text-lg">Pagamento</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                           <div className="bg-muted/30 p-4 rounded-md border border-border/50 text-sm">
-                                <p className="flex items-center gap-2 text-muted-foreground">
-                                    <ShieldCheck className="h-4 w-4 text-green-600" />
-                                    Voce sera redirecionado para o ambiente seguro do <strong>Pagar.me</strong> para finalizar o pagamento via cartao, PIX ou boleto.
-                                </p>
-                           </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <div className="md:col-span-1">
-                    <Card className="sticky top-24 shadow-lg border-primary/10">
-                        <CardHeader className="bg-muted/10">
-                            <CardTitle className="text-lg">Resumo do Pedido</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4 pt-6">
-                            <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                                {items.map((item, idx) => (
-                                    <div key={idx} className="flex justify-between text-sm py-1 border-b border-border/30 last:border-0">
-                                        <span className="truncate max-w-[180px] text-muted-foreground">
-                                            <span className="font-bold text-foreground">{item.quantity}x</span> {item.product.name}
-                                        </span>
-                                        <span className="font-medium shrink-0">
-                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.product.price * item.quantity)}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                            <Separator />
-                            <div className="space-y-2">
-                                 <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Subtotal</span>
-                                    <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground flex items-center gap-1"><Truck size={12}/> Frete</span>
-                                    {calculatingShipping ? (
-                                        <Loader2 className="w-3 h-3 animate-spin text-primary" />
-                                    ) : shippingPrice !== null ? (
-                                        <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(shippingPrice)}</span>
-                                    ) : (
-                                        <span className="text-xs text-muted-foreground italic">Selecione endereco</span>
-                                    )}
-                                </div>
-                                <Separator className="my-2" />
-                                <div className="flex justify-between font-bold text-xl">
-                                    <span>Total</span>
-                                    <span className="text-primary">
-                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal + (shippingPrice || 0))}
-                                    </span>
-                                </div>
-                            </div>
-                        </CardContent>
-                        <CardFooter className="bg-muted/10 pb-6 pt-2">
-                             <Button 
-                                className="w-full py-6 text-lg font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform" 
-                                onClick={handleCheckout}
-                                disabled={isProcessing || items.length === 0 || !selectedAddressId || calculatingShipping}
-                            >
-                                {isProcessing ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Inciando Pagamento...
-                                    </>
-                                ) : calculatingShipping ? (
-                                    "Calculando Frete..."
-                                ) : (
-                                    `Ir para Pagamento`
-                                )}
-                            </Button>
-                        </CardFooter>
-                    </Card>
-                    
-                    <div className="mt-4 text-center text-xs text-muted-foreground">
-                        <p>Compra 100% segura e processada por Pagar.me</p>
-                    </div>
-                </div>
-            </div>
+      <div className="container mx-auto px-4 py-16 text-center max-w-lg">
+        <div className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center mx-auto mb-6 text-emerald-600">
+          <CheckCircle2 className="w-10 h-10 stroke-[2.5]" />
         </div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-2">
+          Pagamento Confirmado!
+        </h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mb-8">
+          Seu pedido #{currentOrderId} foi recebido com sucesso e já está sendo preparado pela equipe da Demir Diesel.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Button asChild variant="default" className="rounded-xl font-semibold">
+            <Link href="/pedidos">Ver Meus Pedidos</Link>
+          </Button>
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link href="/">Voltar à Página Inicial</Link>
+          </Button>
+        </div>
+      </div>
     );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8 md:py-12 max-w-5xl">
+      {/* Top Header Seguro */}
+      <div className="flex items-center justify-between pb-6 mb-8 border-b border-border/80">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/carrinho"
+            className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-foreground"
+            aria-label="Voltar ao carrinho"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-extrabold text-foreground flex items-center gap-2">
+              <Lock className="w-5 h-5 text-primary" />
+              <span>Checkout Seguro</span>
+            </h1>
+            <span className="text-[11px] text-muted-foreground">Demir Diesel • Pagar.me</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-full border border-emerald-600/20">
+          <ShieldCheck className="w-4 h-4" />
+          <span>Ambiente Criptografado</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Lado Esquerdo: Endereço & Pagamento */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* 1. Endereço de Entrega */}
+          <div className="bg-card rounded-2xl border border-border/80 p-6 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">
+                  1
+                </div>
+                <h2 className="font-extrabold text-base text-foreground">Endereço de Entrega</h2>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsAddressDialogOpen(true)}
+                className="text-xs h-8 rounded-lg gap-1 border-dashed"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Novo Endereço</span>
+              </Button>
+            </div>
+
+            {loadingAddresses ? (
+              <div className="p-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                <span>Carregando seus endereços...</span>
+              </div>
+            ) : addresses.length === 0 ? (
+              <div className="p-6 text-center rounded-xl bg-slate-50 dark:bg-slate-900 border border-dashed border-border text-xs space-y-3">
+                <MapPin className="w-6 h-6 text-slate-400 mx-auto" />
+                <p className="text-muted-foreground">Você ainda não tem nenhum endereço cadastrado.</p>
+                <Button
+                  size="sm"
+                  onClick={() => setIsAddressDialogOpen(true)}
+                  className="rounded-lg text-xs"
+                >
+                  Cadastrar Endereço de Entrega
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {addresses.map((addr) => {
+                  const isSelected = selectedAddressId === addr.id;
+                  return (
+                    <div
+                      key={addr.id}
+                      onClick={() => setSelectedAddressId(addr.id)}
+                      className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-xs relative ${
+                        isSelected
+                          ? "border-primary bg-primary/5 shadow-2xs"
+                          : "border-border/80 hover:border-slate-400 bg-card"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <strong className="text-foreground text-sm font-bold block">
+                          {addr.logradouro}, {addr.numero}
+                        </strong>
+                        <div
+                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            isSelected ? "border-primary bg-primary" : "border-slate-300"
+                          }`}
+                        >
+                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+                      </div>
+
+                      {addr.complemento && (
+                        <span className="text-muted-foreground block mt-0.5">{addr.complemento}</span>
+                      )}
+
+                      <span className="text-muted-foreground block mt-1">
+                        {addr.bairro} • {addr.cidade} - {addr.estado}
+                      </span>
+                      <span className="font-mono text-slate-500 block mt-0.5">CEP: {addr.cep}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 2. Aguardando Pagamento ou Gatilho */}
+          <div className="bg-card rounded-2xl border border-border/80 p-6 shadow-2xs space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">
+                2
+              </div>
+              <h2 className="font-extrabold text-base text-foreground">
+                Pagamento Integrado (PIX, Cartão de Crédito ou Boleto)
+              </h2>
+            </div>
+
+            {isWaitingPayment && paymentUrl ? (
+              <div className="p-6 rounded-xl bg-slate-50 dark:bg-slate-900 border border-primary/30 space-y-4 text-center">
+                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                </div>
+                <h3 className="font-bold text-base text-foreground">
+                  Aguardando confirmação do pagamento...
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                  A tela de pagamento do Pagar.me foi aberta em uma nova janela. Conclua o pagamento por PIX, Cartão ou Boleto.
+                </p>
+                <div className="flex flex-wrap gap-2 justify-center pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(paymentUrl, "PagarMeCheckout")}
+                    className="text-xs gap-1 rounded-xl"
+                  >
+                    <span>Reabrir Tela de Pagamento</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={checkOrderStatus}
+                    className="text-xs rounded-xl"
+                  >
+                    Já realizei o pagamento
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Ao clicar em <strong>Prosseguir para Pagamento</strong>, você será direcionado ao ambiente seguro da Pagar.me para escolher entre PIX (aprovação imediata), Cartão de Crédito (em até 12x) ou Boleto Bancário.
+                </p>
+
+                <Button
+                  size="lg"
+                  onClick={handleCheckout}
+                  disabled={isProcessing || !selectedAddressId || items.length === 0}
+                  className="w-full h-12 text-sm font-bold gap-2 rounded-xl bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Processando Pedido...
+                    </>
+                  ) : (
+                    <span>Prosseguir para Pagamento Seguro</span>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Lado Direito: Resumo dos Itens e Valores */}
+        <div className="lg:col-span-4">
+          <div className="bg-card rounded-2xl border border-border/80 p-6 shadow-2xs space-y-5 sticky top-24">
+            <h2 className="font-extrabold text-base text-foreground">Resumo da Compra</h2>
+
+            {/* Lista compacta de itens */}
+            <div className="space-y-3 max-h-56 overflow-y-auto pr-1 no-scrollbar divide-y divide-border/50 text-xs">
+              {items.map((item) => (
+                <div key={item.product.id} className="pt-2 first:pt-0 flex justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <span className="font-semibold text-foreground truncate block">
+                      {item.product.name || item.product.title}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground block">
+                      Qtd: {item.quantity} × {formatCurrency(item.product.price)}
+                    </span>
+                  </div>
+                  <span className="font-mono font-bold text-foreground">
+                    {formatCurrency(item.product.price * item.quantity)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Totais */}
+            <div className="pt-4 border-t border-border/80 space-y-2 text-xs">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Subtotal dos produtos</span>
+                <span className="font-semibold text-foreground">{formatCurrency(subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Frete rodoviário</span>
+                <span className="font-semibold text-foreground">
+                  {calculatingShipping ? "Calculando..." : shippingPrice ? formatCurrency(shippingPrice) : "A calcular"}
+                </span>
+              </div>
+              <div className="flex justify-between items-baseline pt-3 border-t border-border/60 text-base">
+                <span className="font-bold text-foreground">Total</span>
+                <span className="text-2xl font-black text-foreground">
+                  {formatCurrency(finalTotal)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal para Adicionar Novo Endereço */}
+      <Dialog open={isAddressDialogOpen} onOpenChange={setIsAddressDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold">Novo Endereço de Entrega</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 text-xs pt-2">
+            <div>
+              <Label className="text-xs">CEP*</Label>
+              <Input
+                placeholder="00000-000"
+                value={cep}
+                onChange={(e) => setCep(e.target.value)}
+                onBlur={handleCepBlur}
+                maxLength={9}
+                className="h-9 text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
+                <Label className="text-xs">Logradouro / Rua*</Label>
+                <Input
+                  value={logradouro}
+                  onChange={(e) => setLogradouro(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Número*</Label>
+                <Input
+                  value={numero}
+                  onChange={(e) => setNumero(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs">Complemento</Label>
+              <Input
+                value={complemento}
+                onChange={(e) => setComplemento(e.target.value)}
+                placeholder="Ex: Galpão 3, Apto 101"
+                className="h-9 text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <Label className="text-xs">Bairro*</Label>
+                <Input
+                  value={bairro}
+                  onChange={(e) => setBairro(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Cidade*</Label>
+                <Input
+                  value={cidade}
+                  onChange={(e) => setCidade(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Estado (UF)*</Label>
+                <Input
+                  value={estado}
+                  maxLength={2}
+                  onChange={(e) => setEstado(e.target.value.toUpperCase())}
+                  className="h-9 text-xs"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAddressDialogOpen(false)}
+              className="text-xs rounded-xl"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSaveAddress}
+              disabled={savingAddress}
+              className="text-xs rounded-xl font-semibold"
+            >
+              {savingAddress ? "Salvando..." : "Salvar Endereço"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }

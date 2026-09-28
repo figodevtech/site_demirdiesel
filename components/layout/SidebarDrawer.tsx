@@ -98,13 +98,17 @@ export default function SidebarDrawer({ categories }: SidebarProps) {
                                     </Button>
                                 </Link>
                                 
-                                {categories.map((cat) => (
-                                    <Link key={cat.id} href={`/produtos?category=${slugify(cat.nome)}`} onClick={() => setOpen(false)} className="block">
-                                        <Button variant="ghost" className="w-full justify-start font-medium text-foreground/80 hover:text-foreground hover:bg-muted/60">
-                                            {cat.nome}
-                                        </Button>
-                                    </Link>
-                                ))}
+                                {categories.map((cat: any) => {
+                                    const catName = cat.name || cat.nome || "Categoria";
+                                    const catSlug = cat.slug || slugify(catName);
+                                    return (
+                                        <Link key={cat.id} href={`/produtos?category=${catSlug}`} onClick={() => setOpen(false)} className="block">
+                                            <Button variant="ghost" className="w-full justify-start font-medium text-foreground/80 hover:text-foreground hover:bg-muted/60">
+                                                {catName}
+                                            </Button>
+                                        </Link>
+                                    );
+                                })}
 
                                 <Link href="/ofertas" onClick={() => setOpen(false)} className="block mt-2">
                                     <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 font-medium">

@@ -5,14 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function slugify(text: string) {
-  return text
-    .toString()
+export function slugify(text: string | null | undefined): string {
+  if (!text) return "";
+  return String(text)
     .toLowerCase()
-    .normalize('NFD') // Remove acentos
-    .replace(/[\u0300-\u036f]/g, '')
+    .normalize("NFD") // Remove acentos
+    .replace(/[\u0300-\u036f]/g, "")
     .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^\w-]+/g, '')
-    .replace(/--+/g, '-');
+    .replace(/\s+/g, "-")
+    .replace(/[^\w-]+/g, "")
+    .replace(/--+/g, "-");
 }
+

@@ -4,13 +4,15 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-space-grotesk), monospace;
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -31,11 +33,6 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -49,108 +46,87 @@
 :root {
   --radius: 0.5rem;
 
-  /* Palette defined by user */
-  --background: #E9FAFC;
-  /* Fundo claro (quase branco azulado) */
-  --foreground: #000000;
-  /* Texto escuro */
+  /* Demir Diesel Design System: Engenharia Diesel de Alta Precisão */
+  --background: #F8FAFC;
+  --foreground: #0F172A;
 
   --card: #FFFFFF;
-  /* Cards brancos */
-  --card-foreground: #000000;
+  --card-foreground: #0F172A;
 
   --popover: #FFFFFF;
-  --popover-foreground: #000000;
+  --popover-foreground: #0F172A;
 
+  /* Azul Técnico Demir Diesel */
   --primary: #0A7AAC;
-  /* Primária (teal/azul principal) */
   --primary-foreground: #FFFFFF;
 
-  --secondary: #3E418E;
-  /* Secundária (azul/índigo escuro) */
-  --secondary-foreground: #FFFFFF;
+  /* Grafite Industrial Profundo */
+  --secondary: #0F172A;
+  --secondary-foreground: #F8FAFC;
 
-  --muted: #EFF3F8;
-  /* Neutro bem claro */
-  --muted-foreground: #5BA2BC;
-  /* Apoio (azul médio) text/icon */
+  /* Superfícies neutras de apoio */
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
 
-  --accent: #A6D6E1;
-  /* Apoio claro (usar para hover/bg de itens) */
+  --accent: #F1F5F9;
   --accent-foreground: #0A7AAC;
 
-  --destructive: #EB9C95;
-  /* Acento quente (coral/rosa) */
+  --destructive: #DC2626;
   --destructive-foreground: #FFFFFF;
 
-  --border: #A6D6E1;
-  /* Apoio claro */
-  --input: #A6D6E1;
+  /* Bordas sutis e limpas */
+  --border: #E2E8F0;
+  --input: #E2E8F0;
   --ring: #0A7AAC;
 
-  /* Charts - Placeholder colors derived from palette */
-  --chart-1: #0A7AAC;
-  --chart-2: #3E418E;
-  --chart-3: #5BA2BC;
-  --chart-4: #A6D6E1;
-  --chart-5: #EB9C95;
-
   /* Sidebar */
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #3E418E;
+  --sidebar: #0F172A;
+  --sidebar-foreground: #F8FAFC;
   --sidebar-primary: #0A7AAC;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #E9FAFC;
-  --sidebar-accent-foreground: #0A7AAC;
-  --sidebar-border: #A6D6E1;
+  --sidebar-accent: #1E293B;
+  --sidebar-accent-foreground: #F8FAFC;
+  --sidebar-border: #1E293B;
   --sidebar-ring: #0A7AAC;
 }
 
 .dark {
-  /* Using dark equivalents based on Secondary #3E418E */
-  --background: #0f1126;
-  /* Very dark indigo */
-  --foreground: #E9FAFC;
+  --background: #0B0F19;
+  --foreground: #F8FAFC;
 
-  --card: #1a1d3d;
-  --card-foreground: #E9FAFC;
+  --card: #111827;
+  --card-foreground: #F8FAFC;
 
-  --popover: #1a1d3d;
-  --popover-foreground: #E9FAFC;
+  --popover: #111827;
+  --popover-foreground: #F8FAFC;
 
-  --primary: #0A7AAC;
-  --primary-foreground: #FFFFFF;
+  --primary: #38BDF8;
+  --primary-foreground: #0B0F19;
 
-  --secondary: #5BA2BC;
-  --secondary-foreground: #000000;
+  --secondary: #1E293B;
+  --secondary-foreground: #F8FAFC;
 
-  --muted: #1e2246;
-  --muted-foreground: #A6D6E1;
+  --muted: #1E293B;
+  --muted-foreground: #94A3B8;
 
-  --accent: #1e2246;
-  --accent-foreground: #E9FAFC;
+  --accent: #1E293B;
+  --accent-foreground: #38BDF8;
 
-  --destructive: #EB9C95;
+  --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
 
-  --border: #3E418E;
-  --input: #3E418E;
-  --ring: #0A7AAC;
+  --border: #1E293B;
+  --input: #1E293B;
+  --ring: #38BDF8;
 
-  --chart-1: #0A7AAC;
-  --chart-2: #3E418E;
-  --chart-3: #5BA2BC;
-  --chart-4: #A6D6E1;
-  --chart-5: #EB9C95;
-
-  --sidebar: #0f1126;
-  --sidebar-foreground: #E9FAFC;
-  --sidebar-primary: #0A7AAC;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #1e2246;
-  --sidebar-accent-foreground: #E9FAFC;
-  --sidebar-border: #3E418E;
-  --sidebar-ring: #0A7AAC;
+  --sidebar: #0B0F19;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-primary: #38BDF8;
+  --sidebar-primary-foreground: #0B0F19;
+  --sidebar-accent: #1E293B;
+  --sidebar-accent-foreground: #F8FAFC;
+  --sidebar-border: #1E293B;
+  --sidebar-ring: #38BDF8;
 }
 
 @layer base {
@@ -159,6 +135,51 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary;
+  }
+
+  :where(a, button, [role="button"]):focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+}
+
+/* Micro-interações táteis e feedback suave */
+@media (hover: hover) and (pointer: fine) {
+  [data-slot="button"]:not(:disabled) {
+    transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+    transition-duration: 150ms;
+  }
+
+  [data-slot="button"]:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+}
+
+[data-slot="button"]:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+/* Safe area inset para mobile app bar */
+.pb-safe-area {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Scrollbar fina e moderna */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

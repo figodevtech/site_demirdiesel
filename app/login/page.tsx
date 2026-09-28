@@ -1,111 +1,140 @@
-'use client';
+"use client";
 
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Lock, Mail, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useState, Suspense } from "react";
 import { supabase } from "@/lib/supabase";
-import { Loader2 } from "lucide-react";
 
 function LoginForm() {
-    const router = useRouter();
-    const searchParams = useSearchParams();
-    const redirect = searchParams.get('redirect') || '/';
-    
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect") || "/";
 
-    const handleLogin = async () => {
-        if (!email || !password) {
-            toast.warning("Preencha email e senha.");
-            return;
-        }
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-        setIsLoading(true);
-        try {
-            const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password
-            });
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      toast.warning("Preencha e-mail e senha.");
+      return;
+    }
 
-            if (error) {
-                console.error(error);
-                toast.error("Falha ao entrar: " + error.message);
-            } else {
-                toast.success("Login realizado com sucesso!");
-                router.push(redirect);
-                router.refresh();
-            }
-        } catch (error) {
-            console.error(error);
-            toast.error("Erro inesperado ao fazer login.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    return (
-        <Card className="w-full max-w-sm bg-white shadow-lg">
-            <CardHeader className="space-y-1 text-center">
-                <CardTitle className="text-2xl font-bold text-secondary">Acesse sua conta</CardTitle>
-                <CardDescription>
-                    Entre com seus dados para continuar
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-                <div className="grid gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                        id="email"
-                        type="email"
-                        placeholder="nome@exemplo.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="password">Senha</Label>
-                    <Input 
-                        id="password" 
-                        type="password" 
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                    />
-                </div>
-                <Button className="w-full mt-2" onClick={handleLogin} disabled={isLoading}>
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Entrar
-                </Button>
-                <div className="text-center text-xs">
-                    <Link href="#" className="text-primary hover:underline">
-                        Esqueceu sua senha?
-                    </Link>
-                </div>
-            </CardContent>
-            <CardFooter className="flex flex-col gap-2 border-t pt-6 bg-muted/10">
-                <p className="text-xs text-muted-foreground text-center">
-                    Não tem uma conta?{" "}
-                    <Link href="/registro" className="text-primary hover:underline font-semibold">
-                        Registre-se agora
-                    </Link>
-                </p>
-            </CardFooter>
-        </Card>
-    );
+      if (error) {
+        toast.error("Falha ao entrar: " + error.message);
+      } else {
+        toast.success("Login realizado com sucesso!");
+        router.push(redirect);
+        router.refresh();
+      }
+    } catch {
+      toast.error("Erro inesperado ao realizar login.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-md bg-card rounded-3xl border border-border/80 p-8 shadow-xl">
+      <div className="text-center mb-8">
+        {/* Brand Badge */}
+        <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-xl mx-auto mb-4 border border-slate-800 shadow-sm">
+          <span className="text-primary">D</span>
+        </div>
+        <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
+          Acesse sua Conta
+        </h1>
+        <p className="text-xs text-muted-foreground mt-1">
+          Acompanhe seus pedidos, orçamentos e lista de peças
+        </p>
+      </div>
+
+      <form onSubmit={handleLogin} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+            E-mail
+          </Label>
+          <div className="relative">
+            <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Input
+              type="email"
+              placeholder="seuemail@exemplo.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="pl-9 h-11 text-xs rounded-xl"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Senha
+            </Label>
+          </div>
+          <div className="relative">
+            <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="pl-9 h-11 text-xs rounded-xl"
+              required
+            />
+          </div>
+        </div>
+
+        <Button
+          type="submit"
+          disabled={isLoading}
+          className="w-full h-11 rounded-xl text-xs font-bold gap-2 bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20 mt-2"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Entrando...
+            </>
+          ) : (
+            <>
+              <span>Entrar na Conta</span>
+              <ArrowRight className="w-4 h-4" />
+            </>
+          )}
+        </Button>
+      </form>
+
+      <div className="mt-8 pt-6 border-t border-border/60 text-center">
+        <p className="text-xs text-muted-foreground">
+          Ainda não tem cadastro?{" "}
+          <Link href="/registro" className="text-primary font-bold hover:underline">
+            Cadastre-se agora
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export default function LoginPage() {
-    return (
-        <div className="flex min-h-[500px] items-center justify-center py-10 px-4 bg-muted/30">
-            <Suspense fallback={<div className="text-center">Carregando...</div>}>
-                <LoginForm />
-            </Suspense>
-        </div>
-    );
+  return (
+    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
+      <Suspense fallback={<div className="text-xs text-muted-foreground">Carregando...</div>}>
+        <LoginForm />
+      </Suspense>
+    </div>
+  );
 }

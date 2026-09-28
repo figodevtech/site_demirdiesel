@@ -1,194 +1,284 @@
-'use client';
+"use client";
 
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import {
+  ShoppingBag,
+  Trash2,
+  Plus,
+  Minus,
+  ArrowRight,
+  ShieldCheck,
+  Truck,
+  ArrowLeft,
+  Package,
+} from "lucide-react";
+import { useCart } from "@/components/providers/CartContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import Link from "next/link";
-import { ShoppingCart, ArrowLeft, Trash2, Plus, Minus, Truck, Loader2 } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
+import { ProductFallbackImage } from "@/components/product/ProductFallbackImage";
 
-import { useCart } from "@/components/providers/CartContext";
-import { useState } from "react";
+export default function CarrinhoPage() {
+  const router = useRouter();
+  const {
+    items,
+    removeFromCart,
+    updateQuantity,
+    subtotal,
+    totalItems,
+    shippingInfo,
+    setShippingInfo,
+  } = useCart();
 
-import { useRouter } from "next/navigation";
+  const [cep, setCep] = useState(shippingInfo?.cep || "");
+  const [isSimulating, setIsSimulating] = useState(false);
 
-export default function PaginaCarrinho() {
-    const { items, removeFromCart, updateQuantity, subtotal, totalItems, shippingInfo, setShippingInfo } = useCart();
-    const router = useRouter();
-    const [cep, setCep] = useState(shippingInfo?.cep || '');
-    const [isSimulating, setIsSimulating] = useState(false);
+  const formatCurrency = (val: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
 
-    const handleShippingCalc = async () => {
-        if (cep.length < 8) return;
-        setIsSimulating(true);
-        // Simula API
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Lógica mock
-        const price = 25.90; // preço mock fixo
-        setShippingInfo({ cep, price, days: 5 });
-        setIsSimulating(false);
-    };
+  const handleShippingCalc = async () => {
+    const cleanCep = cep.replace(/\D/g, "");
+    if (cleanCep.length < 8) {
+      toast.warning("Digite um CEP válido com 8 dígitos.");
+      return;
+    }
 
-    const handleCheckout = () => {
-        router.push('/checkout');
-    };
+    setIsSimulating(true);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    setShippingInfo({ cep: cleanCep, price: 38.5, days: 4 });
+    setIsSimulating(false);
+    toast.success("Frete calculado com sucesso!");
+  };
 
-    return (
-        <div className="container mx-auto px-4 py-8 max-w-5xl">
-            <h1 className="text-3xl font-bold text-secondary mb-8 flex items-center gap-3">
-                <ShoppingCart className="w-8 h-8 text-primary" />
-                Seu Carrinho
-            </h1>
+  const finalTotal = subtotal + (shippingInfo?.price || 0);
 
-            {items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-white rounded-lg shadow-sm border border-border/50">
-                    <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-6 text-muted-foreground">
-                        <ShoppingCart size={40} />
-                    </div>
-                    <h2 className="text-xl font-semibold text-secondary mb-2">Seu carrinho está vazio</h2>
-                    <p className="text-muted-foreground mb-8 text-sm max-w-md">
-                        Você ainda não adicionou nenhum produto ao seu carrinho. Explore nossa loja para encontrar as melhores peças.
-                    </p>
-                    <Link href="/produtos">
-                        <Button className="font-semibold px-8">
-                            Ver Produtos
-                        </Button>
-                    </Link>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Lista de Itens do Carrinho */}
-                    <div className="lg:col-span-2 space-y-4">
-                       <Card>
-                            <CardHeader className="pb-4">
-                                <CardTitle className="text-lg">Itens ({totalItems})</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4 divide-y">
-                                {items.map((item, idx) => (
-                                    <div key={idx} className="flex gap-4 py-4 first:pt-0 last:pb-0">
-                                        <div className="h-20 w-20 bg-muted rounded-md overflow-hidden shrink-0 border border-border/50">
-                                            <img 
-                                                src={item.product.image} 
-                                                alt={item.product.name} 
-                                                className="h-full w-full object-contain"
-                                            />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="font-medium text-sm text-secondary truncate">{item.product.name}</h4>
-                                            <p className="text-xs text-muted-foreground mb-2">Marca: {item.product.brand}</p>
-                                            <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <Button 
-                                                    variant="outline" 
-                                                    size="icon" 
-                                                    className="h-8 w-8" 
-                                                    onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                                                    disabled={item.quantity <= 1}
-                                                >
-                                                    <Minus size={14} />
-                                                </Button>
-                                                <span className="font-semibold w-8 text-center">{item.quantity}</span>
-                                                <Button 
-                                                    variant="outline" 
-                                                    size="icon" 
-                                                    className="h-8 w-8" 
-                                                    onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                                                    disabled={item.quantity >= (item.product.stock || 10)}
-                                                >
-                                                    <Plus size={14} />
-                                                </Button>
-                                            </div>
-                                            <div className="font-bold text-primary">
-                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.product.price * item.quantity)}
-                                            </div>
-                                            </div>
-                                        </div>
-                                        <Button 
-                                            variant="ghost" 
-                                            size="icon" 
-                                            className="text-muted-foreground hover:text-destructive h-8 w-8 self-center"
-                                            onClick={() => removeFromCart(item.product.id)}
-                                        >
-                                            <Trash2 size={18} />
-                                        </Button>
-                                    </div>
-                                ))}
-                            </CardContent>
-                       </Card>
-                    </div>
-
-                    {/* Summary */}
-                    <div className="lg:col-span-1">
-                        <Card className="sticky top-24">
-                            <CardHeader className="bg-muted/30 pb-4">
-                                <CardTitle className="text-lg">Resumo do Pedido</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-6 space-y-4">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Subtotal</span>
-                                    <span>
-                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between text-sm items-center">
-                                    <span className="text-muted-foreground">Frete</span>
-                                    {shippingInfo ? (
-                                        <span className="font-medium">
-                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(shippingInfo.price)}
-                                        </span>
-                                    ) : (
-                                        <span className="text-xs text-muted-foreground">Não calculado</span>
-                                    )}
-                                </div>
-                                
-                                <div className="space-y-2 pt-2">
-                                     <label className="text-xs font-medium text-muted-foreground">Calcular Frete</label>
-                                     <div className="flex gap-2">
-                                        <Input 
-                                            placeholder="CEP" 
-                                            className="h-8 text-sm" 
-                                            value={cep} 
-                                            onChange={(e) => setCep(e.target.value)}
-                                            maxLength={9}
-                                        />
-                                        <Button 
-                                            variant="secondary" 
-                                            size="sm" 
-                                            className="h-8"
-                                            onClick={handleShippingCalc}
-                                            disabled={isSimulating}
-                                        >
-                                            {isSimulating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Truck size={14} />}
-                                        </Button>
-                                     </div>
-                                </div>
-
-                                <Separator />
-                                <div className="flex justify-between font-bold text-lg pt-2">
-                                    <span>Total</span>
-                                    <span className="text-primary">
-                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal + (shippingInfo?.price || 0))}
-                                    </span>
-                                </div>
-                            </CardContent>
-                            <CardFooter className="p-6 pt-0 flex flex-col gap-3">
-                                <Button 
-                                    className="w-full text-base py-6 font-bold shadow-md hover:shadow-lg transition-all"
-                                    onClick={handleCheckout}
-                                >
-                                    Finalizar Compra
-                                </Button>
-                                <Link href="/produtos" className="w-full">
-                                    <Button variant="outline" className="w-full">
-                                        Continuar Comprando
-                                    </Button>
-                                </Link>
-                            </CardFooter>
-                        </Card>
-                    </div>
-                </div>
-            )}
+  return (
+    <div className="container mx-auto px-4 py-8 md:py-12 max-w-5xl">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-6 mb-8 border-b border-border/80">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground flex items-center gap-2.5">
+            <ShoppingBag className="w-7 h-7 text-primary" />
+            <span>Meu Carrinho</span>
+          </h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            {totalItems > 0
+              ? `${totalItems} ${totalItems === 1 ? "item selecionado" : "itens selecionados"}`
+              : "Nenhum item adicionado"}
+          </p>
         </div>
-    );
+
+        <Link
+          href="/produtos"
+          className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Continuar Comprando</span>
+        </Link>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="py-20 px-4 text-center rounded-3xl border border-dashed border-border/80 bg-slate-50/50 dark:bg-slate-900/30 max-w-lg mx-auto">
+          <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 shadow-xs border border-border/60 flex items-center justify-center mx-auto mb-4 text-slate-400">
+            <Package className="w-8 h-8 stroke-[1.5]" />
+          </div>
+          <h2 className="text-lg font-bold text-foreground">Seu carrinho está vazio</h2>
+          <p className="text-xs text-muted-foreground mt-1 mb-6 max-w-sm mx-auto">
+            Você ainda não adicionou nenhum componente ao carrinho. Explore nosso catálogo de peças e módulos.
+          </p>
+          <Button asChild className="rounded-xl px-6 font-semibold text-xs h-10">
+            <Link href="/produtos">Explorar Catálogo Diesel</Link>
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Lista de Itens do Carrinho */}
+          <div className="lg:col-span-8 space-y-4">
+            <div className="bg-card rounded-2xl border border-border/80 divide-y divide-border/60 overflow-hidden shadow-2xs">
+              {items.map((item) => {
+                const p = item.product;
+                const itemTotal = (Number(p.price) || 0) * item.quantity;
+
+                return (
+                  <div key={p.id} className="p-4 sm:p-5 flex gap-4 items-start sm:items-center">
+                    {/* Imagem do Item */}
+                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border/60 overflow-hidden shrink-0 p-1 flex items-center justify-center">
+                      {p.image ? (
+                        <Image
+                          src={p.image}
+                          alt={p.name || p.title}
+                          fill
+                          sizes="96px"
+                          className="object-contain p-1"
+                        />
+                      ) : (
+                        <ProductFallbackImage category={p.category} />
+                      )}
+                    </div>
+
+                    {/* Detalhes do Item */}
+                    <div className="flex-1 min-w-0">
+                      <Link
+                        href={`/produto/${p.slug || p.id}`}
+                        className="font-bold text-xs sm:text-sm text-foreground hover:text-primary transition-colors line-clamp-2 block leading-snug"
+                      >
+                        {p.name || p.title}
+                      </Link>
+
+                      <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
+                        {p.brand && (
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            {p.brand}
+                          </span>
+                        )}
+                        {p.reference && (
+                          <>
+                            <span>•</span>
+                            <span className="font-mono text-[10px]">Ref: {p.reference}</span>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-2">
+                        {/* Seletor de Quantidade */}
+                        <div className="flex items-center rounded-lg border border-border/80 bg-slate-50 dark:bg-slate-900 p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(p.id, item.quantity - 1)}
+                            disabled={item.quantity <= 1}
+                            className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-foreground disabled:opacity-40"
+                            aria-label="Diminuir"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="w-8 text-center font-mono font-semibold text-xs">
+                            {item.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(p.id, item.quantity + 1)}
+                            disabled={item.quantity >= (Number(p.stock) || 99)}
+                            className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-foreground disabled:opacity-40"
+                            aria-label="Aumentar"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+
+                        {/* Valor Unitário e Total do Item */}
+                        <div className="text-right">
+                          <span className="font-bold text-sm sm:text-base text-foreground block">
+                            {formatCurrency(itemTotal)}
+                          </span>
+                          {item.quantity > 1 && (
+                            <span className="text-[10px] text-muted-foreground block">
+                              {formatCurrency(p.price)} un.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Remover */}
+                    <button
+                      type="button"
+                      onClick={() => removeFromCart(p.id)}
+                      className="text-slate-400 hover:text-rose-600 transition-colors p-1"
+                      aria-label="Remover do carrinho"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Simulação de Frete */}
+            <div className="bg-card rounded-2xl border border-border/80 p-5 shadow-2xs space-y-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                <Truck className="w-4 h-4 text-primary" />
+                <span>Simulação de Frete para Entrega</span>
+              </div>
+              <div className="flex gap-2 max-w-sm">
+                <Input
+                  placeholder="00000-000"
+                  value={cep}
+                  onChange={(e) => setCep(e.target.value)}
+                  maxLength={9}
+                  className="h-9 text-xs"
+                />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleShippingCalc}
+                  disabled={isSimulating}
+                  className="h-9 text-xs font-semibold px-4"
+                >
+                  {isSimulating ? "Calculando..." : "Calcular"}
+                </Button>
+              </div>
+              {shippingInfo && (
+                <div className="text-xs text-muted-foreground pt-1 flex items-center justify-between">
+                  <span>Transporte Especializado (até {shippingInfo.days} dias):</span>
+                  <span className="font-bold text-foreground">
+                    {formatCurrency(shippingInfo.price)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Resumo do Pedido */}
+          <div className="lg:col-span-4">
+            <div className="sticky top-24 bg-card rounded-2xl border border-border/80 p-6 shadow-2xs space-y-5">
+              <h2 className="font-extrabold text-base text-foreground">Resumo do Pedido</h2>
+
+              <div className="space-y-3 text-xs divide-y divide-border/60">
+                <div className="flex justify-between py-1.5">
+                  <span className="text-muted-foreground">Subtotal dos produtos</span>
+                  <span className="font-semibold text-foreground">{formatCurrency(subtotal)}</span>
+                </div>
+
+                <div className="flex justify-between py-1.5">
+                  <span className="text-muted-foreground">Frete</span>
+                  <span className="font-semibold text-foreground">
+                    {shippingInfo ? formatCurrency(shippingInfo.price) : "A calcular"}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-baseline pt-3 text-base">
+                  <span className="font-bold text-foreground">Total</span>
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-foreground block">
+                      {formatCurrency(finalTotal)}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground block">
+                      Em até 12x no cartão de crédito
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                size="lg"
+                onClick={() => router.push("/checkout")}
+                className="w-full h-12 text-sm font-bold gap-2 rounded-xl bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20"
+              >
+                <span>Avançar para o Checkout</span>
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+
+              <div className="flex items-center gap-2 justify-center text-[11px] text-muted-foreground pt-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Ambiente Seguro e Criptografado</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
