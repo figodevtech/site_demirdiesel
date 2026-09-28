@@ -19,6 +19,7 @@ import { useCart } from "@/components/providers/CartContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { getShippingEstimate } from "@/lib/shipping";
 import { ProductFallbackImage } from "@/components/product/ProductFallbackImage";
 
 export default function CarrinhoPage() {
@@ -47,13 +48,14 @@ export default function CarrinhoPage() {
     }
 
     setIsSimulating(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setShippingInfo({ cep: cleanCep, price: 38.5, days: 4 });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const quote = getShippingEstimate(cleanCep);
+    setShippingInfo({ cep: cleanCep, price: 0, days: 0 });
     setIsSimulating(false);
-    toast.success("Frete calculado com sucesso!");
+    toast.info(quote.message);
   };
 
-  const finalTotal = subtotal + (shippingInfo?.price || 0);
+  const finalTotal = subtotal;
 
   return (
     <div className="container mx-auto px-4 py-8 md:py-12 max-w-5xl">
@@ -222,9 +224,9 @@ export default function CarrinhoPage() {
               </div>
               {shippingInfo && (
                 <div className="text-xs text-muted-foreground pt-1 flex items-center justify-between">
-                  <span>Transporte Especializado (até {shippingInfo.days} dias):</span>
-                  <span className="font-bold text-foreground">
-                    {formatCurrency(shippingInfo.price)}
+                  <span>Transporte Especializado:</span>
+                  <span className="font-semibold text-primary">
+                    A combinar
                   </span>
                 </div>
               )}
@@ -244,8 +246,8 @@ export default function CarrinhoPage() {
 
                 <div className="flex justify-between py-1.5">
                   <span className="text-muted-foreground">Frete</span>
-                  <span className="font-semibold text-foreground">
-                    {shippingInfo ? formatCurrency(shippingInfo.price) : "A calcular"}
+                  <span className="font-semibold text-primary">
+                    A calcular
                   </span>
                 </div>
 

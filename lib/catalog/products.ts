@@ -43,14 +43,18 @@ export function mapRowToPublicProduct(row: any, extraImages: string[] = []): Pub
     "Componente Diesel"
   ).trim();
 
-  const brand = (row.fabricante || "Genuíno").trim();
+  const rawBrand = row.fabricante ? String(row.fabricante).trim() : "";
+  const brand = rawBrand && rawBrand !== "-" && rawBrand.length > 1 ? rawBrand : null;
+
   const rawCondition = String(row.conservacao || "").trim().toUpperCase();
-  const condition: ProductCondition =
+  const condition: ProductCondition | null =
     rawCondition === "USADO"
       ? "USADO"
       : rawCondition === "RECONDICIONADO"
       ? "RECONDICIONADO"
-      : "NOVO";
+      : rawCondition === "NOVO"
+      ? "NOVO"
+      : null;
 
   const price = Number(row.precovenda) || 0;
   const stock = Number(row.estoque) || 0;
@@ -217,16 +221,53 @@ export async function getPaginatedProducts(
     if (options.categoryId) {
       query = query.eq("grupo_produto_id", options.categoryId);
     } else if (options.categorySlug && options.categorySlug !== "todos") {
-      const { data: cat } = await supabaseAdmin
-        .from("produtogrupo")
-        .select("id, nome")
-        .eq("ativo", true);
+      const cleanSlug = options.categorySlug.trim().toLowerCase();
 
-      const matched = (cat || []).find(
-        (c) => slugify(c.nome) === options.categorySlug
-      );
-      if (matched) {
-        query = query.eq("grupo_produto_id", matched.id);
+      // Mapeamento explícito de atalhos comerciais para grupos reais do banco
+      const COMMERCIAL_GROUP_ALIASES: Record<string, number[]> = {
+        modulos: [4], // MÓDULOS
+        injecao: [23, 25], // INJ BICOS / UNID / BBA, BOMBAS
+        bombas: [25], // BOMBAS
+        motor: [17], // MOTOR
+        sensores: [24, 19], // SENSORES, VÁLVULAS
+        valvulas: [19], // VÁLVULAS
+        filtros: [3], // FILTROS
+        chicotes: [22], // CHICOTES
+        arla: [15], // ARLA
+        aditivos: [11], // ADITIVOS
+        lubrificantes: [16], // LUBRIFICANTES
+      };
+
+      if (COMMERCIAL_GROUP_ALIASES[cleanSlug]) {
+        const ids = COMMERCIAL_GROUP_ALIASES[cleanSlug];
+        if (ids.length === 1) {
+          query = query.eq("grupo_produto_id", ids[0]);
+        } else {
+          query = query.in("grupo_produto_id", ids);
+        }
+      } else {
+        const { data: cat } = await supabaseAdmin
+          .from("produtogrupo")
+          .select("id, nome")
+          .eq("ativo", true);
+
+        const matched = (cat || []).find(
+          (c) => slugify(c.nome) === cleanSlug
+        );
+
+        if (matched) {
+          query = query.eq("grupo_produto_id", matched.id);
+        } else {
+          // REGRA CRÍTICA: Slug inexistente NUNCA deve retornar o catálogo inteiro!
+          // Retorna resultado vazio controlado
+          return {
+            products: [],
+            totalCount: 0,
+            page: options.page || 1,
+            pageSize: options.pageSize || 24,
+            totalPages: 0,
+          };
+        }
       }
     }
 
@@ -338,3 +379,36 @@ export async function getAvailableBrands(): Promise<string[]> {
     return [];
   }
 }
+
+/**
+ * Retorna todos os produtos públicos para o sitemap completo, sem paginação arbitrária e sem colunas pesadas.
+ */
+export async function getAllProductsForSitemap(): Promise<Array<{ id: number; slug: string; updatedAt?: string }>> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("produto")
+      .select("id, titulo, tituloMarketplace, referencia, updatedat")
+      .eq("is_deleted", false)
+      .eq("exibirPdv", true);
+
+    if (error || !data) {
+      console.error("Erro ao buscar produtos para sitemap:", error);
+      return [];
+    }
+
+    return data.map((row) => {
+      const title = (row.tituloMarketplace || row.titulo || "componente-diesel").trim();
+      const referencePart = row.referencia ? `-${slugify(row.referencia)}` : "";
+      const slug = `${slugify(title)}${referencePart}-${row.id}`;
+      return {
+        id: row.id,
+        slug,
+        updatedAt: row.updatedat,
+      };
+    });
+  } catch (err) {
+    console.error("Exceção ao gerar sitemap de produtos:", err);
+    return [];
+  }
+}
+

@@ -65,7 +65,7 @@ export default function FavoritosPage() {
           title: p?.tituloMarketplace || p?.titulo || "Peça Diesel",
           price: Number(p?.precovenda) || 0,
           stock: Number(p?.estoque) || 0,
-          brand: p?.fabricante || "Genuíno",
+          brand: p?.fabricante || null,
           reference: p?.referencia,
           category: p?.produtogrupo?.nome || "Geral",
           image: p?.imgUrl || "",
@@ -168,9 +168,11 @@ export default function FavoritosPage() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary block">
-                    {product.brand}
-                  </span>
+                  {product.brand && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary block">
+                      {product.brand}
+                    </span>
+                  )}
                   <Link
                     href={`/produto/${product.id}`}
                     className="font-bold text-xs text-foreground hover:text-primary transition-colors line-clamp-2 leading-snug block"

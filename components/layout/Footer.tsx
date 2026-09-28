@@ -2,6 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { Phone, Mail, MapPin, ShieldCheck, Truck, Wrench, MessageCircle } from "lucide-react";
 import { getCategories } from "@/lib/catalog/categories";
+import { siteConfig, buildWhatsAppUrl } from "@/lib/site-config";
 
 export default async function Footer() {
   const categories = (await getCategories()).slice(0, 6);
@@ -69,7 +70,7 @@ export default async function Footer() {
 
             <div className="pt-2">
               <a
-                href="https://wa.me/5583999999999?text=Ol%C3%A1%2C%20gostaria%20de%20um%20atendimento%20t%C3%A9cnico."
+                href={buildWhatsAppUrl("Olá, gostaria de um atendimento técnico.")}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
@@ -101,7 +102,7 @@ export default async function Footer() {
                   href="/produtos"
                   className="text-primary hover:underline font-semibold block pt-1"
                 >
-                  Ver todos os 1.200+ itens →
+                  Ver catálogo completo →
                 </Link>
               </li>
             </ul>
@@ -155,28 +156,35 @@ export default async function Footer() {
               <li className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                 <span>
-                  R. Jorn. João José Ramalho, 33
+                  {siteConfig.address.street}, {siteConfig.address.number}
                   <br />
-                  Costa e Silva, João Pessoa - PB
+                  {siteConfig.address.neighborhood}, {siteConfig.address.city} - {siteConfig.address.state}
                   <br />
-                  CEP: 58081-110
+                  CEP: {siteConfig.address.cep}
                 </span>
               </li>
-              <li className="flex items-center gap-2.5">
-                <Phone className="w-4 h-4 text-primary shrink-0" />
-                <span>(83) 3000-0000 / (83) 99999-9999</span>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <Mail className="w-4 h-4 text-primary shrink-0" />
-                <span>contato@demirdiesel.com.br</span>
-              </li>
+              {(siteConfig.phoneDisplay || siteConfig.phone) && (
+                <li className="flex items-center gap-2.5">
+                  <Phone className="w-4 h-4 text-primary shrink-0" />
+                  <span>{siteConfig.phoneDisplay || siteConfig.phone}</span>
+                </li>
+              )}
+              {siteConfig.email && (
+                <li className="flex items-center gap-2.5">
+                  <Mail className="w-4 h-4 text-primary shrink-0" />
+                  <span>{siteConfig.email}</span>
+                </li>
+              )}
             </ul>
           </div>
         </div>
 
         {/* Linha Inferior com Copyright e Segurança */}
         <div className="border-t border-slate-900 mt-12 pt-6 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-4">
-          <p>© {new Date().getFullYear()} Demir Diesel Peças e Serviços Ltda. CNPJ: 00.000.000/0001-00.</p>
+          <p>
+            © {new Date().getFullYear()} {siteConfig.legalName}
+            {siteConfig.cnpj ? ` CNPJ: ${siteConfig.cnpj}` : ""}.
+          </p>
           <p className="text-slate-400">
             Tecnologia & Peças para manter sua operação em movimento.
           </p>

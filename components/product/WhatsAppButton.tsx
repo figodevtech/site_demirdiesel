@@ -3,12 +3,13 @@
 import React from "react";
 import { MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { siteConfig, buildWhatsAppUrl } from "@/lib/site-config";
+import { useRouter } from "next/navigation";
 
 interface WhatsAppButtonProps {
   productTitle: string;
   reference?: string | null;
   productId?: string;
-  phone?: string;
   variant?: "outline" | "default" | "secondary";
   size?: "default" | "sm" | "lg";
   className?: string;
@@ -19,12 +20,13 @@ export function WhatsAppButton({
   productTitle,
   reference,
   productId,
-  phone = "5583999999999", // Contato WhatsApp da Demir Diesel
   variant = "outline",
   size = "default",
   className = "",
   label = "Falar com Especialista",
 }: WhatsAppButtonProps) {
+  const router = useRouter();
+
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -33,12 +35,15 @@ export function WhatsAppButton({
     const refText = reference ? ` (Ref: ${reference})` : "";
     const codeText = productId ? ` [#${productId}]` : "";
 
-    const message = encodeURIComponent(
-      `Olá! Tenho interesse no item:\n*${productTitle}*${refText}${codeText}\n${currentUrl}\n\nGostaria de confirmar compatibilidade e disponibilidade.`
-    );
+    const message = `Olá! Tenho interesse no item:\n*${productTitle}*${refText}${codeText}\n${currentUrl}\n\nGostaria de confirmar compatibilidade e disponibilidade.`;
 
-    const whatsappUrl = `https://wa.me/${phone.replace(/\D/g, "")}?text=${message}`;
-    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    const targetUrl = buildWhatsAppUrl(message);
+
+    if (targetUrl.startsWith("http")) {
+      window.open(targetUrl, "_blank", "noopener,noreferrer");
+    } else {
+      router.push(targetUrl);
+    }
   };
 
   return (

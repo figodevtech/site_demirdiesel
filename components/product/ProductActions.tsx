@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WhatsAppButton } from "./WhatsAppButton";
 import { PublicProduct } from "@/lib/catalog/types";
+import { getShippingEstimate, ShippingQuoteResult } from "@/lib/shipping";
 
 export function ProductActions({ product }: { product: PublicProduct }) {
   const { addToCart } = useCart();
@@ -18,9 +19,7 @@ export function ProductActions({ product }: { product: PublicProduct }) {
   const [cep, setCep] = useState("");
   const [isSimulating, setIsSimulating] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
-  const [shippingResult, setShippingResult] = useState<
-    { type: string; price: number; days: number }[] | null
-  >(null);
+  const [shippingQuote, setShippingQuote] = useState<ShippingQuoteResult | null>(null);
 
   const favorited = isInWishlist(product.id);
   const maxStock = Math.max(0, Number(product.stock) || 0);
@@ -48,17 +47,15 @@ export function ProductActions({ product }: { product: PublicProduct }) {
     }
 
     setIsSimulating(true);
-    setShippingResult(null);
+    setShippingQuote(null);
 
     try {
-      // Simulação rápida com prazo e faixas de frete
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setShippingResult([
-        { type: "Transportadora Rodoviária / Carga Pesada", price: 38.5, days: 4 },
-        { type: "Envio Expresso Aéreo", price: 68.0, days: 2 },
-      ]);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const quote = getShippingEstimate(cleanCep);
+      setShippingQuote(quote);
+      toast.info(quote.message);
     } catch {
-      toast.error("Não foi possível simular o frete.");
+      toast.error("Não foi possível consultar as condições de envio.");
     } finally {
       setIsSimulating(false);
     }
@@ -198,15 +195,18 @@ export function ProductActions({ product }: { product: PublicProduct }) {
           </Button>
         </div>
 
-        {shippingResult && (
+        {shippingQuote && (
           <div className="rounded-xl border border-border/80 bg-slate-50 dark:bg-slate-900/60 p-3 space-y-2 text-xs">
-            {shippingResult.map((res, idx) => (
-              <div key={idx} className="flex justify-between items-center py-1 border-b border-border/40 last:border-0">
+            <p className="text-[11px] text-muted-foreground font-medium pb-1 border-b border-border/40">
+              {shippingQuote.message}
+            </p>
+            {shippingQuote.options.map((res, idx) => (
+              <div key={idx} className="flex justify-between items-center py-1.5 border-b border-border/40 last:border-0">
                 <div>
-                  <span className="font-medium text-foreground block">{res.type}</span>
-                  <span className="text-[11px] text-muted-foreground">Prazo estimado: até {res.days} dias úteis</span>
+                  <span className="font-semibold text-foreground block">{res.type}</span>
+                  <span className="text-[11px] text-muted-foreground">{res.daysText}</span>
                 </div>
-                <span className="font-bold text-foreground">{formatCurrency(res.price)}</span>
+                <span className="font-bold text-primary">{res.formattedPrice}</span>
               </div>
             ))}
           </div>
@@ -214,7 +214,7 @@ export function ProductActions({ product }: { product: PublicProduct }) {
       </div>
 
       {/* Mobile Sticky Bottom CTA Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-border/80 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:hidden shadow-lg">
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-border/80 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <span className="text-[10px] text-muted-foreground block truncate">{product.title}</span>

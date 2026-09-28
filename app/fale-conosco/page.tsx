@@ -3,37 +3,46 @@
 import React from "react";
 import { Mail, Phone, MapPin, Clock, MessageCircle, ShieldCheck } from "lucide-react";
 import { ContactForm } from "@/components/home/ContactForm";
+import { siteConfig, buildWhatsAppUrl } from "@/lib/site-config";
 
 export default function FaleConoscoPage() {
   const contatos = [
-    {
-      icon: Phone,
-      label: "Telefone Comercial",
-      value: "(83) 3000-0000",
-      link: "tel:8330000000",
-    },
-    {
-      icon: MessageCircle,
-      label: "Plantão WhatsApp",
-      value: "(83) 99999-9999",
-      link: "https://wa.me/5583999999999?text=Ol%C3%A1%2C%20gostaria%20de%20um%20or%C3%A7amento%20t%C3%A9cnico.",
-    },
+    ...(siteConfig.phoneDisplay
+      ? [
+          {
+            icon: Phone,
+            label: "Telefone Comercial",
+            value: siteConfig.phoneDisplay,
+            link: `tel:${siteConfig.phone.replace(/\D/g, "")}`,
+          },
+        ]
+      : []),
+    ...(siteConfig.whatsapp
+      ? [
+          {
+            icon: MessageCircle,
+            label: "WhatsApp de Atendimento",
+            value: siteConfig.whatsappDisplay || "Iniciar Conversa",
+            link: buildWhatsAppUrl("Olá, gostaria de um orçamento técnico."),
+          },
+        ]
+      : []),
     {
       icon: Mail,
       label: "E-mail de Contato",
-      value: "contato@demirdiesel.com.br",
-      link: "mailto:contato@demirdiesel.com.br",
+      value: siteConfig.email,
+      link: `mailto:${siteConfig.email}`,
     },
     {
       icon: MapPin,
       label: "Endereço Físico",
-      value: "R. Jorn. João José Ramalho, 33 - Costa e Silva, João Pessoa - PB, 58081-110",
+      value: siteConfig.address.full,
       link: "https://maps.google.com/?q=Demir+Diesel+João+Pessoa",
     },
     {
       icon: Clock,
       label: "Horário de Atendimento",
-      value: "Seg a Sex: 07:30 às 17:30 | Sábado: 07:30 às 12:00",
+      value: siteConfig.openingHours,
     },
   ];
 

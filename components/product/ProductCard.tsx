@@ -73,16 +73,16 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
               variant="secondary"
               className="text-[10px] font-bold px-2 py-0.5 bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20 backdrop-blur-xs"
             >
-              REVISADO
+              RECONDICIONADO
             </Badge>
-          ) : (
+          ) : product.condition === "NOVO" ? (
             <Badge
               variant="secondary"
               className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 backdrop-blur-xs"
             >
               NOVO
             </Badge>
-          )}
+          ) : null}
 
           {!product.isAvailable && (
             <Badge

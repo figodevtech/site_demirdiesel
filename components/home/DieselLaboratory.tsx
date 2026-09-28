@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { Cpu, Fuel, Wrench, ShieldCheck, MessageCircle, ArrowRight, CheckCircle2 } from "lucide-react";
+import { siteConfig, buildWhatsAppUrl } from "@/lib/site-config";
 
 export function DieselLaboratory() {
   const services = [
@@ -45,7 +46,7 @@ export function DieselLaboratory() {
             </h2>
 
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-              Combinamos bancadas computadorizadas de teste com mais de 20 anos de experiência
+              Combinamos bancadas computadorizadas de teste com sólida experiência técnica
               em mecânica pesada. Diagnosticamos e solucionamos falhas complexas com precisão cirúrgica.
             </p>
 
@@ -66,8 +67,8 @@ export function DieselLaboratory() {
 
             <div className="pt-4 flex flex-wrap items-center gap-4">
               <a
-                href="https://wa.me/5583999999999?text=Ol%C3%A1%2C%20gostaria%20de%20consultar%20o%20laborat%C3%B3rio%20Demir%20Diesel%20sobre%20um%20m%C3%B3dulo%20ou%20bomba."
-                target="_blank"
+                href={buildWhatsAppUrl("Olá, gostaria de consultar o laboratório Demir Diesel sobre um módulo ou bomba.")}
+                target={siteConfig.whatsapp ? "_blank" : undefined}
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm shadow-lg transition-colors"
               >

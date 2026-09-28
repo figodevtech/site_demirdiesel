@@ -7,7 +7,9 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import Footer from "@/components/layout/Footer";
 import { CartProvider } from "@/components/providers/CartContext";
 import { AuthProvider } from "@/components/providers/AuthContext";
+import { WishlistProvider } from "@/components/providers/WishlistContext";
 import { Analytics } from "@vercel/analytics/react";
+import { siteConfig } from "@/lib/site-config";
 import "./globals.css";
 
 const inter = Inter({
@@ -48,11 +50,11 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Demir Diesel" }],
   creator: "Demir Diesel",
-  metadataBase: new URL("https://erp.demirdiesel.com.br"),
+  metadataBase: new URL(siteConfig.url),
   openGraph: {
     type: "website",
     locale: "pt_BR",
-    url: "https://erp.demirdiesel.com.br",
+    url: siteConfig.url,
     siteName: "Demir Diesel",
     title: "Demir Diesel - Peças, Módulos Eletrônicos & Oficina Especializada",
     description:
@@ -80,16 +82,18 @@ export default function RootLayout({
           shadow="0 0 10px #0A7AAC,0 0 5px #0A7AAC"
         />
         <AuthProvider>
-          <CartProvider>
-            <Navbar />
-            <main className="flex-1 w-full flex flex-col pb-16 md:pb-0">
-              {children}
-            </main>
-            <Footer />
-            <BottomNav />
-            <Toaster position="top-right" richColors />
-            <Analytics />
-          </CartProvider>
+          <WishlistProvider>
+            <CartProvider>
+              <Navbar />
+              <main className="flex-1 w-full flex flex-col pb-16 md:pb-0">
+                {children}
+              </main>
+              <Footer />
+              <BottomNav />
+              <Toaster position="top-right" richColors />
+              <Analytics />
+            </CartProvider>
+          </WishlistProvider>
         </AuthProvider>
       </body>
     </html>

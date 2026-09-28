@@ -12,8 +12,9 @@ export function BottomNav() {
   const { totalItems } = useCart();
   const { wishlistIds } = useWishlist();
 
-  // Esconder bottom navigation durante tela de pagamento/checkout para evitar distração (Regra 26)
-  if (pathname.startsWith("/checkout")) {
+  // Esconder bottom navigation durante checkout e na página de detalhes do produto
+  // para dar total visibilidade e prioridade ao CTA de compra fixo mobile (Prioridade 13)
+  if (pathname.startsWith("/checkout") || pathname.startsWith("/produto/")) {
     return null;
   }
 

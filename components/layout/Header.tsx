@@ -10,6 +10,7 @@ import CartWidget from "./CartWidget";
 import UserWidget from "./UserWidget";
 import { PublicCategory } from "@/lib/catalog/types";
 import { useWishlist } from "@/lib/hooks/useWishlist";
+import { siteConfig, buildWhatsAppUrl } from "@/lib/site-config";
 
 interface HeaderProps {
   categories: PublicCategory[];
@@ -64,11 +65,11 @@ export function Header({ categories }: HeaderProps) {
           <div className="flex items-center gap-4 text-[11px] text-slate-300">
             <span className="flex items-center gap-1.5">
               <Phone className="w-3 h-3 text-primary" />
-              <span>João Pessoa - PB</span>
+              <span>{siteConfig.address.city} - {siteConfig.address.state}</span>
             </span>
             <span className="h-3 w-px bg-slate-700" />
             <a
-              href="https://wa.me/5583999999999?text=Ol%C3%A1%2C%20gostaria%20de%20um%20or%C3%A7amento%20de%20pe%C3%A7as%20diesel."
+              href={buildWhatsAppUrl("Olá, gostaria de um orçamento de peças diesel.")}
               target="_blank"
               rel="noopener noreferrer"
               className="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 transition-colors"
@@ -119,7 +120,7 @@ export function Header({ categories }: HeaderProps) {
         <div className="flex items-center gap-1 sm:gap-2">
           {/* Botão rápido WhatsApp Desktop */}
           <a
-            href="https://wa.me/5583999999999?text=Ol%C3%A1%2C%20preciso%20de%20ajuda%20para%20encontrar%20uma%20pe%C3%A7a%20diesel."
+            href={buildWhatsAppUrl("Olá, preciso de ajuda técnica para encontrar uma peça diesel.")}
             target="_blank"
             rel="noopener noreferrer"
             className="hidden lg:flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-600/20 transition-colors mr-1"
@@ -169,7 +170,7 @@ export function Header({ categories }: HeaderProps) {
               >
                 <span>Todos os Produtos</span>
                 <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.2 rounded-sm font-mono">
-                  1.200+
+                  Catálogo
                 </span>
               </Link>
             </li>

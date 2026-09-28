@@ -15,8 +15,17 @@ export async function getCategories(): Promise<PublicCategory[]> {
       return [];
     }
 
+    const excludedGroups = [
+      "NÃO RELACIONADO",
+      "OUTROS",
+      "PESSOA FÍSICA",
+      "ESTOQUE",
+      "EVENTOS",
+      "PEÇAS",
+    ];
+
     return data
-      .filter((cat) => cat.nome && !["NÃO RELACIONADO", "OUTROS"].includes(cat.nome.trim().toUpperCase()))
+      .filter((cat) => cat.nome && !excludedGroups.includes(cat.nome.trim().toUpperCase()))
       .map((cat) => ({
         id: cat.id,
         name: cat.nome.trim(),

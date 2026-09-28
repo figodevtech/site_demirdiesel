@@ -13,7 +13,7 @@ interface FeaturedSectionProps {
 export function FeaturedSection({
   products,
   title = "Destaques & Oportunidades em Estoque",
-  subtitle = "Componentes diesel revisados e genuínos com disponibilidade imediata.",
+  subtitle = "Peças e componentes diesel disponíveis para pronta entrega e envio nacional.",
 }: FeaturedSectionProps) {
   if (!products || products.length === 0) return null;
 

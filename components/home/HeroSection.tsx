@@ -48,8 +48,8 @@ export function HeroSection() {
 
         {/* Subtítulo */}
         <p className="mt-4 md:mt-5 text-sm sm:text-base md:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
-          Mais de 1.200 itens em estoque real. Módulos eletrônicos, injeção common rail,
-          componentes de motor e laboratório especializado.
+          Catálogo especializado em linha pesada. Módulos eletrônicos, injeção common rail,
+          componentes de motor e oficina com diagnóstico avançado.
         </p>
 
         {/* Campo de Busca em Destaque no Hero */}
@@ -80,19 +80,19 @@ export function HeroSection() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mt-12 md:mt-16 pt-8 border-t border-slate-800/80 max-w-4xl mx-auto text-left">
           <div className="p-3 sm:p-4 rounded-xl bg-slate-900/50 border border-slate-800/60">
             <span className="font-mono text-xl sm:text-2xl font-bold text-white block">
-              1.200+
+              Catálogo
             </span>
             <span className="text-xs text-slate-400 mt-0.5 block">
-              Componentes Ativos em Estoque
+              Peças e Módulos Diesel
             </span>
           </div>
 
           <div className="p-3 sm:p-4 rounded-xl bg-slate-900/50 border border-slate-800/60">
             <span className="font-mono text-xl sm:text-2xl font-bold text-sky-400 block">
-              100%
+              Bancada
             </span>
             <span className="text-xs text-slate-400 mt-0.5 block">
-              Testados em Bancada Técnica
+              Diagnóstico Computadorizado
             </span>
           </div>
 
@@ -101,16 +101,16 @@ export function HeroSection() {
               Nacional
             </span>
             <span className="text-xs text-slate-400 mt-0.5 block">
-              Despacho Aéreo & Rodoviário
+              Envio Aéreo & Rodoviário
             </span>
           </div>
 
           <div className="p-3 sm:p-4 rounded-xl bg-slate-900/50 border border-slate-800/60">
             <span className="font-mono text-xl sm:text-2xl font-bold text-emerald-400 block">
-              Direto
+              Oficina
             </span>
             <span className="text-xs text-slate-400 mt-0.5 block">
-              Consultoria Técnica com Mecânicos
+              Estrutura Física Especializada
             </span>
           </div>
         </div>

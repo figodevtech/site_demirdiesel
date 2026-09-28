@@ -21,8 +21,8 @@ export interface PublicProduct {
   isAvailable: boolean;
   statusEstoque: "OK" | "BAIXO" | "CRITICO" | "ESGOTADO";
   reference: string | null;
-  brand: string;
-  condition: ProductCondition;
+  brand: string | null;
+  condition: ProductCondition | null;
   featured: boolean;
   categoryId: number | null;
   categoryName: string;

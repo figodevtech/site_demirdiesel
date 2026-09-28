@@ -9,6 +9,8 @@ import { ProductActions } from "@/components/product/ProductActions";
 import { ProductCard } from "@/components/product/ProductCard";
 import { Badge } from "@/components/ui/badge";
 
+import { siteConfig } from "@/lib/site-config";
+
 interface ProductPageProps {
   params: Promise<{ id: string }>;
 }
@@ -23,10 +25,12 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     };
   }
 
-  const title = `${product.title} - ${product.brand} | Demir Diesel`;
+  const title = product.brand
+    ? `${product.title} - ${product.brand} | Demir Diesel`
+    : `${product.title} | Demir Diesel`;
   const description =
     product.description ||
-    `Compre ${product.title} (${product.reference ? `Ref: ${product.reference}` : ""}) na Demir Diesel. Peças pesadas e módulos diesel com garantia e envio para todo o Brasil.`;
+    `Consulte ${product.title} (${product.reference ? `Ref: ${product.reference}` : ""}) na Demir Diesel. Peças pesadas e módulos diesel com garantia e envio nacional.`;
 
   return {
     title,
@@ -63,10 +67,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
     description: product.description || product.title,
     sku: product.id,
     mpn: product.reference || undefined,
-    brand: {
-      "@type": "Brand",
-      name: product.brand,
-    },
+    brand: product.brand
+      ? {
+          "@type": "Brand",
+          name: product.brand,
+        }
+      : undefined,
     offers: {
       "@type": "Offer",
       price: product.price > 0 ? product.price : undefined,
@@ -74,7 +80,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       availability: product.isAvailable
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
-      url: `https://erp.demirdiesel.com.br/produto/${product.slug || product.id}`,
+      url: `${siteConfig.url}/produto/${product.slug || product.id}`,
     },
   };
 
@@ -136,12 +142,14 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 {product.categoryName}
               </Badge>
 
-              <Badge
-                variant="outline"
-                className="text-xs font-semibold px-2.5 py-0.5 border-primary/40 text-primary"
-              >
-                {product.brand}
-              </Badge>
+              {product.brand && (
+                <Badge
+                  variant="outline"
+                  className="text-xs font-semibold px-2.5 py-0.5 border-primary/40 text-primary"
+                >
+                  {product.brand}
+                </Badge>
+              )}
 
               {product.condition === "USADO" ? (
                 <Badge className="text-xs font-bold px-2 py-0.5 bg-amber-500/10 text-amber-700 border border-amber-500/20">
@@ -151,11 +159,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 <Badge className="text-xs font-bold px-2 py-0.5 bg-sky-500/10 text-sky-700 border border-sky-500/20">
                   RECONDICIONADO
                 </Badge>
-              ) : (
+              ) : product.condition === "NOVO" ? (
                 <Badge className="text-xs font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
-                  NOVO / GENUÍNO
+                  NOVO
                 </Badge>
-              )}
+              ) : null}
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight leading-tight">
@@ -224,7 +232,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
             </div>
             <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border/60">
               <Truck className="w-4 h-4 text-primary shrink-0" />
-              <span className="text-slate-600 dark:text-slate-300">Despacho Imediato</span>
+              <span className="text-slate-600 dark:text-slate-300">Envio para Todo Brasil</span>
             </div>
           </div>
         </div>
@@ -246,18 +254,22 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   <span className="font-mono font-bold text-foreground">{product.reference}</span>
                 </div>
               )}
-              <div className="p-3 flex justify-between">
-                <span className="text-muted-foreground">Fabricante</span>
-                <span className="font-bold text-foreground">{product.brand}</span>
-              </div>
+              {product.brand && (
+                <div className="p-3 flex justify-between">
+                  <span className="text-muted-foreground">Fabricante</span>
+                  <span className="font-bold text-foreground">{product.brand}</span>
+                </div>
+              )}
               <div className="p-3 flex justify-between">
                 <span className="text-muted-foreground">Categoria</span>
                 <span className="text-foreground">{product.categoryName}</span>
               </div>
-              <div className="p-3 flex justify-between">
-                <span className="text-muted-foreground">Condição</span>
-                <span className="font-semibold text-foreground">{product.condition}</span>
-              </div>
+              {product.condition && (
+                <div className="p-3 flex justify-between">
+                  <span className="text-muted-foreground">Condição</span>
+                  <span className="font-semibold text-foreground">{product.condition}</span>
+                </div>
+              )}
               {product.barcode && (
                 <div className="p-3 flex justify-between">
                   <span className="text-muted-foreground">Código de Barras</span>

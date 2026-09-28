@@ -1,14 +1,25 @@
 import type { MetadataRoute } from "next";
+import { siteConfig } from "@/lib/site-config";
 
 export default function robots(): MetadataRoute.Robots {
+  const baseUrl = siteConfig.url.replace(/\/+$/, "");
+
   return {
     rules: [
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/conta", "/pedidos", "/carrinho", "/checkout", "/enderecos", "/api/"],
+        disallow: [
+          "/conta",
+          "/pedidos",
+          "/carrinho",
+          "/checkout",
+          "/enderecos",
+          "/api/",
+          "/sucesso",
+        ],
       },
     ],
-    sitemap: "https://erp.demirdiesel.com.br/sitemap.xml",
+    sitemap: `${baseUrl}/sitemap.xml`,
   };
 }

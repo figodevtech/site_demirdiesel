@@ -1,6 +1,7 @@
 import React from "react";
 import { MapPin, Phone, Mail, Clock, MessageCircle } from "lucide-react";
 import { ContactForm } from "./ContactForm";
+import { siteConfig, buildWhatsAppUrl } from "@/lib/site-config";
 
 export function WorkshopLocation() {
   return (
@@ -29,7 +30,7 @@ export function WorkshopLocation() {
               <div className="text-xs leading-relaxed">
                 <strong className="text-foreground block text-sm">Endereço</strong>
                 <span className="text-muted-foreground">
-                  R. Jorn. João José Ramalho, 33 - Costa e Silva, João Pessoa - PB, 58081-110
+                  {siteConfig.address.full}
                 </span>
               </div>
             </div>
@@ -41,8 +42,7 @@ export function WorkshopLocation() {
                 </div>
                 <div className="text-xs">
                   <strong className="text-foreground block">Horário de Funcionamento</strong>
-                  <span className="text-muted-foreground block mt-0.5">Seg - Sex: 07:30 às 17:30</span>
-                  <span className="text-muted-foreground block">Sábado: 07:30 às 12:00</span>
+                  <span className="text-muted-foreground block mt-0.5">{siteConfig.openingHours}</span>
                 </div>
               </div>
 
@@ -52,15 +52,23 @@ export function WorkshopLocation() {
                 </div>
                 <div className="text-xs">
                   <strong className="text-foreground block">Telefones & WhatsApp</strong>
-                  <span className="text-muted-foreground block mt-0.5">(83) 3000-0000</span>
-                  <a
-                    href="https://wa.me/5583999999999"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-emerald-600 font-semibold hover:underline block"
-                  >
-                    (83) 99999-9999 (Plantão)
-                  </a>
+                  {siteConfig.phoneDisplay && (
+                    <span className="text-muted-foreground block mt-0.5">{siteConfig.phoneDisplay}</span>
+                  )}
+                  {siteConfig.whatsapp ? (
+                    <a
+                      href={buildWhatsAppUrl("Olá, gostaria de falar com a oficina Demir Diesel.")}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-600 font-semibold hover:underline block mt-0.5"
+                    >
+                      {siteConfig.whatsappDisplay || "WhatsApp de Atendimento"}
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground block mt-0.5">
+                      Atendimento via formulário online
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

@@ -247,7 +247,7 @@ export default function PedidosPage() {
                                 {item.produto?.tituloMarketplace || item.produto?.titulo || "Componente Diesel"}
                               </span>
                               <span className="text-[11px] text-muted-foreground block">
-                                Fabricante: {item.produto?.fabricante || "Genuíno"} • Qtd: {item.quantidade}
+                                {item.produto?.fabricante ? `Fabricante: ${item.produto.fabricante} • ` : ""}Qtd: {item.quantidade}
                               </span>
                             </div>
                             <span className="font-mono font-bold text-foreground">

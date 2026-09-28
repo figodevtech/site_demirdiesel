@@ -78,8 +78,8 @@ export default function CheckoutPage() {
   const calculateShipping = async (cepValue: string) => {
     if (!cepValue) return;
     setCalculatingShipping(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setShippingPrice(38.5);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    setShippingPrice(0);
     setCalculatingShipping(false);
   };
 
@@ -181,18 +181,15 @@ export default function CheckoutPage() {
   const checkOrderStatus = async () => {
     if (!currentOrderId) return;
     try {
-      const { data } = await supabase
-        .from("venda")
-        .select("status")
-        .eq("id", currentOrderId)
-        .single();
-
-      const s = data?.status?.toUpperCase();
-      if (s === "PAGO" || s === "AUTORIZADO") {
-        setPaymentStatus("paid");
-        if (!clearedRef.current) {
-          clearedRef.current = true;
-          clearCart();
+      const res = await fetch(`/api/pedidos/status?orderId=${encodeURIComponent(currentOrderId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.isPaid) {
+          setPaymentStatus("paid");
+          if (!clearedRef.current) {
+            clearedRef.current = true;
+            clearCart();
+          }
         }
       }
     } catch (err) {
@@ -229,7 +226,7 @@ export default function CheckoutPage() {
   // Mensagem enviada pelo popup
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.data === "payment_success") {
+      if (event.data === "order_paid") {
         setPaymentStatus("paid");
         if (!clearedRef.current) {
           clearedRef.current = true;
@@ -265,8 +262,11 @@ export default function CheckoutPage() {
     try {
       const selectedAddress = addresses.find((a) => a.id === selectedAddressId);
       const checkoutData = {
-        items,
-        shippingAmount: shippingPrice || 0,
+        items: items.map((it) => ({
+          productId: it.product.id,
+          quantity: it.quantity,
+          price: it.product.price,
+        })),
         customerId: profile.id,
         customerName: profile.nomerazaosocial || user?.user_metadata?.name || "Cliente",
         customerEmail: user?.email,
@@ -282,7 +282,9 @@ export default function CheckoutPage() {
       });
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Erro ao processar checkout");
+      if (!response.ok) {
+        throw new Error(result.message || result.error || "Erro ao processar checkout");
+      }
 
       if (result.url) {
         setPaymentUrl(result.url);
@@ -312,7 +314,7 @@ export default function CheckoutPage() {
     }
   };
 
-  const finalTotal = subtotal + (shippingPrice || 0);
+  const finalTotal = subtotal;
 
   // Tela de Pagamento Aprovado
   if (paymentStatus === "paid") {
@@ -547,9 +549,9 @@ export default function CheckoutPage() {
                 <span className="font-semibold text-foreground">{formatCurrency(subtotal)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>Frete rodoviário</span>
-                <span className="font-semibold text-foreground">
-                  {calculatingShipping ? "Calculando..." : shippingPrice ? formatCurrency(shippingPrice) : "A calcular"}
+                <span>Frete</span>
+                <span className="font-semibold text-primary">
+                  A calcular (análise de carga)
                 </span>
               </div>
               <div className="flex justify-between items-baseline pt-3 border-t border-border/60 text-base">
