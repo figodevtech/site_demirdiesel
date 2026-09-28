@@ -381,22 +381,46 @@ export async function getAvailableBrands(): Promise<string[]> {
 }
 
 /**
- * Retorna todos os produtos públicos para o sitemap completo, sem paginação arbitrária e sem colunas pesadas.
+ * Retorna todos os produtos públicos para o sitemap completo, paginando em blocos de 500
+ * para não sofrer limitação de 1.000 itens do Supabase/PostgREST e sem carregar colunas pesadas.
  */
 export async function getAllProductsForSitemap(): Promise<Array<{ id: number; slug: string; updatedAt?: string }>> {
   try {
-    const { data, error } = await supabaseAdmin
-      .from("produto")
-      .select("id, titulo, tituloMarketplace, referencia, updatedat")
-      .eq("is_deleted", false)
-      .eq("exibirPdv", true);
+    const pageSize = 500;
+    let page = 0;
+    const allProducts: Array<{ id: number; titulo: string | null; tituloMarketplace: string | null; referencia: string | null; updatedat?: string }> = [];
 
-    if (error || !data) {
-      console.error("Erro ao buscar produtos para sitemap:", error);
-      return [];
+    while (true) {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data, error } = await supabaseAdmin
+        .from("produto")
+        .select("id, titulo, tituloMarketplace, referencia, updatedat")
+        .eq("is_deleted", false)
+        .eq("exibirPdv", true)
+        .order("id", { ascending: true })
+        .range(from, to);
+
+      if (error) {
+        console.error("Erro ao buscar bloco de produtos para sitemap:", error);
+        break;
+      }
+
+      if (!data || data.length === 0) {
+        break;
+      }
+
+      allProducts.push(...data);
+
+      if (data.length < pageSize) {
+        break;
+      }
+
+      page++;
     }
 
-    return data.map((row) => {
+    return allProducts.map((row) => {
       const title = (row.tituloMarketplace || row.titulo || "componente-diesel").trim();
       const referencePart = row.referencia ? `-${slugify(row.referencia)}` : "";
       const slug = `${slugify(title)}${referencePart}-${row.id}`;

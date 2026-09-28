@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthContext";
@@ -178,10 +178,20 @@ export default function CheckoutPage() {
     }
   };
 
-  const checkOrderStatus = async () => {
+  const checkOrderStatus = useCallback(async () => {
     if (!currentOrderId) return;
     try {
-      const res = await fetch(`/api/pedidos/status?orderId=${encodeURIComponent(currentOrderId)}`);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (sessionData?.session?.access_token) {
+        headers["Authorization"] = `Bearer ${sessionData.session.access_token}`;
+      }
+
+      const res = await fetch(`/api/pedidos/status?orderId=${encodeURIComponent(currentOrderId)}`, {
+        credentials: "include",
+        headers,
+      });
+
       if (res.ok) {
         const data = await res.json();
         if (data.isPaid) {
@@ -195,7 +205,7 @@ export default function CheckoutPage() {
     } catch (err) {
       console.error("Polling order error:", err);
     }
-  };
+  }, [currentOrderId, clearCart]);
 
   // Tempo real via Supabase
   useEffect(() => {
@@ -223,20 +233,20 @@ export default function CheckoutPage() {
     };
   }, [currentOrderId, isWaitingPayment, paymentStatus, clearCart]);
 
-  // Mensagem enviada pelo popup
+  // Mensagem enviada pelo popup com validação estrita de origem (Regra 14)
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      if (typeof window !== "undefined" && event.origin !== window.location.origin) {
+        return;
+      }
       if (event.data === "order_paid") {
-        setPaymentStatus("paid");
-        if (!clearedRef.current) {
-          clearedRef.current = true;
-          clearCart();
-        }
+        // Dispara re-consulta oficial ao backend em vez de confiar cegamente na mensagem do popup
+        checkOrderStatus();
       }
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [clearCart]);
+  }, [checkOrderStatus]);
 
   // Polling automático
   useEffect(() => {
@@ -245,7 +255,7 @@ export default function CheckoutPage() {
       checkOrderStatus();
     }, 4000);
     return () => clearInterval(id);
-  }, [isWaitingPayment, currentOrderId, paymentStatus]);
+  }, [isWaitingPayment, currentOrderId, paymentStatus, checkOrderStatus]);
 
   const handleCheckout = async () => {
     if (!selectedAddressId) {
@@ -260,24 +270,25 @@ export default function CheckoutPage() {
 
     setIsProcessing(true);
     try {
-      const selectedAddress = addresses.find((a) => a.id === selectedAddressId);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      // Envia somente addressId e lista sanitizada de IDs e quantidades (Regra 1)
       const checkoutData = {
+        addressId: selectedAddressId,
         items: items.map((it) => ({
           productId: it.product.id,
           quantity: it.quantity,
-          price: it.product.price,
         })),
-        customerId: profile.id,
-        customerName: profile.nomerazaosocial || user?.user_metadata?.name || "Cliente",
-        customerEmail: user?.email,
-        customerDocument: profile.cpfcnpj || "",
-        customerPhone: profile.telefone || "",
-        address: selectedAddress,
       };
 
       const response = await fetch("/api/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(checkoutData),
       });
 

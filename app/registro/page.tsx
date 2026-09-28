@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import { formatCpfCnpj, cleanCpfCnpj, formatPhone } from "@/lib/auth-utils";
+import { formatCpfCnpj, cleanCpfCnpj, formatPhone, isValidCpfCnpj } from "@/lib/auth-utils";
 import { useAuth } from "@/components/providers/AuthContext";
 
 export default function RegisterPage() {
@@ -44,15 +44,24 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!isValidCpfCnpj(cpfCnpj, tipoPessoa)) {
+      toast.error(
+        tipoPessoa === "FISICA"
+          ? "CPF inválido. Por favor, verifique os dígitos informados."
+          : "CNPJ inválido. Por favor, verifique os dígitos informados."
+      );
+      return;
+    }
+
     setIsLoading(true);
     try {
       // 1. Criar usuário no Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
+        email: email.trim().toLowerCase(),
         password,
         options: {
           data: {
-            name,
+            name: name.trim(),
           },
         },
       });
@@ -66,20 +75,35 @@ export default function RegisterPage() {
       }
 
       if (authData.user) {
-        // 2. Criar perfil na tabela cliente
-        const { error: dbError } = await supabase.from("cliente").insert({
-          user_id: authData.user.id,
-          nomerazaosocial: name,
-          tipopessoa: tipoPessoa,
-          cpfcnpj: cleanCpfCnpj(cpfCnpj),
-          email,
-          telefone: phone,
-          cidade: "Não Informado",
-          estado: "PB",
-        });
+        // 2. Verifica se o perfil de cliente já existe para evitar duplicidades
+        const { data: existingProfile } = await supabase
+          .from("cliente")
+          .select("id")
+          .eq("user_id", authData.user.id)
+          .maybeSingle();
 
-        if (dbError) {
-          console.error("Erro no cadastro cliente:", dbError);
+        if (!existingProfile) {
+          const cleanDoc = cleanCpfCnpj(cpfCnpj);
+          const { error: dbError } = await supabase.from("cliente").insert({
+            user_id: authData.user.id,
+            nomerazaosocial: name.trim(),
+            tipopessoa: tipoPessoa,
+            cpfcnpj: cleanDoc,
+            email: email.trim().toLowerCase(),
+            telefone: phone.trim(),
+            cidade: "Não Informado",
+            estado: "PB",
+          });
+
+          if (dbError) {
+            console.error("Erro no cadastro de perfil do cliente:", dbError);
+            toast.error(
+              dbError.message.includes("duplicate") || dbError.message.includes("unique")
+                ? "Este CPF/CNPJ ou e-mail já está associado a outro cadastro."
+                : "Sua conta de login foi criada, mas ocorreu uma falha ao registrar o perfil: " + dbError.message
+            );
+            return;
+          }
         }
 
         toast.success("Cadastro concluído com sucesso!");

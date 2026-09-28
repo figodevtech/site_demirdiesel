@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { siteConfig } from "@/lib/site-config";
 
 export const runtime = "nodejs";
@@ -18,18 +19,68 @@ interface RequestItem {
   quantity: number;
 }
 
+/**
+ * Autentica o usuário de forma robusta no servidor:
+ * 1. Tenta cookies da sessão Supabase (SSR)
+ * 2. Tenta header Authorization: Bearer <token>
+ */
+async function getAuthenticatedUser(request: Request) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (user && !error) return user;
+  } catch {
+    // Falha silenciosa para tentar via header
+  }
+
+  const authHeader = request.headers.get("authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.substring(7).trim();
+    if (token) {
+      const {
+        data: { user },
+        error,
+      } = await supabaseAdmin.auth.getUser(token);
+      if (user && !error) return user;
+    }
+  }
+
+  return null;
+}
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const {
-      items,
-      customerId,
-      address,
-      customerName,
-      customerEmail,
-      customerDocument,
-      customerPhone,
-    } = body || {};
+    // 1. AUTENTICAR NO SERVIDOR (Prioridade 1)
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return NextResponse.json(
+        { error: "NAO_AUTENTICADO", message: "Faça login para continuar o checkout." },
+        { status: 401 }
+      );
+    }
+
+    // Buscar perfil de cliente vinculado ao auth.uid()
+    const { data: cliente, error: clienteError } = await supabaseAdmin
+      .from("cliente")
+      .select("id, nomerazaosocial, email, cpfcnpj, telefone, user_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (clienteError || !cliente) {
+      return NextResponse.json(
+        {
+          error: "PERFIL_NAO_ENCONTRADO",
+          message: "Perfil de cliente não encontrado. Complete seu cadastro antes de finalizar a compra.",
+        },
+        { status: 403 }
+      );
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const { addressId, items } = body || {};
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -38,39 +89,60 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!customerId) {
+    // 2. VALIDAR ENDEREÇO AUTORITATIVO NO BANCO (Prioridade 1)
+    // O frontend deve enviar apenas addressId. Não confiar em endereço cru do cliente.
+    if (!addressId) {
       return NextResponse.json(
-        { error: "CLIENTE_NAO_IDENTIFICADO", message: "Faça login para continuar o checkout." },
-        { status: 401 }
-      );
-    }
-
-    if (!address || !address.logradouro || !address.cep) {
-      return NextResponse.json(
-        { error: "ENDERECO_INVALIDO", message: "Selecione um endereço de entrega válido." },
+        { error: "ENDERECO_OBRIGATORIO", message: "Selecione um endereço de entrega." },
         { status: 400 }
       );
     }
 
-    // 1. Extrai e sanitiza os IDs solicitados
-    const normalizedItems: { id: number; quantity: number }[] = [];
+    const { data: addressRow, error: addressError } = await supabaseAdmin
+      .from("cliente_endereco")
+      .select("id, cliente_id, logradouro, numero, complemento, bairro, cidade, estado, cep")
+      .eq("id", addressId)
+      .eq("cliente_id", cliente.id)
+      .maybeSingle();
+
+    if (addressError || !addressRow) {
+      return NextResponse.json(
+        {
+          error: "ENDERECO_NAO_AUTORIZADO",
+          message: "O endereço selecionado não pertence ao cliente autenticado.",
+        },
+        { status: 403 }
+      );
+    }
+
+    // 3. AGRUPAR PRODUTOS DUPLICADOS ANTES DA VALIDAÇÃO (Prioridade 4)
+    // Ex: produto 10 qtd 2 + produto 10 qtd 3 => produto 10 qtd 5
+    const consolidatedMap = new Map<number, number>();
+
     for (const it of items as RequestItem[]) {
       const rawId = it.productId || it.product?.id || it.id;
       const numId = Number(rawId);
       const qty = Math.max(1, Math.floor(Number(it.quantity) || 1));
+
       if (!numId || isNaN(numId) || numId <= 0) {
         return NextResponse.json(
           { error: "ITEM_INVALIDO", message: "Identificador de produto inválido no carrinho." },
           { status: 400 }
         );
       }
-      normalizedItems.push({ id: numId, quantity: qty });
+
+      consolidatedMap.set(numId, (consolidatedMap.get(numId) || 0) + qty);
     }
 
-    const uniqueProductIds = Array.from(new Set(normalizedItems.map((i) => i.id)));
+    const uniqueProductIds = Array.from(consolidatedMap.keys());
+    if (uniqueProductIds.length === 0) {
+      return NextResponse.json(
+        { error: "CARRINHO_VAZIO", message: "Nenhum produto válido no carrinho." },
+        { status: 400 }
+      );
+    }
 
-    // 2. Consulta autoritativa no banco de dados (REGRA CRÍTICA 1)
-    // O frontend NUNCA pode determinar preço, estoque ou disponibilidade.
+    // 4. CONSULTA AUTORITATIVA NO BANCO DE DADOS
     const { data: dbProducts, error: dbError } = await supabaseAdmin
       .from("produto")
       .select("id, titulo, tituloMarketplace, precovenda, estoque, is_deleted, exibirPdv")
@@ -87,7 +159,7 @@ export async function POST(request: Request) {
     const dbProductMap = new Map<number, any>();
     (dbProducts || []).forEach((p) => dbProductMap.set(p.id, p));
 
-    // 3. Valida cada item quanto a existência, exclusão, exibição e estoque
+    // 5. VALIDA CADA ITEM (existência, exclusão, exibição e estoque agregado)
     interface ValidatedItem {
       id: number;
       name: string;
@@ -98,14 +170,14 @@ export async function POST(request: Request) {
 
     const validatedItems: ValidatedItem[] = [];
 
-    for (const item of normalizedItems) {
-      const p = dbProductMap.get(item.id);
+    for (const [productId, quantity] of consolidatedMap.entries()) {
+      const p = dbProductMap.get(productId);
 
       if (!p) {
         return NextResponse.json(
           {
             error: "PRODUTO_NAO_ENCONTRADO",
-            message: `Produto #${item.id} não foi encontrado no estoque.`,
+            message: `Produto #${productId} não foi encontrado no estoque.`,
           },
           { status: 404 }
         );
@@ -124,11 +196,11 @@ export async function POST(request: Request) {
       }
 
       const currentStock = Math.max(0, Number(p.estoque) || 0);
-      if (currentStock < item.quantity) {
+      if (currentStock < quantity) {
         return NextResponse.json(
           {
             error: "ESTOQUE_INSUFICIENTE",
-            message: `Estoque insuficiente para "${prodName}". Disponível em estoque: ${currentStock} unidade(s). Solicitado: ${item.quantity}.`,
+            message: `Estoque insuficiente para "${prodName}". Disponível: ${currentStock} unidade(s). Solicitado (total agrupado): ${quantity}.`,
           },
           { status: 409 }
         );
@@ -145,20 +217,19 @@ export async function POST(request: Request) {
         );
       }
 
-      const itemSubtotal = realPrice * item.quantity;
+      const itemSubtotal = realPrice * quantity;
       validatedItems.push({
         id: p.id,
         name: prodName,
         unitPrice: realPrice,
-        quantity: item.quantity,
+        quantity,
         subtotal: itemSubtotal,
       });
     }
 
-    // 4. Recalcula Subtotal e Total no SERVIDOR (REGRA 1 e REGRA 2)
-    // Frete é strictly 0 enquanto não houver transportadora integrada (sem valores fictícios de 38.5)
+    // 6. RECALCULA SUBTOTAL E TOTAL NO SERVIDOR
     const serverSubtotal = validatedItems.reduce((acc, it) => acc + it.subtotal, 0);
-    const serverShipping = 0; // Cotação formal acordada após o endereço e análise da carga
+    const serverShipping = 0;
     const serverTotal = serverSubtotal + serverShipping;
     const totalCents = Math.round(serverTotal * 100);
 
@@ -172,10 +243,8 @@ export async function POST(request: Request) {
     // Configuração de parcelamento
     const maxInstallments = 12;
     const minInstallmentCents = 5000; // R$ 50,00
-    const possibleInstallments = Math.min(
-      Math.floor(totalCents / minInstallmentCents),
-      maxInstallments
-    ) || 1;
+    const possibleInstallments =
+      Math.min(Math.floor(totalCents / minInstallmentCents), maxInstallments) || 1;
 
     const installmentsConfig = [];
     for (let i = 1; i <= possibleInstallments; i++) {
@@ -185,69 +254,19 @@ export async function POST(request: Request) {
       installmentsConfig.push({ number: 1, total: totalCents });
     }
 
-    // 5. Salva a Venda no Banco de Dados
-    let finalClienteId: number | null = Number(customerId);
-    if (!finalClienteId || isNaN(finalClienteId) || finalClienteId <= 0) {
-      if (customerEmail) {
-        const { data: c } = await supabaseAdmin
-          .from("cliente")
-          .select("id")
-          .eq("email", customerEmail)
-          .limit(1)
-          .maybeSingle();
-        if (c?.id) finalClienteId = c.id;
-      }
-      if (!finalClienteId && customerDocument) {
-        const cleanDoc = customerDocument.replace(/\D/g, "");
-        const { data: c } = await supabaseAdmin
-          .from("cliente")
-          .select("id")
-          .eq("cpfcnpj", cleanDoc)
-          .limit(1)
-          .maybeSingle();
-        if (c?.id) finalClienteId = c.id;
-      }
-    }
+    // 7. CRIAÇÃO DE PEDIDO ATÔMICA VIA RPC (Prioridade 3)
+    const enderecoSnapshot = {
+      id: addressRow.id,
+      logradouro: addressRow.logradouro,
+      numero: addressRow.numero,
+      complemento: addressRow.complemento,
+      bairro: addressRow.bairro,
+      cidade: addressRow.cidade,
+      estado: addressRow.estado,
+      cep: addressRow.cep,
+    };
 
-    if (!finalClienteId) {
-      return NextResponse.json(
-        {
-          error: "CLIENTE_NAO_IDENTIFICADO",
-          message: "Identificação do cliente inválida. Por favor, faça login para continuar.",
-        },
-        { status: 400 }
-      );
-    }
-
-    const nowIso = new Date().toISOString();
-    const { data: orderData, error: orderError } = await supabaseAdmin
-      .from("venda")
-      .insert({
-        clienteid: finalClienteId,
-        status: "PENDENTE",
-        valortotal: serverTotal,
-        sub_total: serverSubtotal,
-        datavenda: nowIso,
-        createdat: nowIso,
-        updatedat: nowIso,
-        forma_pagamento: "Pagar.me",
-        endereco_entrega_snapshot: address,
-        canal: "ONLINE",
-      })
-      .select()
-      .single();
-
-    if (orderError || !orderData) {
-      console.error("[checkout] Erro crítico ao criar registro de venda:", orderError);
-      return NextResponse.json(
-        { error: "ERRO_CRIACAO_VENDA", message: "Não foi possível registrar o pedido no banco." },
-        { status: 500 }
-      );
-    }
-
-    // 6. Insere os itens da venda
     const orderItemsPayload = validatedItems.map((it) => ({
-      venda_id: orderData.id,
       produtoid: it.id,
       quantidade: it.quantity,
       sub_total: it.subtotal,
@@ -256,27 +275,39 @@ export async function POST(request: Request) {
       tipo_desconto: null,
     }));
 
-    const { error: itemsError } = await supabaseAdmin
-      .from("vendaproduto")
-      .insert(orderItemsPayload);
+    const { data: orderId, error: rpcError } = await supabaseAdmin.rpc("fn_criar_pedido_site", {
+      p_cliente_id: cliente.id,
+      p_endereco_snapshot: enderecoSnapshot,
+      p_itens: orderItemsPayload,
+      p_subtotal: serverSubtotal,
+      p_total: serverTotal,
+      p_canal: "ONLINE",
+      p_forma_pagamento: "Pagar.me",
+    });
 
-    if (itemsError) {
-      console.error("[checkout] Erro ao gravar itens da venda:", itemsError);
+    if (rpcError || !orderId) {
+      console.error("[checkout] Erro crítico ao criar pedido atômico (RPC):", rpcError);
+      return NextResponse.json(
+        {
+          error: "ERRO_CRIACAO_VENDA",
+          message: "Não foi possível registrar o pedido no banco de dados.",
+        },
+        { status: 500 }
+      );
     }
 
-    // 7. Prepara Payload Pagar.me com dados autoritativos e URLs limpas
+    // 8. CRIA O LINK DE PAGAMENTO NO PAGAR.ME SOMENTE APÓS SUCESSO DA TRANSAÇÃO
     const origin = request.headers.get("origin") || siteConfig.url;
-    // URL de retorno leva o orderId para que a tela de sucesso valide o status real (Prioridade 3)
-    const returnUrl = `${origin}/sucesso?orderId=${orderData.id}`;
+    const returnUrl = `${origin}/sucesso?orderId=${orderId}`;
 
-    const cleanDoc = String(customerDocument || "").replace(/\D/g, "");
+    const cleanDoc = String(cliente.cpfcnpj || body.customerDocument || "").replace(/\D/g, "");
     const docType = cleanDoc.length === 14 ? "company" : "individual";
-    const cleanPhone = String(customerPhone || "").replace(/\D/g, "");
+    const cleanPhone = String(cliente.telefone || body.customerPhone || "").replace(/\D/g, "");
     const areaCode = cleanPhone.substring(0, 2) || "83";
     const phoneNumber = cleanPhone.substring(2) || "900000000";
 
     const paymentLinkPayload = {
-      name: `Demir Diesel - Pedido #${orderData.id}`,
+      name: `Demir Diesel - Pedido #${orderId}`,
       type: "order",
       expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       review_informations: true,
@@ -311,8 +342,8 @@ export async function POST(request: Request) {
         })),
       },
       customer_settings: {
-        name: customerName || "Cliente",
-        email: customerEmail,
+        name: cliente.nomerazaosocial || "Cliente",
+        email: cliente.email || user.email,
         document: cleanDoc,
         type: docType,
         phones: {
@@ -324,8 +355,8 @@ export async function POST(request: Request) {
         },
       },
       metadata: {
-        customerId: String(customerId),
-        orderId: String(orderData.id),
+        customerId: String(cliente.id),
+        orderId: String(orderId),
       },
     };
 
@@ -335,7 +366,7 @@ export async function POST(request: Request) {
         {
           error: "PAGARME_NAO_CONFIGURADO",
           message: "Gateway de pagamentos não configurado no servidor.",
-          orderId: orderData.id,
+          orderId,
         },
         { status: 500 }
       );
@@ -363,11 +394,28 @@ export async function POST(request: Request) {
 
     if (!pagarmeRes.ok || !pagarmeData.url) {
       console.error("[checkout] Erro retornado pelo Pagar.me:", pagarmeRes.status, pagarmeData);
+
+      // REGRA: Se a criação do link do Pagar.me falhar:
+      // - não apagar a venda automaticamente;
+      // - manter status PENDENTE e registrar observação do erro de forma segura;
+      // - permitir recuperação/reprocessamento futuro.
+      try {
+        await supabaseAdmin
+          .from("venda")
+          .update({
+            observacao: `[Pagar.me Erro Link] ${new Date().toISOString()} - ${pagarmeData?.message || "Falha ao gerar link de pagamento"}`,
+            updatedat: new Date().toISOString(),
+          })
+          .eq("id", orderId);
+      } catch (logErr) {
+        console.error("[checkout] Falha ao registrar observação de erro na venda:", logErr);
+      }
+
       return NextResponse.json(
         {
           error: "ERRO_PAGARME",
           message: pagarmeData.message || "Erro ao gerar link de pagamento junto ao Pagar.me.",
-          orderId: orderData.id,
+          orderId,
         },
         { status: pagarmeRes.status >= 400 && pagarmeRes.status < 500 ? 400 : 502 }
       );
@@ -375,7 +423,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       url: pagarmeData.url,
-      orderId: orderData.id,
+      orderId,
       total: serverTotal,
       subtotal: serverSubtotal,
     });

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Clock, AlertTriangle, ArrowRight, Package, Home, RefreshCw } from "lucide-react";
 import { useCart } from "@/components/providers/CartContext";
+import { supabase } from "@/lib/supabase";
 
 function SucessoContent() {
   const searchParams = useSearchParams();
@@ -36,7 +37,17 @@ function SucessoContent() {
     }
 
     try {
-      const res = await fetch(`/api/pedidos/status?orderId=${encodeURIComponent(orderId)}`);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (sessionData?.session?.access_token) {
+        headers["Authorization"] = `Bearer ${sessionData.session.access_token}`;
+      }
+
+      const res = await fetch(`/api/pedidos/status?orderId=${encodeURIComponent(orderId)}`, {
+        credentials: "include",
+        headers,
+      });
+
       if (res.ok) {
         const data = await res.json();
         setOrderInfo(data);
@@ -50,7 +61,7 @@ function SucessoContent() {
 
           if (typeof window !== "undefined" && window.opener) {
             setHasOpener(true);
-            window.opener.postMessage("order_paid", "*");
+            window.opener.postMessage("order_paid", window.location.origin);
           }
         }
       }

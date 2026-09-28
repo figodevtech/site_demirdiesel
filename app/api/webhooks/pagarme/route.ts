@@ -11,18 +11,36 @@ const IS_TEST = PAGARME_API_KEY.startsWith("sk_test");
 const BASE_URL = IS_TEST ? "https://sdx-api.pagar.me/core/v5" : "https://api.pagar.me/core/v5";
 const BASIC_AUTH = PAGARME_API_KEY ? Buffer.from(`${PAGARME_API_KEY}:`).toString("base64") : "";
 const WEBHOOK_SECRET = (process.env.PAGARME_WEBHOOK_SECRET || "").trim();
+const IS_PROD = process.env.NODE_ENV === "production";
 
 /**
  * Validação de autenticidade / origem do webhook da Pagar.me
+ * REGRA CRÍTICA (Prioridade 9 — Fail Closed):
+ * Se em produção o WEBHOOK_SECRET estiver ausente, REJEITAR o processamento imediatamente.
+ * Nunca fazer: WEBHOOK_SECRET ausente => aceitar.
  */
-function verifyWebhookSignature(rawBody: string, signatureHeader?: string | null): boolean {
+function verifyWebhookSignature(
+  rawBody: string,
+  signatureHeader?: string | null
+): { valid: boolean; error?: string } {
   if (!WEBHOOK_SECRET) {
-    // Se o segredo não estiver configurado no ambiente, permite validação por fetchOrderFromPagarme
-    return true;
+    if (IS_PROD) {
+      console.error(
+        "[webhook] ERRO DE SEGURANÇA: PAGARME_WEBHOOK_SECRET não configurado em produção. Rejeitando fail-closed."
+      );
+      return {
+        valid: false,
+        error: "PAGARME_WEBHOOK_SECRET não configurado no servidor em ambiente de produção.",
+      };
+    }
+    console.warn(
+      "[webhook] AVISO: PAGARME_WEBHOOK_SECRET não configurado (permitido apenas em desenvolvimento/teste local)."
+    );
+    return { valid: true };
   }
 
   if (!signatureHeader) {
-    return false;
+    return { valid: false, error: "Cabeçalho de assinatura do webhook ausente." };
   }
 
   try {
@@ -34,16 +52,21 @@ function verifyWebhookSignature(rawBody: string, signatureHeader?: string | null
     hmac.update(rawBody);
     const calculatedHash = hmac.digest("hex");
 
-    return crypto.timingSafeEqual(
+    const valid = crypto.timingSafeEqual(
       Buffer.from(calculatedHash, "utf-8"),
       Buffer.from(expectedHash, "utf-8")
     );
-  } catch (err) {
+
+    return valid ? { valid: true } : { valid: false, error: "Assinatura do webhook inválida." };
+  } catch (err: any) {
     console.error("[webhook] Erro ao validar assinatura:", err);
-    return false;
+    return { valid: false, error: err.message || "Falha na verificação de assinatura." };
   }
 }
 
+/**
+ * Consulta oficial autenticada à API da Pagar.me (Prioridade 10)
+ */
 async function fetchOrderFromPagarme(orderRef: string) {
   if (!orderRef || !PAGARME_API_KEY) return null;
 
@@ -56,7 +79,9 @@ async function fetchOrderFromPagarme(orderRef: string) {
     });
 
     if (!response.ok) {
-      console.warn(`[webhook] Falha ao consultar ordem ${orderRef} no Pagar.me. Status=${response.status}`);
+      console.warn(
+        `[webhook] Falha ao consultar ordem ${orderRef} no Pagar.me. Status=${response.status}`
+      );
       return null;
     }
 
@@ -67,7 +92,10 @@ async function fetchOrderFromPagarme(orderRef: string) {
   }
 }
 
-function resolveStatus(eventType?: string, status?: string): "PAGO" | "AUTORIZADO" | "CANCELADO" | "PENDENTE" {
+function resolveStatus(
+  eventType?: string,
+  status?: string
+): "PAGO" | "AUTORIZADO" | "CANCELADO" | "PENDENTE" {
   const normalizedEvent = (eventType || "").toLowerCase();
   const normalizedStatus = (status || "").toLowerCase();
 
@@ -111,107 +139,6 @@ function isPaidStatus(status?: string | null): boolean {
   return s === "PAGO" || s === "FINALIZADA";
 }
 
-async function baixarEstoqueVendaRpc(vendaId: number) {
-  try {
-    const { error } = await supabaseAdmin.rpc("fn_baixar_estoque_venda", { p_venda_id: vendaId });
-    if (!error) return { ok: true as const };
-
-    console.warn(`[webhook] RPC fn_baixar_estoque_venda não encontrada ou retornou erro, usando fallback:`, error.message);
-  } catch (err: any) {
-    console.warn("[webhook] Exceção ao chamar fn_baixar_estoque_venda:", err.message);
-  }
-
-  // Fallback não-atômico caso a RPC ainda não exista no banco
-  return baixarEstoqueVendaManual(vendaId);
-}
-
-async function baixarEstoqueVendaManual(vendaId: number) {
-  const { data: itens, error: itensErr } = await supabaseAdmin
-    .from("vendaproduto")
-    .select("produtoid, quantidade")
-    .eq("venda_id", vendaId);
-
-  if (itensErr) {
-    console.error("[webhook] Erro ao buscar itens da venda para baixa de estoque:", itensErr);
-    return { ok: false as const, error: itensErr.message };
-  }
-
-  const nowIso = new Date().toISOString();
-
-  for (const it of itens ?? []) {
-    const produtoId = Number((it as any).produtoid);
-    const qtd = Math.max(0, Number((it as any).quantidade) || 0);
-    if (!produtoId || !qtd) continue;
-
-    const { data: prod, error: prodErr } = await supabaseAdmin
-      .from("produto")
-      .select("id, estoque")
-      .eq("id", produtoId)
-      .single();
-
-    if (prodErr || !prod) {
-      console.error(`[webhook] Erro ao buscar produto #${produtoId}:`, prodErr);
-      continue;
-    }
-
-    const estoqueAtual = Number((prod as any).estoque ?? 0);
-    const novoEstoque = Math.max(0, estoqueAtual - qtd);
-
-    const { error: updErr } = await supabaseAdmin
-      .from("produto")
-      .update({ estoque: novoEstoque, updatedat: nowIso })
-      .eq("id", produtoId);
-
-    if (updErr) {
-      console.error(`[webhook] Erro ao atualizar estoque do produto #${produtoId}:`, updErr);
-    }
-  }
-
-  return { ok: true as const };
-}
-
-async function estornarEstoqueVendaRpc(vendaId: number) {
-  try {
-    const { error } = await supabaseAdmin.rpc("fn_estornar_estoque_venda", { p_venda_id: vendaId });
-    if (!error) return { ok: true as const };
-
-    console.warn(`[webhook] RPC fn_estornar_estoque_venda não encontrada, usando fallback manual:`, error.message);
-  } catch (err: any) {
-    console.warn("[webhook] Exceção ao chamar fn_estornar_estoque_venda:", err.message);
-  }
-
-  // Fallback manual para estorno
-  const { data: itens, error: itensErr } = await supabaseAdmin
-    .from("vendaproduto")
-    .select("produtoid, quantidade")
-    .eq("venda_id", vendaId);
-
-  if (itensErr || !itens) return { ok: false as const };
-
-  const nowIso = new Date().toISOString();
-  for (const it of itens) {
-    const produtoId = Number((it as any).produtoid);
-    const qtd = Math.max(0, Number((it as any).quantidade) || 0);
-    if (!produtoId || !qtd) continue;
-
-    const { data: prod } = await supabaseAdmin
-      .from("produto")
-      .select("id, estoque")
-      .eq("id", produtoId)
-      .single();
-
-    if (!prod) continue;
-    const novoEstoque = (Number(prod.estoque) || 0) + qtd;
-
-    await supabaseAdmin
-      .from("produto")
-      .update({ estoque: novoEstoque, updatedat: nowIso })
-      .eq("id", produtoId);
-  }
-
-  return { ok: true as const };
-}
-
 export async function POST(request: Request) {
   try {
     const rawBody = await request.text();
@@ -219,15 +146,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Payload vazio" }, { status: 400 });
     }
 
-    // 1. Validação de Autenticidade (REGRA CRÍTICA 4)
+    // 1. VALIDAÇÃO DE AUTENTICIDADE — FAIL CLOSED (Prioridade 9)
     const signatureHeader =
       request.headers.get("x-hub-signature") ||
       request.headers.get("x-pagarme-signature") ||
       request.headers.get("x-hub-signature-256");
 
-    if (WEBHOOK_SECRET && !verifyWebhookSignature(rawBody, signatureHeader)) {
-      console.warn("[webhook] Tentativa de webhook rejeitada por assinatura inválida.");
-      return NextResponse.json({ error: "Assinatura do webhook inválida" }, { status: 401 });
+    const verification = verifyWebhookSignature(rawBody, signatureHeader);
+    if (!verification.valid) {
+      console.warn(`[webhook] Requisição rejeitada: ${verification.error}`);
+      return NextResponse.json({ error: verification.error }, { status: 401 });
     }
 
     let payload: any = {};
@@ -244,36 +172,45 @@ export async function POST(request: Request) {
     const eventType = payload.type || payload.event || payload.name;
     const data = payload.data?.object || payload.data?.order || payload.data || payload.object || {};
     const orderNode = data.order || data;
-    const metadata = orderNode?.metadata || data?.metadata || payload.metadata || {};
+    const payloadMetadata = orderNode?.metadata || data?.metadata || payload.metadata || {};
 
-    let orderId = metadata?.orderId || metadata?.order_id || metadata?.orderID;
-    const pagarmeOrderRef = orderNode?.id || orderNode?.code || data?.id || data?.code || payload.data?.order_code;
+    const pagarmeOrderRef =
+      orderNode?.id || orderNode?.code || data?.id || data?.code || payload.data?.order_code;
     const statusFromPayload = orderNode?.status || data?.status || payload.status;
 
-    // Se o metadata raiz estiver vazio, tenta extrair das cobranças (charges)
+    // 2. CONSULTA AUTÊNTICA À API DO GATEWAY (Prioridade 10)
+    // Dá preferência ao status retornado pela consulta autenticada à API do Pagar.me
+    let fetchedOrder: any = null;
+    if (pagarmeOrderRef) {
+      fetchedOrder = await fetchOrderFromPagarme(pagarmeOrderRef);
+    }
+
+    // 3. IDENTIFICAÇÃO CONFIÁVEL DO PEDIDO LOCAL (Prioridade 11 — NUNCA USAR HEURÍSTICA DE VALOR)
+    let orderId =
+      fetchedOrder?.metadata?.orderId ||
+      fetchedOrder?.metadata?.order_id ||
+      payloadMetadata?.orderId ||
+      payloadMetadata?.order_id ||
+      payloadMetadata?.orderID;
+
+    if (!orderId && fetchedOrder?.code && /^\d+$/.test(String(fetchedOrder.code))) {
+      orderId = fetchedOrder.code;
+    }
+
     if (!orderId) {
-      const charges = orderNode?.charges || data?.charges;
+      const charges = fetchedOrder?.charges || orderNode?.charges || data?.charges;
       const chargeMeta = charges?.[0]?.metadata || charges?.[0]?.last_transaction?.metadata;
       orderId = chargeMeta?.orderId || chargeMeta?.order_id;
     }
 
-    // Consulta direta à API Pagar.me para confirmar os dados oficiais da transação
-    let fetchedOrder: any = null;
-    if (pagarmeOrderRef) {
-      fetchedOrder = await fetchOrderFromPagarme(pagarmeOrderRef);
-      if (!orderId && fetchedOrder) {
-        const fetchedMeta = fetchedOrder.metadata || {};
-        orderId = fetchedMeta.orderId || fetchedMeta.order_id;
-        if (!orderId && fetchedOrder.code && /^\d+$/.test(String(fetchedOrder.code))) {
-          orderId = fetchedOrder.code;
-        }
-      }
-    }
-
-    // REGRA 4: NUNCA associar pedido por aproximação de valor monetário (findOrderByAmount removido).
     if (!orderId) {
-      console.warn(`[webhook] Webhook ignorado: nenhuma identificação confiável de pedido local (OrderRef=${pagarmeOrderRef}).`);
-      return NextResponse.json({ message: "Identificador de pedido não encontrado" }, { status: 200 });
+      console.warn(
+        `[webhook] Webhook ignorado: nenhuma identificação confiável de pedido local (OrderRef=${pagarmeOrderRef}).`
+      );
+      return NextResponse.json(
+        { message: "Identificador de pedido não encontrado" },
+        { status: 200 }
+      );
     }
 
     const numericOrderId = Number(String(orderId).trim());
@@ -282,18 +219,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Formato de Order ID inválido" }, { status: 200 });
     }
 
+    // Status oficial: Prioriza retorno autenticado da API do gateway sobre o payload (Prioridade 10)
+    const authoritativeStatus = fetchedOrder?.status || statusFromPayload;
+    const newStatus = resolveStatus(eventType, authoritativeStatus);
+
     const paymentSource =
+      fetchedOrder?.charges?.[0]?.last_transaction ||
       orderNode?.last_transaction ||
       data?.last_transaction ||
-      data?.charges?.[0]?.last_transaction ||
-      fetchedOrder?.charges?.[0]?.last_transaction;
+      data?.charges?.[0]?.last_transaction;
 
     const paymentMethod = normalizePaymentMethod(paymentSource?.payment_method);
-    const newStatus = resolveStatus(eventType, statusFromPayload || fetchedOrder?.status);
 
-    console.log(`[webhook] Processando: Pedido=#${numericOrderId}, Status=${newStatus}, Método=${paymentMethod}, Evento=${eventType}`);
+    console.log(
+      `[webhook] Processando: Pedido=#${numericOrderId}, StatusOficial=${newStatus}, Método=${paymentMethod}, Evento=${eventType}`
+    );
 
-    // Consulta o estado anterior da venda para garantir idempotência
+    // Consulta estado anterior da venda para garantir idempotência estrita
     const { data: before, error: beforeErr } = await supabaseAdmin
       .from("venda")
       .select("id, status, forma_pagamento")
@@ -308,7 +250,7 @@ export async function POST(request: Request) {
     const previousStatus = String(before.status || "").trim().toUpperCase();
     const paidBefore = isPaidStatus(previousStatus);
 
-    // 2. Atualiza o status e a forma de pagamento no banco
+    // 4. ATUALIZA O STATUS DA VENDA NO BANCO
     const nowIso = new Date().toISOString();
     const updatePayload: Record<string, any> = {
       status: newStatus,
@@ -329,22 +271,39 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Falha na atualização do banco" }, { status: 500 });
     }
 
-    // 3. Baixa de estoque com Idempotência Estrita
+    // 5. BAIXA DE ESTOQUE COM IDEMPOTÊNCIA ESTRITA VIA RPC (Prioridade 12)
     // Somente baixa estoque se a venda NÃO estava paga anteriormente e agora passa para PAGO
     if (isPaidStatus(newStatus) && !paidBefore) {
-      console.log(`[webhook] Transição para status pago confirmada. Executando baixa de estoque para venda #${numericOrderId}...`);
-      const res = await baixarEstoqueVendaRpc(numericOrderId);
-      if (!res.ok) {
-        console.error(`[webhook] Baixa de estoque da venda #${numericOrderId} falhou:`, res.error);
+      console.log(
+        `[webhook] Transição para status pago confirmada. Executando fn_baixar_estoque_venda para venda #${numericOrderId}...`
+      );
+      const { error: rpcErr } = await supabaseAdmin.rpc("fn_baixar_estoque_venda", {
+        p_venda_id: numericOrderId,
+      });
+
+      if (rpcErr) {
+        console.error(
+          `[webhook] Erro ao executar RPC fn_baixar_estoque_venda para venda #${numericOrderId}:`,
+          rpcErr
+        );
       }
     }
 
-    // 4. Estorno de estoque em caso de cancelamento
+    // 6. ESTORNO DE ESTOQUE EM CASO DE CANCELAMENTO VIA RPC (Prioridade 12)
+    // Somente estorna se a venda ESTAVA paga anteriormente e foi cancelada
     if (newStatus === "CANCELADO" && paidBefore) {
-      console.log(`[webhook] Transição de pago para cancelado. Executando estorno de estoque para venda #${numericOrderId}...`);
-      const res = await estornarEstoqueVendaRpc(numericOrderId);
-      if (!res.ok) {
-        console.error(`[webhook] Estorno de estoque da venda #${numericOrderId} falhou:`, (res as any).error);
+      console.log(
+        `[webhook] Transição de pago para cancelado. Executando fn_estornar_estoque_venda para venda #${numericOrderId}...`
+      );
+      const { error: rpcErr } = await supabaseAdmin.rpc("fn_estornar_estoque_venda", {
+        p_venda_id: numericOrderId,
+      });
+
+      if (rpcErr) {
+        console.error(
+          `[webhook] Erro ao executar RPC fn_estornar_estoque_venda para venda #${numericOrderId}:`,
+          rpcErr
+        );
       }
     }
 
