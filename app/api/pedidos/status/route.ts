@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
+import {
+  isOrderPaid,
+  isOrderAuthorized,
+  isOrderPending,
+  isOrderCancelled,
+} from "@/lib/order-status";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -87,24 +94,17 @@ export async function GET(request: Request) {
     }
 
     const normalizedStatus = String(order.status || "").trim().toUpperCase();
-    const isPaid =
-      normalizedStatus === "PAGO" ||
-      normalizedStatus === "AUTORIZADO" ||
-      normalizedStatus === "FINALIZADA";
-    const isPending =
-      normalizedStatus === "PENDENTE" ||
-      normalizedStatus === "PAGAMENTO" ||
-      normalizedStatus === "ORCAMENTO";
-    const isCancelled =
-      normalizedStatus === "CANCELADO" ||
-      normalizedStatus === "CANCELADA" ||
-      normalizedStatus === "FALHA";
+    const isPaid = isOrderPaid(normalizedStatus);
+    const isAuthorized = isOrderAuthorized(normalizedStatus);
+    const isPending = isOrderPending(normalizedStatus);
+    const isCancelled = isOrderCancelled(normalizedStatus);
 
     // Retornar apenas informações necessárias
     return NextResponse.json({
       orderId: order.id,
       status: normalizedStatus,
       isPaid,
+      isAuthorized,
       isPending,
       isCancelled,
       total: Number(order.valortotal) || 0,

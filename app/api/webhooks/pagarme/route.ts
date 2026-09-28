@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isOrderPaid } from "@/lib/order-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -134,10 +135,6 @@ function normalizePaymentMethod(pm: any): string {
   return String(pm);
 }
 
-function isPaidStatus(status?: string | null): boolean {
-  const s = String(status ?? "").trim().toUpperCase();
-  return s === "PAGO" || s === "FINALIZADA";
-}
 
 export async function POST(request: Request) {
   try {
@@ -248,7 +245,7 @@ export async function POST(request: Request) {
     }
 
     const previousStatus = String(before.status || "").trim().toUpperCase();
-    const paidBefore = isPaidStatus(previousStatus);
+    const paidBefore = isOrderPaid(previousStatus);
 
     // 4. ATUALIZA O STATUS DA VENDA NO BANCO
     const nowIso = new Date().toISOString();
@@ -273,7 +270,7 @@ export async function POST(request: Request) {
 
     // 5. BAIXA DE ESTOQUE COM IDEMPOTÊNCIA ESTRITA VIA RPC (Prioridade 12)
     // Somente baixa estoque se a venda NÃO estava paga anteriormente e agora passa para PAGO
-    if (isPaidStatus(newStatus) && !paidBefore) {
+    if (isOrderPaid(newStatus) && !paidBefore) {
       console.log(
         `[webhook] Transição para status pago confirmada. Executando fn_baixar_estoque_venda para venda #${numericOrderId}...`
       );

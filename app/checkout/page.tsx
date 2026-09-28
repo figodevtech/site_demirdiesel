@@ -21,6 +21,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isOrderPaid, isOrderAuthorized } from "@/lib/order-status";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -217,7 +218,7 @@ export default function CheckoutPage() {
         { event: "UPDATE", schema: "public", table: "venda", filter: `id=eq.${currentOrderId}` },
         (payload) => {
           const newStatus = payload.new.status?.toUpperCase();
-          if (newStatus === "PAGO" || newStatus === "AUTORIZADO") {
+          if (isOrderPaid(newStatus)) {
             setPaymentStatus("paid");
             if (!clearedRef.current) {
               clearedRef.current = true;

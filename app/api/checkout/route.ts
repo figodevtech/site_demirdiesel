@@ -79,6 +79,57 @@ export async function POST(request: Request) {
       );
     }
 
+    // 2. VALIDAÇÃO ESTRITA DE DADOS DO CLIENTE NO SERVIDOR (Prioridade 2)
+    // Dados do cliente vêm EXCLUSIVAMENTE do banco de dados (auth.uid() -> cliente).
+    // O backend NÃO aceita documento, telefone, nome ou email enviados no body.
+    // Não inventar DDD nem telefone. Se faltar dado obrigatório, retornar erro claro solicitando atualização.
+    const cleanDoc = String(cliente.cpfcnpj || "").replace(/\D/g, "");
+    if (!cleanDoc || (cleanDoc.length !== 11 && cleanDoc.length !== 14)) {
+      return NextResponse.json(
+        {
+          error: "CADASTRO_INCOMPLETO_DOCUMENTO",
+          message: "Seu cadastro precisa de um CPF ou CNPJ válido para gerar a cobrança. Por favor, atualize seus dados na página Minha Conta.",
+        },
+        { status: 400 }
+      );
+    }
+    const docType = cleanDoc.length === 14 ? "company" : "individual";
+
+    const cleanPhone = String(cliente.telefone || "").replace(/\D/g, "");
+    if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 11) {
+      return NextResponse.json(
+        {
+          error: "CADASTRO_INCOMPLETO_TELEFONE",
+          message: "Seu cadastro precisa de um telefone celular válido com DDD (10 ou 11 dígitos). Por favor, atualize seus dados na página Minha Conta.",
+        },
+        { status: 400 }
+      );
+    }
+    const areaCode = cleanPhone.substring(0, 2);
+    const phoneNumber = cleanPhone.substring(2);
+
+    const customerName = String(cliente.nomerazaosocial || "").trim();
+    if (!customerName) {
+      return NextResponse.json(
+        {
+          error: "CADASTRO_INCOMPLETO_NOME",
+          message: "Nome ou Razão Social não informado no cadastro. Por favor, atualize seus dados na página Minha Conta.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const customerEmail = String(cliente.email || user.email || "").trim().toLowerCase();
+    if (!customerEmail || !customerEmail.includes("@")) {
+      return NextResponse.json(
+        {
+          error: "CADASTRO_INCOMPLETO_EMAIL",
+          message: "E-mail de contato inválido no cadastro. Por favor, atualize seus dados na página Minha Conta.",
+        },
+        { status: 400 }
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
     const { addressId, items } = body || {};
 
@@ -300,12 +351,6 @@ export async function POST(request: Request) {
     const origin = request.headers.get("origin") || siteConfig.url;
     const returnUrl = `${origin}/sucesso?orderId=${orderId}`;
 
-    const cleanDoc = String(cliente.cpfcnpj || body.customerDocument || "").replace(/\D/g, "");
-    const docType = cleanDoc.length === 14 ? "company" : "individual";
-    const cleanPhone = String(cliente.telefone || body.customerPhone || "").replace(/\D/g, "");
-    const areaCode = cleanPhone.substring(0, 2) || "83";
-    const phoneNumber = cleanPhone.substring(2) || "900000000";
-
     const paymentLinkPayload = {
       name: `Demir Diesel - Pedido #${orderId}`,
       type: "order",
@@ -342,8 +387,8 @@ export async function POST(request: Request) {
         })),
       },
       customer_settings: {
-        name: cliente.nomerazaosocial || "Cliente",
-        email: cliente.email || user.email,
+        name: customerName,
+        email: customerEmail,
         document: cleanDoc,
         type: docType,
         phones: {

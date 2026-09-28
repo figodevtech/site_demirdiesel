@@ -20,6 +20,7 @@ import { supabase } from "@/lib/supabase";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { isOrderPaid, isOrderAuthorized, isOrderCancelled } from "@/lib/order-status";
 
 export default function PedidosPage() {
   const { user, profile, isLoading: authLoading } = useAuth();
@@ -108,14 +109,21 @@ export default function PedidosPage() {
 
   const getStatusBadge = (status: string) => {
     const s = String(status || "").toUpperCase();
-    if (s === "PAGO" || s === "AUTORIZADO" || s === "CONCLUIDO") {
+    if (isOrderPaid(s)) {
       return (
         <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
           PAGO
         </Badge>
       );
     }
-    if (s === "CANCELADO") {
+    if (isOrderAuthorized(s)) {
+      return (
+        <Badge className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20 text-[10px] font-bold">
+          AUTORIZADO
+        </Badge>
+      );
+    }
+    if (isOrderCancelled(s)) {
       return (
         <Badge variant="destructive" className="text-[10px] font-bold">
           CANCELADO

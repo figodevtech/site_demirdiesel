@@ -91,8 +91,6 @@ export default function RegisterPage() {
             cpfcnpj: cleanDoc,
             email: email.trim().toLowerCase(),
             telefone: phone.trim(),
-            cidade: "Não Informado",
-            estado: "PB",
           });
 
           if (dbError) {

@@ -18,6 +18,7 @@ function SucessoContent() {
     orderId: number;
     status: string;
     isPaid: boolean;
+    isAuthorized?: boolean;
     isPending: boolean;
     isCancelled: boolean;
     total: number;
@@ -158,6 +159,34 @@ function SucessoContent() {
             <Link href="/fale-conosco">
               <Button variant="outline" size="lg" className="w-full sm:w-auto font-medium">
                 <span>Falar com o Suporte</span>
+              </Button>
+            </Link>
+          </div>
+        </div>
+      ) : orderInfo?.isAuthorized ? (
+        /* Estado Autorizado / Aguardando Captura */
+        <div className="space-y-5">
+          <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-950/60 flex items-center justify-center mx-auto border border-blue-500/30">
+            <Clock className="w-10 h-10 text-blue-600 dark:text-blue-400 animate-pulse" />
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+              Pagamento Pré-Autorizado
+            </h1>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              O pagamento do seu pedido <strong className="text-foreground">#{orderInfo.orderId}</strong> foi pré-autorizado pela operadora e está aguardando captura e liquidação final.
+            </p>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto pt-1">
+              Esta tela será atualizada automaticamente assim que o pagamento for capturado definitivamente.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+            <Link href="/pedidos">
+              <Button size="lg" className="w-full sm:w-auto font-semibold gap-2 bg-primary text-white">
+                <Package className="w-4 h-4" />
+                <span>Acompanhar em Meus Pedidos</span>
               </Button>
             </Link>
           </div>
