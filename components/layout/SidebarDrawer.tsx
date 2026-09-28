@@ -20,10 +20,15 @@ import { useAuth } from "@/components/providers/AuthContext";
 
 interface SidebarProps {
     categories: ProdutoGrupo[];
+    onOpenChange?: (open: boolean) => void;
 }
 
-export default function SidebarDrawer({ categories }: SidebarProps) {
-    const [open, setOpen] = useState(false);
+export default function SidebarDrawer({ categories, onOpenChange }: SidebarProps) {
+    const [open, setOpenInternal] = useState(false);
+    const setOpen = (val: boolean) => {
+        setOpenInternal(val);
+        if (onOpenChange) onOpenChange(val);
+    };
     const { user, profile, signOut } = useAuth();
 
     const displayName = profile?.nomerazaosocial || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Cliente';

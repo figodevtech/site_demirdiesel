@@ -12,6 +12,7 @@ interface SearchInputProps {
   placeholder?: string;
   autoFocus?: boolean;
   onSelectResult?: () => void;
+  onSearchActiveChange?: (active: boolean) => void;
 }
 
 export function SearchInput({
@@ -19,13 +20,20 @@ export function SearchInput({
   placeholder = "Busque por peça, módulo, referência ou fabricante...",
   autoFocus = false,
   onSelectResult,
+  onSearchActiveChange,
 }: SearchInputProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PublicProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const isActive = isFocused || isOpen || query.trim().length > 0;
+    onSearchActiveChange?.(isActive);
+  }, [isFocused, isOpen, query, onSearchActiveChange]);
 
   // Debounced search
   useEffect(() => {
@@ -90,7 +98,11 @@ export function SearchInput({
           autoFocus={autoFocus}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => {
+            setIsFocused(true);
             if (results.length > 0) setIsOpen(true);
+          }}
+          onBlur={() => {
+            setIsFocused(false);
           }}
           className="w-full pl-10 pr-10 h-10 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm placeholder:text-slate-400"
         />

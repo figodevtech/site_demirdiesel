@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { MessageCircle, Heart, Phone, Sparkles } from "lucide-react";
+import { MessageCircle, Heart, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "./SearchInput";
 import SidebarDrawer from "./SidebarDrawer";
@@ -10,33 +10,114 @@ import CartWidget from "./CartWidget";
 import UserWidget from "./UserWidget";
 import { PublicCategory } from "@/lib/catalog/types";
 import { useWishlist } from "@/lib/hooks/useWishlist";
-import { siteConfig, buildWhatsAppUrl } from "@/lib/site-config";
+import { buildWhatsAppUrl } from "@/lib/site-config";
 
 interface HeaderProps {
   categories: PublicCategory[];
 }
 
 export function Header({ categories }: HeaderProps) {
+  const [isVisible, setIsVisible] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isSearchActive, setIsSearchActive] = useState(false);
+
   const { wishlistIds } = useWishlist();
-  const isScrolledRef = useRef(false);
+
+  const lastScrollYRef = useRef(0);
+  const isVisibleRef = useRef(true);
+  const isDrawerOpenRef = useRef(false);
+  const isSearchActiveRef = useRef(false);
+  const headerRef = useRef<HTMLElement>(null);
+
+  // Sincroniza refs para acesso imediato no loop de animação do scroll
+  useEffect(() => {
+    isDrawerOpenRef.current = isDrawerOpen;
+    if (isDrawerOpen) {
+      isVisibleRef.current = true;
+      setIsVisible(true);
+    }
+  }, [isDrawerOpen]);
+
+  useEffect(() => {
+    isSearchActiveRef.current = isSearchActive;
+    if (isSearchActive) {
+      isVisibleRef.current = true;
+      setIsVisible(true);
+    }
+  }, [isSearchActive]);
 
   useEffect(() => {
     let frameId: number | null = null;
+    const TOP_THRESHOLD = 60; // scrollY < 60px -> sempre visível
+    const DELTA_TOLERANCE = 8; // tolerância para evitar flicker em micro-movimentos e touch
+
     const handleScroll = () => {
       if (frameId !== null) return;
       frameId = window.requestAnimationFrame(() => {
-        const nextIsScrolled = window.scrollY > 20;
-        if (nextIsScrolled !== isScrolledRef.current) {
-          isScrolledRef.current = nextIsScrolled;
-          setIsScrolled(nextIsScrolled);
+        const currentScrollY = Math.max(0, window.scrollY);
+        const lastScrollY = lastScrollYRef.current;
+        const diff = currentScrollY - lastScrollY;
+
+        // Atualiza estilização de sombra/blur quando rolar além de 10px
+        const nextIsScrolled = currentScrollY > 10;
+        setIsScrolled(nextIsScrolled);
+
+        // 1. Próximo ao topo (< 60px): NUNCA esconder
+        if (currentScrollY <= TOP_THRESHOLD) {
+          if (!isVisibleRef.current) {
+            isVisibleRef.current = true;
+            setIsVisible(true);
+          }
+          lastScrollYRef.current = currentScrollY;
+          frameId = null;
+          return;
         }
+
+        // 2. Se houver interação ativa (drawer aberto, busca em uso ou foco no header): manter visível
+        if (
+          isDrawerOpenRef.current ||
+          isSearchActiveRef.current ||
+          (headerRef.current && headerRef.current.contains(document.activeElement))
+        ) {
+          if (!isVisibleRef.current) {
+            isVisibleRef.current = true;
+            setIsVisible(true);
+          }
+          lastScrollYRef.current = currentScrollY;
+          frameId = null;
+          return;
+        }
+
+        // 3. Ignora micro-oscilações menores que a tolerância (evita flickering em touch e scroll)
+        if (Math.abs(diff) < DELTA_TOLERANCE) {
+          frameId = null;
+          return;
+        }
+
+        // 4. Detecção de direção do scroll:
+        if (diff > 0) {
+          // Scroll PARA BAIXO -> esconder suavemente
+          if (isVisibleRef.current) {
+            isVisibleRef.current = false;
+            setIsVisible(false);
+          }
+        } else {
+          // Scroll PARA CIMA -> exibir imediatamente
+          if (!isVisibleRef.current) {
+            isVisibleRef.current = true;
+            setIsVisible(true);
+          }
+        }
+
+        lastScrollYRef.current = currentScrollY;
         frameId = null;
       });
     };
 
-    handleScroll();
+    lastScrollYRef.current = Math.max(0, window.scrollY);
     window.addEventListener("scroll", handleScroll, { passive: true });
+
     return () => {
       window.removeEventListener("scroll", handleScroll);
       if (frameId !== null) window.cancelAnimationFrame(frameId);
@@ -45,48 +126,28 @@ export function Header({ categories }: HeaderProps) {
 
   return (
     <header
-      className={`sticky top-0 z-50 w-full transition-[background-color,border-color,box-shadow] duration-300 ease-in-out ${
+      ref={headerRef}
+      onFocusCapture={() => {
+        isVisibleRef.current = true;
+        setIsVisible(true);
+      }}
+      className={`sticky top-0 z-50 w-full transform transition-[transform,background-color,border-color,box-shadow] duration-300 ease-in-out motion-reduce:transition-none ${
+        isVisible ? "translate-y-0" : "-translate-y-full pointer-events-none"
+      } ${
         isScrolled
           ? "bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-border shadow-sm"
           : "bg-white dark:bg-slate-900 border-b border-border/60"
       }`}
     >
-      {/* Top Banner de Engenharia / Suporte */}
-      <div className="bg-slate-900 text-slate-200 text-xs py-1.5 px-4 hidden md:block border-b border-slate-800">
-        <div className="container mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-semibold text-white">Laboratório Especializado:</span>
-            <span className="text-slate-300">
-              Venda e Reparo de Módulos, Injeção Eletrônica e Motores Diesel
-            </span>
-          </div>
-
-          <div className="flex items-center gap-4 text-[11px] text-slate-300">
-            <span className="flex items-center gap-1.5">
-              <Phone className="w-3 h-3 text-primary" />
-              <span>{siteConfig.address.city} - {siteConfig.address.state}</span>
-            </span>
-            <span className="h-3 w-px bg-slate-700" />
-            <a
-              href={buildWhatsAppUrl("Olá, gostaria de um orçamento de peças diesel.")}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 transition-colors"
-            >
-              <MessageCircle className="w-3.5 h-3.5" />
-              <span>Plantão Técnico WhatsApp</span>
-            </a>
-          </div>
-        </div>
-      </div>
-
       {/* Main Header Row */}
       <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
         {/* Esquerda: Menu Drawer Mobile & Logotipo Demir Diesel */}
         <div className="flex items-center gap-3">
           <div className="md:hidden">
-            <SidebarDrawer categories={categories as any} />
+            <SidebarDrawer
+              categories={categories as any}
+              onOpenChange={(open) => setIsDrawerOpen(open)}
+            />
           </div>
 
           <Link href="/" className="flex items-center gap-2.5 group">
@@ -113,7 +174,7 @@ export function Header({ categories }: HeaderProps) {
 
         {/* Centro: Campo de Busca Desktop em Destaque */}
         <div className="flex-1 max-w-xl mx-4 hidden md:block">
-          <SearchInput />
+          <SearchInput onSearchActiveChange={(active) => setIsSearchActive(active)} />
         </div>
 
         {/* Direita: Ações (WhatsApp Especialista, Favoritos, Usuário, Carrinho) */}
@@ -156,7 +217,10 @@ export function Header({ categories }: HeaderProps) {
 
       {/* Barra de Busca no Mobile */}
       <div className="md:hidden px-4 pb-3">
-        <SearchInput placeholder="Buscar peça, módulo ou referência..." />
+        <SearchInput
+          placeholder="Buscar peça, módulo ou referência..."
+          onSearchActiveChange={(active) => setIsSearchActive(active)}
+        />
       </div>
 
       {/* Menu Secundário Desktop */}
