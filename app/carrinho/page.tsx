@@ -14,6 +14,7 @@ import {
   Truck,
   ArrowLeft,
   Package,
+  MessageCircle,
 } from "lucide-react";
 import { useCart } from "@/components/providers/CartContext";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { getShippingEstimate } from "@/lib/shipping";
 import { ProductFallbackImage } from "@/components/product/ProductFallbackImage";
+import { buildWhatsAppUrl } from "@/lib/site-config";
 
 export default function CarrinhoPage() {
   const router = useRouter();
@@ -276,6 +278,18 @@ export default function CarrinhoPage() {
               <div className="flex items-center gap-2 justify-center text-[11px] text-muted-foreground pt-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
                 <span>Ambiente Seguro e Criptografado</span>
+              </div>
+
+              <div className="text-center pt-2 border-t border-border/40">
+                <a
+                  href={buildWhatsAppUrl("Olá! Tenho dúvidas sobre os itens no meu carrinho e gostaria de atendimento técnico.")}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-emerald-600 transition-colors"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Dúvidas com o pedido? Fale no WhatsApp</span>
+                </a>
               </div>
             </div>
           </div>

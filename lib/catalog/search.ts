@@ -2,7 +2,7 @@ import { getPaginatedProducts } from "./products";
 import { PublicProduct, PaginatedProducts } from "./types";
 
 /**
- * Busca flexível em múltiplas colunas do ERP (título, marketplace, referência, fabricante, descrição)
+ * Busca flexível em colunas públicas do ERP (título, marketplace, referência, fabricante, descriçãoMarketplace)
  */
 export async function searchCatalog(
   term: string,

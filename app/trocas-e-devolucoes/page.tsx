@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { siteConfig, buildWhatsAppUrl } from '@/lib/site-config';
 
 export default function TrocasDevolucoesPage() {
     const itens = [
@@ -9,7 +10,7 @@ export default function TrocasDevolucoesPage() {
         { titulo: 'Condições', texto: 'O produto deve estar sem uso, com embalagem original e acessórios. Para defeito, descreva o problema e, se possível, envie fotos.' },
         { titulo: 'Custos de envio', texto: 'Em caso de defeito ou erro no pedido, o frete é por nossa conta. Para arrependimento, o frete de devolução pode ser cobrado.' },
         { titulo: 'Reembolsos', texto: 'Após recebermos e conferirmos o produto, o estorno é solicitado no mesmo meio de pagamento (cartão, PIX ou boleto). Prazos variam conforme o emissor.' },
-        { titulo: 'Passo a passo', texto: '1) Abra um chamado em contato@demirdiesel.com.br ou WhatsApp. 2) Informe número do pedido, motivo e fotos. 3) Aguarde o código de postagem ou coleta. 4) Após conferência, seguimos com troca ou reembolso.' },
+        { titulo: 'Passo a passo', texto: `1) Abra um chamado em ${siteConfig.email} ou WhatsApp. 2) Informe número do pedido, motivo e fotos. 3) Aguarde o código de postagem ou coleta. 4) Após conferência, seguimos com troca ou reembolso.` },
     ];
 
     return (
@@ -30,7 +31,19 @@ export default function TrocasDevolucoesPage() {
                         </div>
                     ))}
                     <p className="text-sm text-muted-foreground">
-                        Para iniciar, envie e-mail para <span className="text-primary font-semibold">contato@demirdiesel.com.br</span> ou chame no WhatsApp (83) 99873-7170.
+                        Para iniciar, envie e-mail para{' '}
+                        <a href={`mailto:${siteConfig.email}`} className="text-primary font-semibold hover:underline">
+                            {siteConfig.email}
+                        </a>{' '}
+                        ou chame no{' '}
+                        <a
+                            href={buildWhatsAppUrl("Olá, gostaria de orientações sobre troca ou devolução de um pedido.")}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-emerald-600 font-semibold hover:underline"
+                        >
+                            WhatsApp {siteConfig.whatsappDisplay}
+                        </a>.
                     </p>
                 </CardContent>
             </Card>

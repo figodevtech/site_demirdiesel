@@ -21,24 +21,39 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
   if (!product) {
     return {
-      title: "Produto não encontrado | Demir Diesel",
+      title: "Produto não encontrado",
     };
   }
 
-  const title = product.brand
-    ? `${product.title} - ${product.brand} | Demir Diesel`
-    : `${product.title} | Demir Diesel`;
+  // Remove qualquer sufixo duplicado existente nos dados brutos
+  const baseTitle = product.title.replace(/\s*\|\s*Demir Diesel.*$/i, "").trim();
+  const rawBrand = product.brand ? product.brand.trim() : "";
+  const rawTitle =
+    rawBrand && !baseTitle.toUpperCase().includes(rawBrand.toUpperCase())
+      ? `${baseTitle} - ${rawBrand}`
+      : baseTitle;
+
   const description =
     product.description ||
-    `Consulte ${product.title} (${product.reference ? `Ref: ${product.reference}` : ""}) na Demir Diesel. Peças pesadas e módulos diesel com garantia e envio nacional.`;
+    `Consulte ${product.title}${product.reference ? ` (Ref: ${product.reference})` : ""} na Demir Diesel. Peças pesadas e módulos diesel com garantia e envio nacional.`;
+  const cleanDesc = description.slice(0, 160);
 
+  // Retorna somente o título específico do produto.
+  // O layout global aplica o template: "%s | Demir Diesel" uma única vez no <title>.
+  // Open Graph e Twitter são explicitamente configurados com uma única ocorrência da marca.
   return {
-    title,
-    description: description.slice(0, 160),
+    title: rawTitle,
+    description: cleanDesc,
     openGraph: {
-      title,
-      description: description.slice(0, 160),
+      title: `${rawTitle} | Demir Diesel`,
+      description: cleanDesc,
       images: product.image ? [{ url: product.image }] : [],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${rawTitle} | Demir Diesel`,
+      description: cleanDesc,
+      images: product.image ? [product.image] : [],
     },
   };
 }

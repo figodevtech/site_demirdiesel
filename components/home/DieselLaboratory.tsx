@@ -68,7 +68,7 @@ export function DieselLaboratory() {
             <div className="pt-4 flex flex-wrap items-center gap-4">
               <a
                 href={buildWhatsAppUrl("Olá, gostaria de consultar o laboratório Demir Diesel sobre um módulo ou bomba.")}
-                target={siteConfig.whatsapp ? "_blank" : undefined}
+                target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm shadow-lg transition-colors"
               >

@@ -33,10 +33,10 @@ export const siteConfig: SiteConfig = {
   legalName: process.env.NEXT_PUBLIC_COMPANY_LEGAL_NAME || "Demir Diesel Peças e Serviços Ltda.",
   // Se não houver CNPJ real nas variáveis de ambiente, não exibe CNPJ fictício (00.000.000/0001-00)
   cnpj: process.env.NEXT_PUBLIC_COMPANY_CNPJ || "",
-  phone: process.env.NEXT_PUBLIC_COMPANY_PHONE || "",
-  phoneDisplay: process.env.NEXT_PUBLIC_COMPANY_PHONE_DISPLAY || "",
-  whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "",
-  whatsappDisplay: process.env.NEXT_PUBLIC_WHATSAPP_DISPLAY || "",
+  phone: process.env.NEXT_PUBLIC_COMPANY_PHONE || "+55 83 98832-3883",
+  phoneDisplay: process.env.NEXT_PUBLIC_COMPANY_PHONE_DISPLAY || "(83) 98832-3883",
+  whatsapp: (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5583988323883").replace(/\D/g, ""),
+  whatsappDisplay: process.env.NEXT_PUBLIC_WHATSAPP_DISPLAY || "(83) 98832-3883",
   email: process.env.NEXT_PUBLIC_COMPANY_EMAIL || "contato@demirdiesel.com.br",
   address: {
     street: "R. Jorn. João José Ramalho",
@@ -53,16 +53,43 @@ export const siteConfig: SiteConfig = {
   url: process.env.NEXT_PUBLIC_SITE_URL || "https://demirdiesel.com.br",
 };
 
+export const OFFICIAL_WHATSAPP_NUMBER = "5583988323883";
+
 /**
- * Constrói URL do WhatsApp caso o número esteja configurado.
- * Caso o número não esteja definido em variáveis de ambiente, retorna rota interna /fale-conosco.
+ * Constrói URL do WhatsApp oficial da Demir Diesel (+55 83 98832-3883).
+ * Padrão estrito: https://wa.me/5583988323883?text=...
+ * Não utiliza /fale-conosco como fallback para botões com promessa visual de WhatsApp.
  */
 export function buildWhatsAppUrl(messageText?: string): string {
-  const number = siteConfig.whatsapp.replace(/\D/g, "");
-  if (!number) {
-    return "/fale-conosco";
-  }
+  const rawNumber = siteConfig.whatsapp ? siteConfig.whatsapp.replace(/\D/g, "") : "";
+  const number = rawNumber || OFFICIAL_WHATSAPP_NUMBER;
   const base = `https://wa.me/${number}`;
-  if (!messageText) return base;
-  return `${base}?text=${encodeURIComponent(messageText)}`;
+  if (!messageText || !messageText.trim()) return base;
+  return `${base}?text=${encodeURIComponent(messageText.trim())}`;
+}
+
+/**
+ * Constrói a mensagem e link oficial para atendimento de produtos:
+ * "Olá! Tenho interesse no produto [NOME], referência [REFERÊNCIA], código #[ID]. Poderia me ajudar?"
+ * Omite campos ausentes sem escrever 'undefined', 'null' ou valores falsos.
+ */
+export function buildProductWhatsAppUrl(params: {
+  title?: string | null;
+  reference?: string | null;
+  id?: string | number | null;
+}): string {
+  const name = params.title?.trim() || "Item";
+  const ref = params.reference?.trim();
+  const id = params.id !== undefined && params.id !== null ? String(params.id).trim() : "";
+
+  let msg = `Olá! Tenho interesse no produto ${name}`;
+  if (ref && ref !== "N/A" && ref !== "-" && ref !== "null" && ref !== "undefined") {
+    msg += `, referência ${ref}`;
+  }
+  if (id && id !== "null" && id !== "undefined") {
+    msg += `, código #${id}`;
+  }
+  msg += ". Poderia me ajudar?";
+
+  return buildWhatsAppUrl(msg);
 }

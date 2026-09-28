@@ -9,10 +9,11 @@ import {
     SheetTitle,
     SheetTrigger,
 } from "@/components/ui/sheet";
-import { Menu, User, Package, MapPin, CreditCard, Heart, HelpCircle, LogOut } from 'lucide-react';
+import { Menu, User, Package, MapPin, CreditCard, Heart, HelpCircle, LogOut, MessageCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ProdutoGrupo } from '@/lib/types';
 import { slugify } from '@/lib/utils';
+import { buildWhatsAppUrl } from '@/lib/site-config';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
@@ -130,6 +131,15 @@ export default function SidebarDrawer({ categories, onOpenChange }: SidebarProps
                                 <Link href="/faq" onClick={() => setOpen(false)} className="flex items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors">
                                     <HelpCircle size={16} /> Central de Ajuda
                                 </Link>
+                                <a
+                                    href={buildWhatsAppUrl("Olá, preciso de ajuda técnica para encontrar uma peça diesel.")}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={() => setOpen(false)}
+                                    className="flex items-center gap-3 px-2 py-2 text-sm text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-md transition-colors font-medium"
+                                >
+                                    <MessageCircle size={16} /> Falar com Técnico no WhatsApp
+                                </a>
                             </nav>
                         </div>
                     </div>

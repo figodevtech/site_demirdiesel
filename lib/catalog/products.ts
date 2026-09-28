@@ -2,12 +2,12 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { PublicProduct, ProductFilterOptions, PaginatedProducts, ProductCondition } from "./types";
 import { slugify } from "@/lib/utils";
 
-// Colunas estritamente públicas selecionadas do ERP
+// Colunas estritamente públicas selecionadas do ERP.
+// 'descricao' é coluna de observações internas do ERP e NUNCA deve ser incluída em consultas públicas.
 const PUBLIC_PRODUCT_COLUMNS = `
   id,
   titulo,
   tituloMarketplace,
-  descricao,
   descricaoMarketplace,
   precovenda,
   estoque,
@@ -34,12 +34,47 @@ export function formatBrlCurrency(value: number): string {
   }).format(value);
 }
 
+/**
+ * Gera uma descrição comercial genérica e segura baseada estritamente em dados públicos reais,
+ * sem expor dados internos e sem inventar especificações técnicas.
+ */
+export function generateCommercialDescription(params: {
+  title: string;
+  reference?: string | null;
+  brand?: string | null;
+  categoryName?: string | null;
+}): string {
+  const parts: string[] = [];
+
+  const cleanTitle = (params.title || "Componente Diesel").trim();
+  parts.push(cleanTitle);
+
+  const cleanBrand = params.brand ? String(params.brand).trim() : "";
+  if (cleanBrand && cleanBrand !== "-" && cleanBrand.toLowerCase() !== "geral") {
+    parts.push(`Fabricante: ${cleanBrand}.`);
+  }
+
+  const cleanRef = params.reference ? String(params.reference).trim() : "";
+  if (cleanRef && cleanRef !== "N/A" && cleanRef !== "-" && cleanRef !== "null" && cleanRef !== "undefined") {
+    parts.push(`Referência: ${cleanRef}.`);
+  }
+
+  const cleanCategory = params.categoryName ? String(params.categoryName).trim() : "";
+  if (cleanCategory && cleanCategory !== "Geral") {
+    parts.push(`Categoria: ${cleanCategory}.`);
+  }
+
+  const details = parts.slice(1).join(" ");
+  const baseIntro = details ? `${cleanTitle}. ${details}` : `${cleanTitle}.`;
+
+  return `${baseIntro} Componente automotivo para linha diesel pesada com procedência e suporte técnico da Demir Diesel. Consulte nossa equipe especializada para confirmação de aplicação e disponibilidade.`;
+}
+
 // Converte row do ERP em DTO seguro e limpo para o frontend
 export function mapRowToPublicProduct(row: any, extraImages: string[] = []): PublicProduct {
   const title = (
     row.tituloMarketplace ||
     row.titulo ||
-    row.descricao ||
     "Componente Diesel"
   ).trim();
 
@@ -69,11 +104,17 @@ export function mapRowToPublicProduct(row: any, extraImages: string[] = []): Pub
     (url, index, self) => url && self.indexOf(url) === index
   );
 
-  const cleanDescription = (
-    row.descricaoMarketplace ||
-    row.descricao ||
-    ""
-  ).trim();
+  // Usa estritamente descricaoMarketplace como descrição comercial pública.
+  // Nunca usa row.descricao (campo de uso interno com notas de aquisição/fornecedor).
+  const rawMarketplaceDesc = (row.descricaoMarketplace || "").trim();
+  const cleanDescription =
+    rawMarketplaceDesc ||
+    generateCommercialDescription({
+      title,
+      reference: row.referencia,
+      brand,
+      categoryName,
+    });
 
   // Gera slug amigável como /produto/modulo-scania-dc13-1024
   const referencePart = row.referencia ? `-${slugify(row.referencia)}` : "";
@@ -271,11 +312,11 @@ export async function getPaginatedProducts(
       }
     }
 
-    // Termo de busca textual
+    // Termo de busca textual (busca apenas colunas públicas, nunca descricao interna)
     if (options.query && options.query.trim()) {
       const term = options.query.trim();
       query = query.or(
-        `titulo.ilike.%${term}%,tituloMarketplace.ilike.%${term}%,referencia.ilike.%${term}%,fabricante.ilike.%${term}%,descricao.ilike.%${term}%`
+        `titulo.ilike.%${term}%,tituloMarketplace.ilike.%${term}%,referencia.ilike.%${term}%,fabricante.ilike.%${term}%,descricaoMarketplace.ilike.%${term}%`
       );
     }
 

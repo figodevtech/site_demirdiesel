@@ -2,7 +2,7 @@ export interface Produto {
     id: number;
     codigo: string;
     codigobarras: string | null;
-    descricao: string; // usado como nome
+    descricao: string; // campo interno do ERP (não expor publicamente)
     grupoid: number | null;
     unidademedidaid: number | null;
     precovenda: number;

@@ -348,8 +348,27 @@ export async function POST(request: Request) {
     }
 
     // 8. CRIA O LINK DE PAGAMENTO NO PAGAR.ME SOMENTE APÓS SUCESSO DA TRANSAÇÃO
-    const origin = request.headers.get("origin") || siteConfig.url;
-    const returnUrl = `${origin}/sucesso?orderId=${orderId}`;
+    // SEGURANÇA: return_url estritamente ancorado na URL oficial configurada do site.
+    // Allowlist explícita por ambiente para suportar homologação/desenvolvimento sem permitir domínios arbitrários.
+    const configuredBaseUrl = siteConfig.url.replace(/\/+$/, "");
+    const allowedOrigins = new Set<string>([
+      configuredBaseUrl,
+      "https://demirdiesel.com.br",
+      "https://www.demirdiesel.com.br",
+    ]);
+
+    if (process.env.NODE_ENV !== "production") {
+      allowedOrigins.add("http://localhost:3000");
+      allowedOrigins.add("http://127.0.0.1:3000");
+    }
+
+    const requestOrigin = request.headers.get("origin")?.replace(/\/+$/, "");
+    const safeBaseUrl =
+      requestOrigin && allowedOrigins.has(requestOrigin)
+        ? requestOrigin
+        : configuredBaseUrl;
+
+    const returnUrl = `${safeBaseUrl}/sucesso?orderId=${orderId}`;
 
     const paymentLinkPayload = {
       name: `Demir Diesel - Pedido #${orderId}`,
