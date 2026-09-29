@@ -45,12 +45,12 @@ export function FeaturedSection({
         </div>
 
         {/* Grid de Produtos */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {products.slice(0, 8).map((product, idx) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
+          {products.slice(0, 10).map((product, idx) => (
             <ProductCard
               key={product.id}
               product={product}
-              priority={idx < 4}
+              priority={idx < 5}
             />
           ))}
         </div>
