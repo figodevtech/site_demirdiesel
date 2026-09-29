@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { MessageCircle, Heart, Sparkles } from "lucide-react";
@@ -176,24 +177,25 @@ export function Header({ categories }: HeaderProps) {
             />
           </div>
 
-          <Link href="/" className="flex items-center gap-2.5 group">
-            {/* Símbolo Industrial 'D' */}
-            <div className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-primary text-white flex items-center justify-center font-black text-lg shadow-sm border border-slate-700/50 group-hover:scale-105 transition-transform duration-300">
-              <span className="text-primary dark:text-white">D</span>
-            </div>
-
-            <div className="flex flex-col">
-              <div className="flex items-baseline gap-1">
-                <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white">
-                  DEMIR
-                </span>
-                <span className="font-bold text-xl tracking-tight text-primary">
-                  DIESEL
-                </span>
-              </div>
-              <span className="hidden sm:block text-[9px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 font-mono -mt-1">
-                Peças & Tecnologia
-              </span>
+          <Link href="/" className="flex items-center gap-2 group py-1" aria-label="Demir Diesel Página Inicial">
+            {/* Logotipo Oficial Demir Diesel */}
+            <div className="relative h-10 flex items-center">
+              <Image
+                src="/images/demir-logo.png"
+                alt="Demir Diesel - Injeção Eletrônica a Diesel"
+                width={200}
+                height={77}
+                priority
+                className="h-9 sm:h-10 w-auto object-contain dark:hidden transition-transform duration-300 group-hover:scale-105"
+              />
+              <Image
+                src="/images/demir-logo-dark.png"
+                alt="Demir Diesel - Injeção Eletrônica a Diesel"
+                width={200}
+                height={77}
+                priority
+                className="h-9 sm:h-10 w-auto object-contain hidden dark:block transition-transform duration-300 group-hover:scale-105"
+              />
             </div>
           </Link>
         </div>

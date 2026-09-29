@@ -1,4 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 import { ImageResponse } from "next/og";
+import fs from "fs";
+import path from "path";
 
 export const alt = "Demir Diesel - Peças, Módulos Eletrônicos & Oficina Especializada";
 export const size = {
@@ -8,6 +11,9 @@ export const size = {
 export const contentType = "image/png";
 
 export default function OpenGraphImage() {
+  const logoBuffer = fs.readFileSync(path.join(process.cwd(), "public", "images", "demir-logo-dark.png"));
+  const logoBase64 = logoBuffer.toString("base64");
+
   return new ImageResponse(
     (
       <div
@@ -35,83 +41,14 @@ export default function OpenGraphImage() {
             width: "100%",
           }}
         >
-          <div
+          <img
+            src={`data:image/png;base64,${logoBase64}`}
+            alt="Demir Diesel"
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "16px",
+              height: "68px",
+              objectFit: "contain",
             }}
-          >
-            <div
-              style={{
-                width: "64px",
-                height: "64px",
-                borderRadius: "16px",
-                backgroundColor: "#0F172A",
-                border: "2px solid #0A7AAC",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 0 20px rgba(10, 122, 172, 0.4)",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "38px",
-                  fontWeight: 900,
-                  color: "#0A7AAC",
-                }}
-              >
-                D
-              </span>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "baseline",
-                  gap: "6px",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: "32px",
-                    fontWeight: 900,
-                    letterSpacing: "-0.5px",
-                    color: "#FFFFFF",
-                  }}
-                >
-                  DEMIR
-                </span>
-                <span
-                  style={{
-                    fontSize: "32px",
-                    fontWeight: 900,
-                    letterSpacing: "-0.5px",
-                    color: "#0A7AAC",
-                  }}
-                >
-                  DIESEL
-                </span>
-              </div>
-              <span
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  letterSpacing: "2px",
-                  textTransform: "uppercase",
-                  color: "#94A3B8",
-                }}
-              >
-                Peças & Tecnologia Diesel
-              </span>
-            </div>
-          </div>
+          />
 
           {/* Domain Pill */}
           <div

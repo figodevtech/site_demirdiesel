@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, User, Phone, FileText, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -120,8 +121,23 @@ export default function RegisterPage() {
     <div className="min-h-[85vh] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-lg bg-card rounded-3xl border border-border/80 p-8 shadow-xl">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-xl mx-auto mb-4 border border-slate-800 shadow-sm">
-            <span className="text-primary">D</span>
+          <div className="flex justify-center mb-6">
+            <Link href="/" className="inline-block transition-transform hover:scale-105" aria-label="Página Inicial Demir Diesel">
+              <Image
+                src="/images/demir-logo.png"
+                alt="Demir Diesel"
+                width={220}
+                height={85}
+                className="h-11 w-auto object-contain dark:hidden"
+              />
+              <Image
+                src="/images/demir-logo-dark.png"
+                alt="Demir Diesel"
+                width={220}
+                height={85}
+                className="h-11 w-auto object-contain hidden dark:block"
+              />
+            </Link>
           </div>
           <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
             Criar Conta na Demir Diesel

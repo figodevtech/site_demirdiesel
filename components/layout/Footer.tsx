@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Phone, Mail, MapPin, ShieldCheck, Truck, Wrench, MessageCircle } from "lucide-react";
 import { getCategories } from "@/lib/catalog/categories";
 import { siteConfig, buildWhatsAppUrl } from "@/lib/site-config";
@@ -54,14 +55,15 @@ export default async function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           {/* Coluna 1: Sobre a Demir Diesel */}
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center font-black text-sm">
-                D
-              </div>
-              <span className="font-bold text-lg text-white tracking-tight">
-                DEMIR <span className="text-primary">DIESEL</span>
-              </span>
-            </div>
+            <Link href="/" className="inline-block group" aria-label="Demir Diesel Página Inicial">
+              <Image
+                src="/images/demir-logo-dark.png"
+                alt="Demir Diesel - Injeção Eletrônica a Diesel"
+                width={200}
+                height={77}
+                className="h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+              />
+            </Link>
 
             <p className="text-xs text-slate-400 leading-relaxed">
               Referência regional no fornecimento de peças para motores diesel, componentes de

@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Cpu, Fuel, Wrench, ShieldCheck, MessageCircle, ArrowRight, CheckCircle2 } from "lucide-react";
 import { siteConfig, buildWhatsAppUrl } from "@/lib/site-config";
 
@@ -38,6 +39,7 @@ export function DieselLaboratory() {
           {/* Lado Esquerdo: Conteúdo Institucional */}
           <div className="lg:col-span-6 space-y-6">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-xs text-sky-400 font-semibold font-mono">
+              <Image src="/images/demir-d-icon.png" alt="" width={14} height={14} className="w-3.5 h-3.5 object-contain" />
               <span>DEMIR DIESEL LAB</span>
             </div>
 

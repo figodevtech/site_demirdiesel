@@ -2,6 +2,7 @@
 
 import React, { useState, Suspense } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Mail, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,9 +51,24 @@ function LoginForm() {
   return (
     <div className="w-full max-w-md bg-card rounded-3xl border border-border/80 p-8 shadow-xl">
       <div className="text-center mb-8">
-        {/* Brand Badge */}
-        <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-xl mx-auto mb-4 border border-slate-800 shadow-sm">
-          <span className="text-primary">D</span>
+        {/* Brand Logo */}
+        <div className="flex justify-center mb-6">
+          <Link href="/" className="inline-block transition-transform hover:scale-105" aria-label="Página Inicial Demir Diesel">
+            <Image
+              src="/images/demir-logo.png"
+              alt="Demir Diesel"
+              width={220}
+              height={85}
+              className="h-11 w-auto object-contain dark:hidden"
+            />
+            <Image
+              src="/images/demir-logo-dark.png"
+              alt="Demir Diesel"
+              width={220}
+              height={85}
+              className="h-11 w-auto object-contain hidden dark:block"
+            />
+          </Link>
         </div>
         <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
           Acesse sua Conta

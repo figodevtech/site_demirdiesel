@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { SearchInput } from "@/components/layout/SearchInput";
 import { ShieldCheck, Truck, Wrench, Cpu, ArrowRight } from "lucide-react";
 
@@ -32,8 +33,8 @@ export function HeroSection() {
 
       <div className="container relative z-10 mx-auto px-4 max-w-5xl text-center">
         {/* Badge de Credencial */}
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-300 mb-6 shadow-xs">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs text-slate-300 mb-6 shadow-xs">
+          <Image src="/images/demir-d-icon.png" alt="Demir" width={16} height={16} className="w-4 h-4 object-contain" />
           <span className="font-semibold text-white">Demir Diesel:</span>
           <span>Peças, Eletrônica & Injeção Pesada</span>
         </div>

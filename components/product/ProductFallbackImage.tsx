@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import { Cpu, Cog } from "lucide-react";
 
 interface ProductFallbackImageProps {
@@ -31,10 +32,19 @@ export function ProductFallbackImage({ className = "", category = "" }: ProductF
             <Cog className="w-7 h-7 stroke-[1.5] animate-[spin_12s_linear_infinite]" />
           )}
         </div>
-        <div className="space-y-0.5">
-          <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase block">
-            Demir Diesel
-          </span>
+        <div className="space-y-1 flex flex-col items-center">
+          <div className="flex items-center gap-1.5 opacity-80">
+            <Image
+              src="/images/demir-d-icon.png"
+              alt=""
+              width={14}
+              height={14}
+              className="w-3.5 h-3.5 object-contain"
+            />
+            <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+              Demir Diesel
+            </span>
+          </div>
           <span className="text-[10px] text-slate-400 block font-mono">
             Foto Técnica em Atualização
           </span>

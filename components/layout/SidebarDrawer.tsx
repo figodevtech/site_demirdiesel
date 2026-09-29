@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from "@/components/ui/button";
 import {
     Sheet,
@@ -48,8 +49,23 @@ export default function SidebarDrawer({ categories, onOpenChange }: SidebarProps
                 <div className="sr-only">Menu de Navegação</div>
 
                 <SheetHeader className="p-6 border-b border-border bg-sidebar-accent/50 shrink-0">
-                    <SheetTitle className="text-left text-primary font-bold text-xl">
-                        Demir Diesel
+                    <SheetTitle className="text-left">
+                        <Link href="/" onClick={() => setOpen(false)} className="inline-block py-1" aria-label="Demir Diesel Página Inicial">
+                            <Image
+                                src="/images/demir-logo.png"
+                                alt="Demir Diesel"
+                                width={180}
+                                height={70}
+                                className="h-9 w-auto object-contain dark:hidden"
+                            />
+                            <Image
+                                src="/images/demir-logo-dark.png"
+                                alt="Demir Diesel"
+                                width={180}
+                                height={70}
+                                className="h-9 w-auto object-contain hidden dark:block"
+                            />
+                        </Link>
                     </SheetTitle>
                     <div className="flex items-center gap-3 mt-4">
                         <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground shrink-0">
