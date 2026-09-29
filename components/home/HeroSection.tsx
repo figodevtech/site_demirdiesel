@@ -54,10 +54,11 @@ export function HeroSection() {
 
         {/* Campo de Busca em Destaque no Hero */}
         <div className="mt-8 max-w-2xl mx-auto">
-          <div className="p-2 sm:p-2.5 rounded-2xl bg-slate-900/90 border border-slate-700/80 shadow-2xl backdrop-blur-md">
+          <div className="p-1.5 sm:p-2 rounded-2xl bg-slate-900/90 border border-slate-700/80 shadow-2xl backdrop-blur-md">
             <SearchInput
               placeholder="Busque por peça, módulo, referência ou fabricante..."
-              className="w-full text-base"
+              className="w-full"
+              inputClassName="h-11 sm:h-12 text-sm sm:text-base bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 border-slate-200 dark:border-slate-700 focus:border-primary shadow-xs font-medium"
             />
           </div>
 

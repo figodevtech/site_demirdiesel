@@ -14,6 +14,8 @@ import {
   ExternalLink,
   ChevronRight,
   SlidersHorizontal,
+  MessageCircle,
+  ArrowUpRight,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { PublicProduct } from "@/lib/catalog/types";
 import { ProductFallbackImage } from "@/components/product/ProductFallbackImage";
 import { useCart } from "@/components/providers/CartContext";
+import { buildProductWhatsAppUrl } from "@/lib/site-config";
 
 const SEARCH_SUGGESTIONS = [
   "Módulo ECM",
@@ -125,7 +128,7 @@ function SearchPageContent() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar por peça, código, módulo, bomba..."
-              className="h-11 pl-10 pr-10 text-sm bg-slate-100/80 dark:bg-slate-800/80 rounded-xl border-border/80 focus-visible:ring-primary"
+              className="h-11 pl-10 pr-10 text-sm bg-slate-100/90 dark:bg-slate-800/90 text-slate-900 dark:text-slate-100 font-medium placeholder:text-slate-500 dark:placeholder:text-slate-400 rounded-xl border-border/80 focus-visible:ring-primary"
             />
             {query && (
               <button
@@ -239,13 +242,23 @@ function SearchPageContent() {
                         </span>
                       )}
                       {product.condition === "USADO" && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                          USADO
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-600 text-white shadow-xs">
+                          SEMINOVO
                         </span>
                       )}
                       {product.condition === "RECONDICIONADO" && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-600 text-white shadow-xs">
                           RECONDICIONADO
+                        </span>
+                      )}
+                      {product.condition === "NOVO" && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white shadow-xs">
+                          NOVO
+                        </span>
+                      )}
+                      {!product.isAvailable && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white shadow-xs">
+                          Sem estoque
                         </span>
                       )}
                     </div>
@@ -268,16 +281,23 @@ function SearchPageContent() {
                         <span className="text-xs font-bold text-foreground">
                           {product.formattedPrice}
                         </span>
+                      ) : product.isAvailable ? (
+                        <Link
+                          href={`/produto/${product.slug || product.id}`}
+                          className="text-[11px] font-semibold text-foreground hover:text-primary transition-colors"
+                        >
+                          Consulte Valor
+                        </Link>
                       ) : (
-                        <span className="text-[11px] font-semibold text-primary">
-                          Sob Consulta
+                        <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                          Sem estoque
                         </span>
                       )}
                     </div>
                   </div>
 
                   <div className="shrink-0 flex items-center gap-2">
-                    {product.isAvailable ? (
+                    {product.price > 0 && product.isAvailable ? (
                       <Button
                         size="sm"
                         variant="secondary"
@@ -288,10 +308,21 @@ function SearchPageContent() {
                         <ShoppingBag className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Adicionar</span>
                       </Button>
+                    ) : product.price <= 0 && product.isAvailable ? (
+                      <Link href={`/produto/${product.slug || product.id}`}>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 px-2.5 text-xs font-semibold gap-1 bg-primary hover:bg-primary/90 text-white shadow-xs"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Ver Produto</span>
+                        </Button>
+                      </Link>
                     ) : (
                       <Link href={`/produto/${product.slug || product.id}`}>
                         <Button size="sm" variant="outline" className="h-8 px-2 text-xs">
-                          Consultar
+                          Ver Detalhes
                         </Button>
                       </Link>
                     )}

@@ -77,19 +77,31 @@ export function buildProductWhatsAppUrl(params: {
   title?: string | null;
   reference?: string | null;
   id?: string | number | null;
+  action?: "interesse" | "valor" | "disponibilidade";
 }): string {
   const name = params.title?.trim() || "Item";
   const ref = params.reference?.trim();
   const id = params.id !== undefined && params.id !== null ? String(params.id).trim() : "";
 
-  let msg = `Olá! Tenho interesse no produto ${name}`;
+  let prefix = "Olá! Tenho interesse no produto";
+  let suffix = ". Poderia me ajudar?";
+
+  if (params.action === "valor") {
+    prefix = "Olá! Gostaria de consultar o valor do produto";
+    suffix = ". Poderia me informar o valor e condições de pagamento?";
+  } else if (params.action === "disponibilidade") {
+    prefix = "Olá! Gostaria de consultar a disponibilidade do produto";
+    suffix = ". Poderia me passar a previsão de estoque ou encomenda?";
+  }
+
+  let msg = `${prefix} ${name}`;
   if (ref && ref !== "N/A" && ref !== "-" && ref !== "null" && ref !== "undefined") {
     msg += `, referência ${ref}`;
   }
   if (id && id !== "null" && id !== "undefined") {
     msg += `, código #${id}`;
   }
-  msg += ". Poderia me ajudar?";
+  msg += suffix;
 
   return buildWhatsAppUrl(msg);
 }

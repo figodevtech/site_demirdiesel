@@ -59,38 +59,26 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
           <ProductFallbackImage category={product.categoryName} />
         )}
 
-        {/* Badges superiores */}
+        {/* Badges superiores com alto contraste */}
         <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5 z-10">
           {product.condition === "USADO" ? (
-            <Badge
-              variant="secondary"
-              className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 backdrop-blur-xs"
-            >
-              USADO
-            </Badge>
+            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md bg-amber-600 text-white shadow-xs border border-amber-700/40">
+              SEMINOVO
+            </span>
           ) : product.condition === "RECONDICIONADO" ? (
-            <Badge
-              variant="secondary"
-              className="text-[10px] font-bold px-2 py-0.5 bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-500/20 backdrop-blur-xs"
-            >
+            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md bg-sky-600 text-white shadow-xs border border-sky-700/40">
               RECONDICIONADO
-            </Badge>
+            </span>
           ) : product.condition === "NOVO" ? (
-            <Badge
-              variant="secondary"
-              className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 backdrop-blur-xs"
-            >
+            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md bg-emerald-600 text-white shadow-xs border border-emerald-700/40">
               NOVO
-            </Badge>
+            </span>
           ) : null}
 
           {!product.isAvailable && (
-            <Badge
-              variant="destructive"
-              className="text-[10px] font-medium px-2 py-0.5 bg-rose-600/90 text-white"
-            >
-              Indisponível
-            </Badge>
+            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md bg-rose-600 text-white shadow-xs border border-rose-700/40">
+              Sem estoque
+            </span>
           )}
         </div>
 
@@ -155,20 +143,35 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
                   </span>
                 </>
               ) : (
-                <span className="text-sm font-semibold text-primary block py-1">
+                <Link
+                  href={`/produto/${product.slug || product.id}`}
+                  className="text-xs sm:text-sm font-bold text-foreground hover:text-primary transition-colors py-1 block"
+                >
                   Consulte Valor
-                </span>
+                </Link>
               )}
             </div>
 
-            <span className={`text-[11px] font-medium ${product.isAvailable ? "text-emerald-600" : "text-slate-400"}`}>
-              {product.isAvailable ? `Em estoque` : "Sob consulta"}
+            <span className={`text-[11px] font-medium ${product.isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400 font-semibold"}`}>
+              {product.isAvailable ? `Em estoque` : "Sem estoque"}
             </span>
           </div>
 
           {/* Botões de Ação */}
           <div className="grid grid-cols-1 gap-2">
-            {product.isAvailable ? (
+            {product.price <= 0 && product.isAvailable ? (
+              <Button
+                variant="default"
+                size="sm"
+                asChild
+                className="w-full font-medium h-9 text-xs gap-2 bg-primary hover:bg-primary/90 text-white shadow-xs"
+              >
+                <Link href={`/produto/${product.slug || product.id}`}>
+                  <span>Ver Produto</span>
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </Link>
+              </Button>
+            ) : product.isAvailable ? (
               <Button
                 variant="default"
                 size="sm"

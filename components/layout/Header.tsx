@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { motion } from "motion/react";
 import { MessageCircle, Heart, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "./SearchInput";
@@ -17,6 +19,7 @@ interface HeaderProps {
 }
 
 export function Header({ categories }: HeaderProps) {
+  const pathname = usePathname();
   const [isVisible, setIsVisible] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -47,9 +50,25 @@ export function Header({ categories }: HeaderProps) {
     }
   }, [isSearchActive]);
 
+  // Ao mudar de rota: garante header visível, fecha drawer, zera referências e limpa foco residual
+  useEffect(() => {
+    setIsVisible(true);
+    isVisibleRef.current = true;
+    lastScrollYRef.current = typeof window !== "undefined" ? Math.max(0, window.scrollY) : 0;
+    setIsDrawerOpen(false);
+    setIsSearchActive(false);
+
+    if (
+      document.activeElement instanceof HTMLElement &&
+      headerRef.current?.contains(document.activeElement)
+    ) {
+      document.activeElement.blur();
+    }
+  }, [pathname]);
+
   useEffect(() => {
     let frameId: number | null = null;
-    const TOP_THRESHOLD = 60; // scrollY < 60px -> sempre visível
+    const TOP_THRESHOLD = 50; // scrollY < 50px -> sempre visível
     const DELTA_TOLERANCE = 8; // tolerância para evitar flicker em micro-movimentos e touch
 
     const handleScroll = () => {
@@ -63,7 +82,7 @@ export function Header({ categories }: HeaderProps) {
         const nextIsScrolled = currentScrollY > 10;
         setIsScrolled(nextIsScrolled);
 
-        // 1. Próximo ao topo (< 60px): NUNCA esconder
+        // 1. Próximo ao topo (< 50px): NUNCA esconder
         if (currentScrollY <= TOP_THRESHOLD) {
           if (!isVisibleRef.current) {
             isVisibleRef.current = true;
@@ -74,12 +93,15 @@ export function Header({ categories }: HeaderProps) {
           return;
         }
 
-        // 2. Se houver interação ativa (drawer aberto, busca em uso ou foco no header): manter visível
-        if (
-          isDrawerOpenRef.current ||
-          isSearchActiveRef.current ||
-          (headerRef.current && headerRef.current.contains(document.activeElement))
-        ) {
+        // 2. Se houver interação ativa (drawer aberto, busca em uso ou input focado no header): manter visível
+        const isInputFocused =
+          headerRef.current &&
+          document.activeElement &&
+          (document.activeElement.tagName === "INPUT" ||
+            document.activeElement.tagName === "TEXTAREA") &&
+          headerRef.current.contains(document.activeElement);
+
+        if (isDrawerOpenRef.current || isSearchActiveRef.current || isInputFocused) {
           if (!isVisibleRef.current) {
             isVisibleRef.current = true;
             setIsVisible(true);
@@ -97,7 +119,7 @@ export function Header({ categories }: HeaderProps) {
 
         // 4. Detecção de direção do scroll:
         if (diff > 0) {
-          // Scroll PARA BAIXO -> esconder suavemente
+          // Scroll PARA BAIXO -> subir suavemente
           if (isVisibleRef.current) {
             isVisibleRef.current = false;
             setIsVisible(false);
@@ -115,7 +137,7 @@ export function Header({ categories }: HeaderProps) {
       });
     };
 
-    lastScrollYRef.current = Math.max(0, window.scrollY);
+    lastScrollYRef.current = typeof window !== "undefined" ? Math.max(0, window.scrollY) : 0;
     window.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
@@ -125,14 +147,18 @@ export function Header({ categories }: HeaderProps) {
   }, []);
 
   return (
-    <header
+    <motion.header
       ref={headerRef}
-      onFocusCapture={() => {
-        isVisibleRef.current = true;
-        setIsVisible(true);
+      initial={false}
+      animate={{
+        y: isVisible ? 0 : "-100%",
       }}
-      className={`sticky top-0 z-50 w-full transform transition-[transform,background-color,border-color,box-shadow] duration-300 ease-in-out motion-reduce:transition-none ${
-        isVisible ? "translate-y-0" : "-translate-y-full pointer-events-none"
+      transition={{
+        duration: 0.28,
+        ease: [0.16, 1, 0.3, 1],
+      }}
+      className={`sticky top-0 z-50 w-full ${
+        isVisible ? "pointer-events-auto" : "pointer-events-none"
       } ${
         isScrolled
           ? "bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-border shadow-sm"
@@ -283,7 +309,7 @@ export function Header({ categories }: HeaderProps) {
           </ul>
         </div>
       </nav>
-    </header>
+    </motion.header>
   );
 }
 

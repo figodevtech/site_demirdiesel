@@ -118,7 +118,7 @@ export function ProductFilters({
           {[
             { label: "Todos", value: null },
             { label: "Novo", value: "novo" },
-            { label: "Usado", value: "usado" },
+            { label: "Seminovo", value: "usado" },
             { label: "Revisado", value: "recondicionado" },
           ].map((item) => {
             const isSelected = item.value === null ? !currentCondition : currentCondition === item.value;

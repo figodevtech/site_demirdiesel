@@ -24,10 +24,15 @@ export function ProductActions({ product }: { product: PublicProduct }) {
   const favorited = isInWishlist(product.id);
   const maxStock = Math.max(0, Number(product.stock) || 0);
   const isAvailable = product.isAvailable && maxStock > 0;
+  const hasPrice = product.price > 0;
 
   const handleAddToCart = () => {
     if (!isAvailable) {
-      toast.error("Produto indisponível no momento.");
+      toast.error("Produto sem estoque no momento.");
+      return;
+    }
+    if (!hasPrice) {
+      toast.info("Produto com valor sob consulta. Entre em contato pelo WhatsApp.");
       return;
     }
     addToCart(product, quantity);
@@ -68,7 +73,7 @@ export function ProductActions({ product }: { product: PublicProduct }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4">
-        {isAvailable ? (
+        {isAvailable && hasPrice ? (
           <div className="space-y-3">
             <Label htmlFor="quantity" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Quantidade (Disponível: {maxStock})
@@ -148,25 +153,83 @@ export function ProductActions({ product }: { product: PublicProduct }) {
               </Button>
             </div>
           </div>
+        ) : isAvailable && !hasPrice ? (
+          <div className="space-y-3">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border/80 space-y-1.5">
+              <p className="font-semibold text-foreground text-sm">
+                Valor sob consulta técnica comercial
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Peça disponível em estoque. Fale diretamente com nossa equipe especializada para cotação imediata, condições de faturamento e prazo.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <WhatsAppButton
+                productTitle={product.title}
+                reference={product.reference}
+                productId={product.id}
+                action="valor"
+                variant="default"
+                className="flex-1 h-12 justify-center bg-primary hover:bg-primary/90 text-white font-semibold text-sm shadow-md"
+                label="Consultar Valor"
+              />
+
+              {/* Botão de Favoritos */}
+              <Button
+                size="lg"
+                variant="outline"
+                className={`w-12 h-12 px-0 rounded-xl border border-border/80 transition-colors ${
+                  favorited
+                    ? "bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100 dark:bg-rose-950/30 dark:border-rose-900"
+                    : "hover:bg-slate-100 text-slate-500"
+                }`}
+                onClick={() => toggleWishlist(product.id)}
+                disabled={wishlistLoading}
+                aria-label={favorited ? "Remover dos favoritos" : "Salvar nos favoritos"}
+              >
+                {wishlistLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Heart
+                    className={`w-4 h-4 ${favorited ? "fill-current" : ""}`}
+                  />
+                )}
+              </Button>
+            </div>
+          </div>
         ) : (
           <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
-            <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
-              Peça com disponibilidade sob consulta técnica
+            <p className="font-semibold text-rose-600 dark:text-rose-400 text-sm">
+              Peça atualmente sem estoque imediato
             </p>
             <p className="text-xs text-muted-foreground">
-              Esta peça ou módulo pode ser encomendada ou passar por diagnóstico em nosso laboratório.
+              Consulte nossa equipe especializada pelo WhatsApp para previsão de reposição ou diagnóstico sob encomenda.
             </p>
           </div>
         )}
 
-        {/* Botão Consultivo WhatsApp */}
-        <WhatsAppButton
-          productTitle={product.title}
-          reference={product.reference}
-          productId={product.id}
-          className="w-full h-11 justify-center"
-          label="Consultar Especialista no WhatsApp"
-        />
+        {/* Botão WhatsApp Secundário para produto com preço normal */}
+        {hasPrice && isAvailable && (
+          <WhatsAppButton
+            productTitle={product.title}
+            reference={product.reference}
+            productId={product.id}
+            action="interesse"
+            className="w-full h-11 justify-center"
+            label="Tirar Dúvidas com Especialista no WhatsApp"
+          />
+        )}
+        {!isAvailable && (
+          <WhatsAppButton
+            productTitle={product.title}
+            reference={product.reference}
+            productId={product.id}
+            action="disponibilidade"
+            className="w-full h-11 justify-center"
+            label="Consultar Disponibilidade no WhatsApp"
+          />
+        )}
       </div>
 
       {/* Simulação de Frete & Entrega */}
@@ -219,10 +282,16 @@ export function ProductActions({ product }: { product: PublicProduct }) {
           <div className="min-w-0 flex-1">
             <span className="text-[10px] text-muted-foreground block truncate">{product.title}</span>
             <span className="text-base font-bold text-foreground block">
-              {product.price > 0 ? product.formattedPrice : "Sob Consulta"}
+              {hasPrice ? (
+                product.formattedPrice
+              ) : isAvailable ? (
+                <span className="text-foreground font-bold">Consulte Valor</span>
+              ) : (
+                "Sem Estoque"
+              )}
             </span>
           </div>
-          {isAvailable ? (
+          {hasPrice && isAvailable ? (
             <Button
               size="sm"
               onClick={handleAddToCart}
@@ -235,9 +304,11 @@ export function ProductActions({ product }: { product: PublicProduct }) {
               productTitle={product.title}
               reference={product.reference}
               productId={product.id}
+              action={!hasPrice && isAvailable ? "valor" : "disponibilidade"}
               size="sm"
-              className="h-10 px-3 text-xs"
-              label="Consultar"
+              variant="default"
+              className="h-10 px-4 text-xs bg-primary hover:bg-primary/90 text-white font-semibold"
+              label={!hasPrice && isAvailable ? "Consultar Valor" : "Consultar"}
             />
           )}
         </div>

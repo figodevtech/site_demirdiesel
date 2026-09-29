@@ -6,9 +6,11 @@ import Link from "next/link";
 import { Search, Loader2, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PublicProduct } from "@/lib/catalog/types";
+import { cn } from "@/lib/utils";
 
 interface SearchInputProps {
   className?: string;
+  inputClassName?: string;
   placeholder?: string;
   autoFocus?: boolean;
   onSelectResult?: () => void;
@@ -17,6 +19,7 @@ interface SearchInputProps {
 
 export function SearchInput({
   className = "",
+  inputClassName = "",
   placeholder = "Busque por peça, módulo, referência ou fabricante...",
   autoFocus = false,
   onSelectResult,
@@ -90,7 +93,7 @@ export function SearchInput({
   return (
     <div ref={containerRef} className={`relative w-full ${className}`}>
       <form onSubmit={handleSubmit} className="relative group">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors pointer-events-none" />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 dark:text-slate-400 group-focus-within:text-primary transition-colors pointer-events-none" />
         <Input
           type="search"
           placeholder={placeholder}
@@ -104,7 +107,10 @@ export function SearchInput({
           onBlur={() => {
             setIsFocused(false);
           }}
-          className="w-full pl-10 pr-10 h-10 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm placeholder:text-slate-400"
+          className={cn(
+            "w-full pl-10 pr-10 h-10 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-medium placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-sm",
+            inputClassName
+          )}
         />
         {loading && (
           <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -147,10 +153,10 @@ export function SearchInput({
 
                   <div className="text-right shrink-0">
                     <span className="text-xs font-bold text-foreground block">
-                      {product.price > 0 ? product.formattedPrice : "Sob Consulta"}
+                      {product.price > 0 ? product.formattedPrice : (product.isAvailable ? "Consulte Valor" : "Sem estoque")}
                     </span>
-                    <span className={`text-[10px] ${product.isAvailable ? "text-emerald-600" : "text-slate-400"}`}>
-                      {product.isAvailable ? "Disponível" : "Indisponível"}
+                    <span className={`text-[10px] font-medium ${product.isAvailable ? "text-emerald-600" : "text-rose-600 dark:text-rose-400"}`}>
+                      {product.isAvailable ? "Em estoque" : "Sem estoque"}
                     </span>
                   </div>
                 </button>

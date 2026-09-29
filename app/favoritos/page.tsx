@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, Trash2, ShoppingBag, Loader2, ArrowLeft, Package } from "lucide-react";
+import { Heart, Trash2, ShoppingBag, Loader2, ArrowLeft, Package, ArrowUpRight } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthContext";
 import { useWishlist } from "@/lib/hooks/useWishlist";
 import { useCart } from "@/components/providers/CartContext";
@@ -60,11 +60,13 @@ export default function FavoritosPage() {
 
       const formatted = (data || []).map((item: any) => {
         const p = item.produto;
+        const stock = Number(p?.estoque) || 0;
         return {
           id: String(item.produto_id),
           title: p?.tituloMarketplace || p?.titulo || "Peça Diesel",
           price: Number(p?.precovenda) || 0,
-          stock: Number(p?.estoque) || 0,
+          stock,
+          isAvailable: stock > 0,
           brand: p?.fabricante || null,
           reference: p?.referencia,
           category: p?.produtogrupo?.nome || "Geral",
@@ -87,6 +89,10 @@ export default function FavoritosPage() {
   };
 
   const handleAddToCart = (item: any) => {
+    if (item.price <= 0) {
+      toast.info("Este item é sob consulta. Entre em contato pelo WhatsApp para consultar o valor.");
+      return;
+    }
     addToCart(
       {
         id: item.id,
@@ -184,22 +190,59 @@ export default function FavoritosPage() {
                       Ref: {product.reference}
                     </span>
                   )}
-                  <span className="font-bold text-sm text-foreground block mt-1">
-                    {product.price > 0 ? formatCurrency(product.price) : "Sob Consulta"}
-                  </span>
+                  {product.price > 0 ? (
+                    <span className="font-bold text-sm text-foreground block mt-1">
+                      {formatCurrency(product.price)}
+                    </span>
+                  ) : product.isAvailable ? (
+                    <Link
+                      href={`/produto/${product.id}`}
+                      className="font-bold text-sm text-foreground hover:text-primary transition-colors block mt-1"
+                    >
+                      Consulte Valor
+                    </Link>
+                  ) : (
+                    <span className="font-semibold text-xs text-rose-600 dark:text-rose-400 block mt-1">
+                      Sem estoque
+                    </span>
+                  )}
                 </div>
               </div>
 
               <div className="flex items-center gap-2 pt-2 border-t border-border/50">
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={() => handleAddToCart(product)}
-                  className="flex-1 text-xs font-semibold h-8 rounded-xl gap-1.5"
-                >
-                  <ShoppingBag className="w-3.5 h-3.5" />
-                  <span>Adicionar</span>
-                </Button>
+                {product.price > 0 ? (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => handleAddToCart(product)}
+                    disabled={!product.isAvailable && product.stock <= 0}
+                    className="flex-1 text-xs font-semibold h-8 rounded-xl gap-1.5"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>Adicionar</span>
+                  </Button>
+                ) : product.isAvailable ? (
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="default"
+                    className="flex-1 text-xs font-semibold h-8 rounded-xl gap-1.5 bg-primary hover:bg-primary/90 text-white shadow-xs"
+                  >
+                    <Link href={`/produto/${product.id}`}>
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                      <span>Ver Produto</span>
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled
+                    className="flex-1 text-xs font-semibold h-8 rounded-xl"
+                  >
+                    Indisponível
+                  </Button>
+                )}
 
                 <Button
                   size="sm"

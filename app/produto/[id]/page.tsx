@@ -2,14 +2,14 @@ import React from "react";
 import { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Home, ChevronRight, Check, ShieldCheck, Truck, Wrench } from "lucide-react";
-import { getProductById, getPaginatedProducts } from "@/lib/catalog/products";
+import { Home, ChevronRight, Check, ShieldCheck, Truck, Wrench, MessageCircle } from "lucide-react";
+import { getProductById, getPaginatedProducts, formatProductCondition } from "@/lib/catalog/products";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { ProductActions } from "@/components/product/ProductActions";
 import { ProductCard } from "@/components/product/ProductCard";
 import { Badge } from "@/components/ui/badge";
 
-import { siteConfig } from "@/lib/site-config";
+import { siteConfig, buildProductWhatsAppUrl } from "@/lib/site-config";
 
 interface ProductPageProps {
   params: Promise<{ id: string }>;
@@ -167,17 +167,17 @@ export default async function ProductPage({ params }: ProductPageProps) {
               )}
 
               {product.condition === "USADO" ? (
-                <Badge className="text-xs font-bold px-2 py-0.5 bg-amber-500/10 text-amber-700 border border-amber-500/20">
-                  USADO
-                </Badge>
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-amber-600 text-white shadow-xs border border-amber-700/40">
+                  SEMINOVO
+                </span>
               ) : product.condition === "RECONDICIONADO" ? (
-                <Badge className="text-xs font-bold px-2 py-0.5 bg-sky-500/10 text-sky-700 border border-sky-500/20">
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-sky-600 text-white shadow-xs border border-sky-700/40">
                   RECONDICIONADO
-                </Badge>
+                </span>
               ) : product.condition === "NOVO" ? (
-                <Badge className="text-xs font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-emerald-600 text-white shadow-xs border border-emerald-700/40">
                   NOVO
-                </Badge>
+                </span>
               ) : null}
             </div>
 
@@ -203,8 +203,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   Disponível ({product.stock} un.)
                 </span>
               ) : (
-                <span className="text-slate-400 font-medium">
-                  Sob Consulta / Encomenda
+                <span className="text-rose-600 dark:text-rose-400 font-semibold">
+                  Sem estoque
                 </span>
               )}
             </div>
@@ -226,11 +226,17 @@ export default async function ProductPage({ params }: ProductPageProps) {
               </>
             ) : (
               <div>
-                <span className="text-xl font-bold text-primary block">
-                  Valor sob consulta técnica
-                </span>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Consulte nossa equipe para cotação direta deste módulo ou componente.
+                <a
+                  href={buildProductWhatsAppUrl({ title: product.title, reference: product.reference, id: product.id, action: "valor" })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-xl sm:text-2xl font-bold text-foreground hover:text-primary transition-colors group"
+                >
+                  <MessageCircle className="w-5 h-5 text-primary shrink-0" />
+                  <span>Consulte Valor</span>
+                </a>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Clique para consultar valor, disponibilidade e condições de pagamento diretamente com nossos especialistas.
                 </p>
               </div>
             )}
@@ -282,7 +288,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
               {product.condition && (
                 <div className="p-3 flex justify-between">
                   <span className="text-muted-foreground">Condição</span>
-                  <span className="font-semibold text-foreground">{product.condition}</span>
+                  <span className="font-semibold text-foreground">
+                    {formatProductCondition(product.condition)}
+                  </span>
                 </div>
               )}
               {product.barcode && (

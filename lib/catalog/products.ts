@@ -11,6 +11,7 @@ const PUBLIC_PRODUCT_COLUMNS = `
   descricaoMarketplace,
   precovenda,
   estoque,
+  em_estoque,
   referencia,
   fabricante,
   grupo_produto_id,
@@ -32,6 +33,28 @@ export function formatBrlCurrency(value: number): string {
     style: "currency",
     currency: "BRL",
   }).format(value);
+}
+
+/**
+ * Converte a condição do produto para exibição amigável: "USADO" -> "Seminovo"
+ */
+export function formatProductCondition(condition: ProductCondition | null): string {
+  if (!condition) return "";
+  if (condition === "USADO") return "Seminovo";
+  if (condition === "NOVO") return "Novo";
+  if (condition === "RECONDICIONADO") return "Recondicionado";
+  return condition;
+}
+
+/**
+ * Converte a condição do produto para exibição em badges em caixa alta: "USADO" -> "SEMINOVO"
+ */
+export function formatProductConditionUpper(condition: ProductCondition | null): string {
+  if (!condition) return "";
+  if (condition === "USADO") return "SEMINOVO";
+  if (condition === "NOVO") return "NOVO";
+  if (condition === "RECONDICIONADO") return "RECONDICIONADO";
+  return String(condition).toUpperCase();
 }
 
 /**
@@ -152,7 +175,7 @@ export function mapRowToPublicProduct(row: any, extraImages: string[] = []): Pub
  */
 export async function getFeaturedProducts(limit = 8): Promise<PublicProduct[]> {
   try {
-    // 1. Tenta buscar marcados como destaque=true
+    // 1. Tenta buscar marcados como destaque=true com estoque e com imagem pública válida
     const { data: featuredData } = await supabaseAdmin
       .from("produto")
       .select(PUBLIC_PRODUCT_COLUMNS)
@@ -160,14 +183,18 @@ export async function getFeaturedProducts(limit = 8): Promise<PublicProduct[]> {
       .eq("exibirPdv", true)
       .eq("destaque", true)
       .gt("estoque", 0)
+      .not("imgUrl", "is", null)
+      .neq("imgUrl", "")
       .order("id", { ascending: false })
       .limit(limit);
 
     if (featuredData && featuredData.length > 0) {
-      return featuredData.map((row) => mapRowToPublicProduct(row));
+      return featuredData
+        .filter((row) => row.imgUrl && row.imgUrl.trim())
+        .map((row) => mapRowToPublicProduct(row));
     }
 
-    // 2. Fallback inteligente: produtos recentes, com estoque e com foto
+    // 2. Fallback inteligente: produtos recentes, com estoque e com foto válida
     const { data: fallbackData } = await supabaseAdmin
       .from("produto")
       .select(PUBLIC_PRODUCT_COLUMNS)
@@ -180,19 +207,26 @@ export async function getFeaturedProducts(limit = 8): Promise<PublicProduct[]> {
       .limit(limit);
 
     if (fallbackData && fallbackData.length > 0) {
-      return fallbackData.map((row) => mapRowToPublicProduct(row));
+      return fallbackData
+        .filter((row) => row.imgUrl && row.imgUrl.trim())
+        .map((row) => mapRowToPublicProduct(row));
     }
 
-    // 3. Fallback secundário seguro
+    // 3. Fallback secundário seguro com imagem válida
     const { data: anyData } = await supabaseAdmin
       .from("produto")
       .select(PUBLIC_PRODUCT_COLUMNS)
       .eq("is_deleted", false)
       .eq("exibirPdv", true)
+      .not("imgUrl", "is", null)
+      .neq("imgUrl", "")
+      .order("em_estoque", { ascending: false })
       .order("id", { ascending: false })
       .limit(limit);
 
-    return (anyData || []).map((row) => mapRowToPublicProduct(row));
+    return (anyData || [])
+      .filter((row) => row.imgUrl && row.imgUrl.trim())
+      .map((row) => mapRowToPublicProduct(row));
   } catch (err) {
     console.error("Erro ao carregar produtos em destaque:", err);
     return [];
@@ -202,6 +236,7 @@ export async function getFeaturedProducts(limit = 8): Promise<PublicProduct[]> {
 /**
  * Busca detalhe de um produto por ID ou slug
  * Carrega a galeria completa da tabela produto_imagem ordenada por `ordem`
+ * REGRA 7: Produtos sem imagem principal válida retornam null (404 seguro)
  */
 export async function getProductById(idOrSlug: string): Promise<PublicProduct | null> {
   try {
@@ -219,9 +254,11 @@ export async function getProductById(idOrSlug: string): Promise<PublicProduct | 
       .eq("id", numericId)
       .eq("is_deleted", false)
       .eq("exibirPdv", true)
+      .not("imgUrl", "is", null)
+      .neq("imgUrl", "")
       .single();
 
-    if (productError || !productRow) {
+    if (productError || !productRow || !productRow.imgUrl || !productRow.imgUrl.trim()) {
       return null;
     }
 
@@ -256,7 +293,9 @@ export async function getPaginatedProducts(
       .from("produto")
       .select(PUBLIC_PRODUCT_COLUMNS, { count: "exact" })
       .eq("is_deleted", false)
-      .eq("exibirPdv", true);
+      .eq("exibirPdv", true)
+      .not("imgUrl", "is", null)
+      .neq("imgUrl", "");
 
     // Categoria
     if (options.categoryId) {
@@ -343,7 +382,10 @@ export async function getPaginatedProducts(
       query = query.lte("precovenda", options.maxPrice);
     }
 
-    // Ordenação
+    // REGRA 4: PRODUTOS DISPONÍVEIS (EM ESTOQUE) SEMPRE PRIMEIRO, SEM ESTOQUE POR ÚLTIMO
+    query = query.order("em_estoque", { ascending: false });
+
+    // Ordenação secundária dentro de cada grupo (preserva ordenação escolhida)
     switch (options.sort) {
       case "price_asc":
         query = query.order("precovenda", { ascending: true });
@@ -402,6 +444,8 @@ export async function getAvailableBrands(): Promise<string[]> {
       .select("fabricante")
       .eq("is_deleted", false)
       .eq("exibirPdv", true)
+      .not("imgUrl", "is", null)
+      .neq("imgUrl", "")
       .not("fabricante", "is", null);
 
     if (!data) return [];
@@ -424,6 +468,7 @@ export async function getAvailableBrands(): Promise<string[]> {
 /**
  * Retorna todos os produtos públicos para o sitemap completo, paginando em blocos de 500
  * para não sofrer limitação de 1.000 itens do Supabase/PostgREST e sem carregar colunas pesadas.
+ * Apenas produtos com imagem pública válida são incluídos no sitemap.
  */
 export async function getAllProductsForSitemap(): Promise<Array<{ id: number; slug: string; updatedAt?: string }>> {
   try {
@@ -440,6 +485,8 @@ export async function getAllProductsForSitemap(): Promise<Array<{ id: number; sl
         .select("id, titulo, tituloMarketplace, referencia, updatedat")
         .eq("is_deleted", false)
         .eq("exibirPdv", true)
+        .not("imgUrl", "is", null)
+        .neq("imgUrl", "")
         .order("id", { ascending: true })
         .range(from, to);
 
