@@ -14,9 +14,16 @@ import { useWishlist } from "@/lib/hooks/useWishlist";
 interface ProductCardProps {
   product: PublicProduct;
   priority?: boolean;
+  rank?: number;
+  badgeText?: string;
 }
 
-export function ProductCard({ product, priority = false }: ProductCardProps) {
+export function ProductCard({
+  product,
+  priority = false,
+  rank,
+  badgeText,
+}: ProductCardProps) {
   const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist, loading: wishlistLoading } = useWishlist();
   const [imageError, setImageError] = useState(false);
@@ -51,7 +58,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
             alt={product.title}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-contain p-2 group-hover:scale-105 transition-transform duration-500 ease-out"
+            className="object-contain  p-2 group-hover:scale-105 transition-transform duration-500 ease-out"
             priority={priority}
             onError={() => setImageError(true)}
           />
@@ -60,20 +67,18 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
         )}
 
         {/* Badges superiores com alto contraste */}
-        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5 z-10">
-          {product.condition === "USADO" ? (
-            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md bg-amber-600 text-white shadow-xs border border-amber-700/40">
-              SEMINOVO
+        <div className="absolute top-2.5 left-2.5 flex flex-col items-start gap-1.5 z-10 max-w-[80%]">
+          {rank ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 shadow-sm border border-amber-400/80 uppercase tracking-tight">
+              <span>#{rank} Mais Vendido</span>
             </span>
-          ) : product.condition === "RECONDICIONADO" ? (
-            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md bg-sky-600 text-white shadow-xs border border-sky-700/40">
-              RECONDICIONADO
-            </span>
-          ) : product.condition === "NOVO" ? (
-            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md bg-emerald-600 text-white shadow-xs border border-emerald-700/40">
-              NOVO
+          ) : badgeText ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 shadow-sm border border-amber-400/80 uppercase tracking-tight">
+              {badgeText}
             </span>
           ) : null}
+
+
 
           {!product.isAvailable && (
             <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md bg-rose-600 text-white shadow-xs border border-rose-700/40">
@@ -91,9 +96,8 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
           className="absolute top-2.5 right-2.5 z-10 w-8 h-8 rounded-full bg-white/90 dark:bg-slate-800/90 backdrop-blur-xs border border-border/60 shadow-xs flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"
         >
           <Heart
-            className={`w-4 h-4 transition-transform active:scale-125 ${
-              favorited ? "fill-rose-500 text-rose-500" : ""
-            }`}
+            className={`w-4 h-4 transition-transform active:scale-125 ${favorited ? "fill-rose-500 text-rose-500" : ""
+              }`}
           />
         </button>
       </Link>
@@ -122,6 +126,20 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
               {product.title}
             </h3>
           </Link>
+
+          {product.condition === "USADO" ? (
+            <span className="text-[11px] truncate font-medium uppercase tracking-wider text-slate-500">
+              SEMINOVO
+            </span>
+          ) : product.condition === "RECONDICIONADO" ? (
+            <span className="text-[11px] truncate font-medium uppercase tracking-wider text-slate-500">
+              RECONDICIONADO
+            </span>
+          ) : product.condition === "NOVO" ? (
+            <span className="text-[11px] truncate font-medium uppercase tracking-wider text-slate-500">
+              NOVO
+            </span>
+          ) : null}
 
           {/* Referência Técnica */}
           {product.reference && (

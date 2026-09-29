@@ -106,6 +106,13 @@ export default function SidebarDrawer({ categories, onOpenChange }: SidebarProps
                                 </Button>
                             </Link>
                             
+                            <Link href="/favoritos" onClick={() => setOpen(false)} className="block">
+                                <Button variant="ghost" className="w-full justify-start font-medium text-foreground/80 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 gap-2.5">
+                                    <Heart size={16} className="text-rose-500 fill-rose-500/20" />
+                                    <span>Meus Favoritos</span>
+                                </Button>
+                            </Link>
+                            
                             {categories.map((cat: any) => {
                                 const catName = cat.name || cat.nome || "Categoria";
                                 const catSlug = cat.slug || slugify(catName);

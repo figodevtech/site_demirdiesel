@@ -234,6 +234,84 @@ export async function getFeaturedProducts(limit = 8): Promise<PublicProduct[]> {
 }
 
 /**
+ * Busca os produtos mais vendidos com base nas vendas reais (vendaproduto),
+ * preservando o ranking e priorizando produtos ativos com estoque e imagem.
+ */
+export async function getBestSellerProducts(limit = 8): Promise<PublicProduct[]> {
+  try {
+    // 1. Agrupa vendas da tabela vendaproduto
+    const { data: salesData } = await supabaseAdmin
+      .from("vendaproduto")
+      .select("produtoid, quantidade");
+
+    const salesMap = new Map<number, number>();
+    for (const item of salesData || []) {
+      if (item.produtoid) {
+        salesMap.set(
+          item.produtoid,
+          (salesMap.get(item.produtoid) || 0) + (Number(item.quantidade) || 1)
+        );
+      }
+    }
+
+    const rankedIds = Array.from(salesMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([id]) => id);
+
+    const orderedProducts: PublicProduct[] = [];
+    const usedIds = new Set<string>();
+
+    if (rankedIds.length > 0) {
+      // Busca dados completos dos produtos ranqueados
+      const { data: productsData } = await supabaseAdmin
+        .from("produto")
+        .select(PUBLIC_PRODUCT_COLUMNS)
+        .in("id", rankedIds.slice(0, limit * 5))
+        .eq("is_deleted", false)
+        .eq("exibirPdv", true)
+        .gt("estoque", 0)
+        .not("imgUrl", "is", null)
+        .neq("imgUrl", "");
+
+      const prodMap = new Map((productsData || []).map((p) => [p.id, p]));
+
+      for (const id of rankedIds) {
+        const row = prodMap.get(id);
+        if (row && row.imgUrl && row.imgUrl.trim()) {
+          const product = mapRowToPublicProduct(row);
+          orderedProducts.push(product);
+          usedIds.add(product.id);
+          if (orderedProducts.length >= limit) break;
+        }
+      }
+    }
+
+    // Se já alcançou o limite desejado, retorna
+    if (orderedProducts.length >= limit) {
+      return orderedProducts;
+    }
+
+    // 2. Fallback complementar se houver menos de `limit` produtos com vendas e estoque
+    const fallbackLimit = limit - orderedProducts.length;
+    const fallbackProducts = await getFeaturedProducts(fallbackLimit * 2);
+
+    for (const fb of fallbackProducts) {
+      if (!usedIds.has(fb.id)) {
+        orderedProducts.push(fb);
+        usedIds.add(fb.id);
+        if (orderedProducts.length >= limit) break;
+      }
+    }
+
+    return orderedProducts;
+  } catch (err) {
+    console.error("Erro ao carregar mais vendidos:", err);
+    return getFeaturedProducts(limit);
+  }
+}
+
+
+/**
  * Busca detalhe de um produto por ID ou slug
  * Carrega a galeria completa da tabela produto_imagem ordenada por `ordem`
  * REGRA 7: Produtos sem imagem principal válida retornam null (404 seguro)

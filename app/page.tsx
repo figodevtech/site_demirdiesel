@@ -1,16 +1,20 @@
 import React from "react";
 import { HeroSection } from "@/components/home/HeroSection";
 import { CategoryShortcuts } from "@/components/home/CategoryShortcuts";
+import { BestSellersSection } from "@/components/home/BestSellersSection";
 import { FeaturedSection } from "@/components/home/FeaturedSection";
 import { DieselLaboratory } from "@/components/home/DieselLaboratory";
 import { WorkshopLocation } from "@/components/home/WorkshopLocation";
-import { getFeaturedProducts } from "@/lib/catalog/products";
+import { getFeaturedProducts, getBestSellerProducts } from "@/lib/catalog/products";
 
 // Revalidação periódica do catálogo na Home
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const featuredProducts = await getFeaturedProducts(8);
+  const [featuredProducts, bestSellerProducts] = await Promise.all([
+    getFeaturedProducts(8),
+    getBestSellerProducts(8),
+  ]);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -19,6 +23,9 @@ export default async function HomePage() {
 
       {/* 2. Atalhos das principais linhas diesel */}
       <CategoryShortcuts />
+
+      {/* 2.5 Seção de Mais Vendidos da Demir Diesel */}
+      <BestSellersSection products={bestSellerProducts} />
 
       {/* 3. Vitrine real de peças e módulos */}
       <FeaturedSection products={featuredProducts} />

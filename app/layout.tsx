@@ -51,6 +51,16 @@ export const metadata: Metadata = {
   authors: [{ name: "Demir Diesel" }],
   creator: "Demir Diesel",
   metadataBase: new URL(siteConfig.url),
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+  },
   openGraph: {
     type: "website",
     locale: "pt_BR",
@@ -58,7 +68,23 @@ export const metadata: Metadata = {
     siteName: "Demir Diesel",
     title: "Demir Diesel - Peças, Módulos Eletrônicos & Oficina Especializada",
     description:
-      "Catálogo de peças pesadas, componentes de injeção e módulos eletrônicos diesel para caminhões e frotas.",
+      "Catálogo de peças pesadas, componentes de injeção e módulos eletrônicos diesel para caminhões e frotas. Envio para todo o Brasil.",
+    images: [
+      {
+        url: "/images/og-presentation.png",
+        width: 1200,
+        height: 630,
+        alt: "Demir Diesel - Peças, Módulos Eletrônicos & Oficina Especializada",
+        type: "image/png",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Demir Diesel - Peças, Módulos Eletrônicos & Oficina Especializada",
+    description:
+      "Catálogo de peças pesadas, componentes de injeção e módulos eletrônicos diesel para caminhões e frotas. Envio para todo o Brasil.",
+    images: ["/images/og-presentation.png"],
   },
 };
 
