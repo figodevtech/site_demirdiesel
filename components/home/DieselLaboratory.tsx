@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { Cpu, Fuel, Wrench, ShieldCheck, MessageCircle, ArrowRight, CheckCircle2 } from "lucide-react";
-import { siteConfig, buildWhatsAppUrl } from "@/lib/site-config";
+import { buildWhatsAppUrl } from "@/lib/site-config";
 
 export function DieselLaboratory() {
   const services = [
@@ -28,7 +28,7 @@ export function DieselLaboratory() {
   ];
 
   return (
-    <section className="bg-slate-950 text-white py-16 md:py-24 relative overflow-hidden border-b border-slate-800">
+    <section className="bg-secondary text-white py-16 md:py-24 relative overflow-hidden border-b border-primary/20">
       {/* Detalhes de iluminação técnica */}
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-0 left-10 w-72 h-72 bg-sky-500/10 rounded-full blur-[100px] pointer-events-none" />
@@ -70,7 +70,7 @@ export function DieselLaboratory() {
                 href={buildWhatsAppUrl("Olá, gostaria de consultar o laboratório Demir Diesel sobre um módulo ou bomba.")}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm shadow-lg transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs sm:text-sm shadow-lg transition-colors"
               >
                 <MessageCircle className="w-4 h-4" />
                 <span>Falar com o Laboratório</span>
@@ -93,7 +93,7 @@ export function DieselLaboratory() {
               return (
                 <div
                   key={idx}
-                  className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition-all shadow-md group"
+                  className="group rounded-2xl bg-slate-900/80 p-5 shadow-lg shadow-black/25 transition-all hover:-translate-y-0.5 hover:shadow-xl"
                 >
                   <div className="w-10 h-10 rounded-xl bg-slate-800 text-sky-400 flex items-center justify-center mb-3 group-hover:bg-primary group-hover:text-white transition-colors">
                     <Icon className="w-5 h-5 stroke-[1.75]" />

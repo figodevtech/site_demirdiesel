@@ -14,7 +14,7 @@ export default function TrocasDevolucoesPage() {
     ];
 
     return (
-        <div className="container mx-auto px-4 py-12 max-w-5xl">
+        <div className="container mx-auto max-w-5xl px-4 pb-10 pt-4 md:pt-6">
             <h1 className="text-3xl md:text-4xl font-bold text-secondary mb-3">Trocas e Devoluções</h1>
             <p className="text-muted-foreground mb-8">Regras e procedimentos para trocar ou devolver um produto.</p>
 

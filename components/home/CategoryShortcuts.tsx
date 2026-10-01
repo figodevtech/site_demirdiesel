@@ -13,10 +13,10 @@ export function CategoryShortcuts() {
       <div className="flex items-center justify-between gap-3 mb-3.5 sm:mb-4">
         <div>
           <h2 className="text-base sm:text-lg font-bold text-foreground tracking-tight">
-            Navegue por Categorias
+            Compre por categoria
           </h2>
           <p className="text-xs text-muted-foreground hidden sm:block">
-            Atalhos rápidos para as principais linhas do catálogo
+            Encontre rapidamente a linha que seu veículo precisa
           </p>
         </div>
 
@@ -35,7 +35,7 @@ export function CategoryShortcuts() {
           <Link
             key={cat.slug}
             href={`/produtos?category=${cat.slug}`}
-            className="group relative flex items-end justify-center p-2.5 sm:p-3 rounded-xl overflow-hidden border border-border/70 hover:border-primary/60 shadow-xs transition-all duration-300 shrink-0 w-[115px] sm:w-[130px] md:w-auto h-20 sm:h-24"
+            className="group relative flex h-20 w-[104px] shrink-0 items-end justify-center overflow-hidden rounded-xl p-2.5 shadow-md shadow-slate-900/15 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-24 sm:w-[130px] sm:p-3 md:w-auto"
           >
             {/* Imagem preenchendo o card completamente */}
             <Image

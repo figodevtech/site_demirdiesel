@@ -97,7 +97,7 @@ Não remova nem quebre:
 - contato;
 - APIs existentes;
 - integração de pagamento;
-- webhook Pagar.me;
+- webhook Asaas;
 - autenticação;
 - regras de negócio existentes.
 
@@ -900,7 +900,7 @@ Mantenha resumo do pedido acessível.
 
 Validações devem ser claras.
 
-Nunca altere o webhook Pagar.me ou a lógica financeira apenas para atender ao redesign.
+Nunca altere o webhook Asaas ou a lógica financeira apenas para atender ao redesign.
 
 ---
 

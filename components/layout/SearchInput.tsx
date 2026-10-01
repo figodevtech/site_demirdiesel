@@ -121,7 +121,7 @@ export function SearchInput({
 
       {/* Dropdown de Resultados Rápidos */}
       {isOpen && (results.length > 0 || query.trim().length >= 2) && (
-        <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-slate-900 rounded-xl border border-border shadow-xl z-50 overflow-hidden divide-y divide-border/60 animate-in fade-in-50 zoom-in-95 duration-150">
+        <div className="absolute left-0 right-0 top-full z-50 mt-2 divide-y divide-border/40 overflow-hidden rounded-xl bg-white shadow-xl shadow-slate-900/12 animate-in fade-in-50 zoom-in-95 duration-150 dark:bg-slate-900 dark:shadow-black/35">
           {results.length > 0 ? (
             <div className="py-2 max-h-[360px] overflow-y-auto no-scrollbar">
               <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">

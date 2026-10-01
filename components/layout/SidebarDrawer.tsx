@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from "@/components/ui/button";
 import {
     Sheet,
@@ -9,17 +10,17 @@ import {
     SheetTitle,
     SheetTrigger,
 } from "@/components/ui/sheet";
-import { Menu, User, Package, MapPin, CreditCard, Heart, HelpCircle, LogOut, MessageCircle } from 'lucide-react';
+import { Menu, User, Package, MapPin, Heart, HelpCircle, LogOut, MessageCircle, PackageCheck } from 'lucide-react';
 import { ProdutoGrupo } from '@/lib/types';
-import { slugify } from '@/lib/utils';
+import type { PublicCategory } from '@/lib/catalog/types';
+import { formatCategoryName, slugify } from '@/lib/utils';
 import { buildWhatsAppUrl } from '@/lib/site-config';
-import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 import { useAuth } from "@/components/providers/AuthContext";
 
 interface SidebarProps {
-    categories: ProdutoGrupo[];
+    categories: Array<ProdutoGrupo | PublicCategory>;
     onOpenChange?: (open: boolean) => void;
 }
 
@@ -36,7 +37,7 @@ export default function SidebarDrawer({ categories, onOpenChange }: SidebarProps
     return (
         <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:bg-primary/10">
+                <Button aria-label="Abrir menu principal" variant="ghost" size="icon" className="hover:bg-primary/10">
                     <Menu className="h-6 w-6 text-primary" />
                 </Button>
             </SheetTrigger>
@@ -47,9 +48,16 @@ export default function SidebarDrawer({ categories, onOpenChange }: SidebarProps
             >
                 <div className="sr-only">Menu de Navegação</div>
 
-                <SheetHeader className="p-6 border-b border-border bg-sidebar-accent/50 shrink-0">
-                    <SheetTitle className="text-left text-primary font-bold text-xl">
-                        Demir Diesel
+                <SheetHeader className="p-6 border-b border-primary/20 bg-secondary/[0.035] shrink-0">
+                    <SheetTitle className="text-left">
+                        <Image
+                            src="/brand/demir-logo.avif"
+                            alt="Demir Diesel"
+                            width={256}
+                            height={99}
+                            className="h-auto w-36"
+                            sizes="144px"
+                        />
                     </SheetTitle>
                     <div className="flex items-center gap-3 mt-4">
                         <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground shrink-0">
@@ -102,10 +110,14 @@ export default function SidebarDrawer({ categories, onOpenChange }: SidebarProps
                         <nav className="space-y-1">
                             <Link href="/produtos" onClick={() => setOpen(false)} className="block">
                                 <Button variant="ghost" className="w-full justify-start font-medium text-foreground/80 hover:text-foreground hover:bg-muted/60">
-                                    Todos os Produtos
+                                    <Package size={16} /> Catálogo completo
                                 </Button>
                             </Link>
-                            
+                            <Link href="/produtos?estoque=disponivel" onClick={() => setOpen(false)} className="block">
+                                <Button variant="ghost" className="w-full justify-start gap-2.5 font-medium text-foreground/80 hover:bg-muted/60 hover:text-foreground">
+                                    <PackageCheck size={16} className="text-primary" /> Pronta entrega
+                                </Button>
+                            </Link>
                             <Link href="/favoritos" onClick={() => setOpen(false)} className="block">
                                 <Button variant="ghost" className="w-full justify-start font-medium text-foreground/80 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 gap-2.5">
                                     <Heart size={16} className="text-rose-500 fill-rose-500/20" />
@@ -113,9 +125,10 @@ export default function SidebarDrawer({ categories, onOpenChange }: SidebarProps
                                 </Button>
                             </Link>
                             
-                            {categories.map((cat: any) => {
-                                const catName = cat.name || cat.nome || "Categoria";
-                                const catSlug = cat.slug || slugify(catName);
+                            <div className="px-2 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Departamentos</div>
+                            {categories.map((cat) => {
+                                const catName = formatCategoryName("name" in cat ? cat.name : cat.nome);
+                                const catSlug = "slug" in cat ? cat.slug : slugify(catName);
                                 return (
                                     <Link key={cat.id} href={`/produtos?category=${catSlug}`} onClick={() => setOpen(false)} className="block">
                                         <Button variant="ghost" className="w-full justify-start font-medium text-foreground/80 hover:text-foreground hover:bg-muted/60">
@@ -125,11 +138,6 @@ export default function SidebarDrawer({ categories, onOpenChange }: SidebarProps
                                 );
                             })}
 
-                            <Link href="/ofertas" onClick={() => setOpen(false)} className="block mt-2">
-                                <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 font-medium">
-                                    Ofertas do Dia
-                                </Button>
-                            </Link>
                         </nav>
                     </div>
 
@@ -137,7 +145,7 @@ export default function SidebarDrawer({ categories, onOpenChange }: SidebarProps
                     <div>
                         <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Ajuda</h4>
                         <nav className="space-y-1">
-                            <Link href="/faq" onClick={() => setOpen(false)} className="flex items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors">
+                            <Link href="/duvidas-frequentes" onClick={() => setOpen(false)} className="flex items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors">
                                 <HelpCircle size={16} /> Central de Ajuda
                             </Link>
                             <a

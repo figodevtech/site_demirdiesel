@@ -53,9 +53,9 @@ export function ContactForm() {
                 </div>
             </div>
             <div className="space-y-2">
-                <label className="text-xs font-medium">Título*</label>
+                <label className="text-xs font-medium" htmlFor="contact-subject">Título*</label>
                 <Select value={assunto} onValueChange={setAssunto}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger aria-label="Assunto do contato" className="w-full" id="contact-subject">
                         <SelectValue placeholder="Escolha uma opção" />
                     </SelectTrigger>
                     <SelectContent>

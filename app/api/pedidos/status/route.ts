@@ -108,7 +108,7 @@ export async function GET(request: Request) {
       isPending,
       isCancelled,
       total: Number(order.valortotal) || 0,
-      paymentMethod: order.forma_pagamento || "Pagar.me",
+      paymentMethod: order.forma_pagamento || "Asaas",
       date: order.datavenda || order.createdat,
     });
   } catch (err: any) {

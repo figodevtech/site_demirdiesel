@@ -50,19 +50,36 @@ export default function CarrinhoPage() {
     }
 
     setIsSimulating(true);
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const quote = getShippingEstimate(cleanCep);
-    setShippingInfo({ cep: cleanCep, price: 0, days: 0 });
-    setIsSimulating(false);
-    toast.info(quote.message);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const location = response.ok ? await response.json() : null;
+      const quote = getShippingEstimate(cleanCep, {
+        city: location?.localidade,
+        state: location?.uf,
+      });
+      setShippingInfo({
+        cep: cleanCep,
+        price: 0,
+        days: 0,
+        method: "delivery",
+        pickupEligible: quote.pickupEligible,
+        label: quote.pickupEligible ? "Retirada no local disponível" : "Entrega a calcular",
+      });
+      toast.info(quote.message);
+    } catch {
+      setShippingInfo({ cep: cleanCep, price: 0, days: 0, method: "delivery", label: "Entrega a calcular" });
+      toast.info("O frete será confirmado após a análise do endereço e da cubagem.");
+    } finally {
+      setIsSimulating(false);
+    }
   };
 
   const finalTotal = subtotal;
 
   return (
-    <div className="container mx-auto px-4 py-8 md:py-12 max-w-5xl">
+    <div className="container mx-auto max-w-5xl px-4 pb-8 pt-3 md:pb-10 md:pt-5">
       {/* Header */}
-      <div className="flex items-center justify-between pb-6 mb-8 border-b border-border/80">
+      <div className="mb-8 flex items-center justify-between pb-2">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground flex items-center gap-2.5">
             <ShoppingBag className="w-7 h-7 text-primary" />
@@ -101,7 +118,7 @@ export default function CarrinhoPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Lista de Itens do Carrinho */}
           <div className="lg:col-span-8 space-y-4">
-            <div className="bg-card rounded-2xl border border-border/80 divide-y divide-border/60 overflow-hidden shadow-2xs">
+            <div className="divide-y divide-border/40 overflow-hidden rounded-2xl bg-card shadow-lg shadow-slate-900/8 dark:shadow-black/25">
               {items.map((item) => {
                 const p = item.product;
                 const itemTotal = (Number(p.price) || 0) * item.quantity;
@@ -109,11 +126,11 @@ export default function CarrinhoPage() {
                 return (
                   <div key={p.id} className="p-4 sm:p-5 flex gap-4 items-start sm:items-center">
                     {/* Imagem do Item */}
-                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border/60 overflow-hidden shrink-0 p-1 flex items-center justify-center">
+                    <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-50 p-1 shadow-sm shadow-slate-900/6 dark:bg-slate-900 dark:shadow-black/20 sm:h-24 sm:w-24">
                       {p.image ? (
                         <Image
                           src={p.image}
-                          alt={p.name || p.title}
+                          alt={p.name || p.title || "Produto"}
                           fill
                           sizes="96px"
                           className="object-contain p-1"
@@ -201,7 +218,7 @@ export default function CarrinhoPage() {
             </div>
 
             {/* Simulação de Frete */}
-            <div className="bg-card rounded-2xl border border-border/80 p-5 shadow-2xs space-y-3">
+            <div className="space-y-3 rounded-2xl bg-card p-5 shadow-lg shadow-slate-900/8 dark:shadow-black/25">
               <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
                 <Truck className="w-4 h-4 text-primary" />
                 <span>Simulação de Frete para Entrega</span>
@@ -226,9 +243,9 @@ export default function CarrinhoPage() {
               </div>
               {shippingInfo && (
                 <div className="text-xs text-muted-foreground pt-1 flex items-center justify-between">
-                  <span>Transporte Especializado:</span>
+                  <span>{shippingInfo.pickupEligible ? "Retirada no local" : "Transporte especializado"}:</span>
                   <span className="font-semibold text-primary">
-                    A combinar
+                    {shippingInfo.pickupEligible ? "Disponível e grátis" : "A combinar"}
                   </span>
                 </div>
               )}
@@ -237,7 +254,7 @@ export default function CarrinhoPage() {
 
           {/* Resumo do Pedido */}
           <div className="lg:col-span-4">
-            <div className="sticky top-24 bg-card rounded-2xl border border-border/80 p-6 shadow-2xs space-y-5">
+            <div className="sticky top-24 space-y-5 rounded-2xl bg-card p-6 shadow-xl shadow-slate-900/10 dark:shadow-black/30">
               <h2 className="font-extrabold text-base text-foreground">Resumo do Pedido</h2>
 
               <div className="space-y-3 text-xs divide-y divide-border/60">

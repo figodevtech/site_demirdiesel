@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
-import { MessageCircle, Heart, Sparkles } from "lucide-react";
+import { Boxes, ChevronRight, Headphones, Heart, MessageCircle, PackageCheck, PackageSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SearchInput } from "./SearchInput";
 import SidebarDrawer from "./SidebarDrawer";
 import CartWidget from "./CartWidget";
@@ -13,17 +14,22 @@ import UserWidget from "./UserWidget";
 import { PublicCategory } from "@/lib/catalog/types";
 import { useWishlist } from "@/lib/hooks/useWishlist";
 import { buildWhatsAppUrl } from "@/lib/site-config";
+import { formatCategoryName } from "@/lib/utils";
 
 interface HeaderProps {
   categories: PublicCategory[];
 }
 
+const FALLBACK_CATEGORIES: PublicCategory[] = [
+  { id: -1, name: "Módulos eletrônicos", slug: "modulos", description: null },
+  { id: -2, name: "Injeção e bombas", slug: "injecao", description: null },
+  { id: -3, name: "Componentes de motor", slug: "motor", description: null },
+  { id: -4, name: "Filtros", slug: "filtros", description: null },
+];
+
 export function Header({ categories }: HeaderProps) {
-  const pathname = usePathname();
   const [isVisible, setIsVisible] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isSearchActive, setIsSearchActive] = useState(false);
 
   const { wishlistIds } = useWishlist();
 
@@ -32,39 +38,23 @@ export function Header({ categories }: HeaderProps) {
   const isDrawerOpenRef = useRef(false);
   const isSearchActiveRef = useRef(false);
   const headerRef = useRef<HTMLElement>(null);
+  const storeCategories = categories.length > 0 ? categories : FALLBACK_CATEGORIES;
 
-  // Sincroniza refs para acesso imediato no loop de animação do scroll
-  useEffect(() => {
-    isDrawerOpenRef.current = isDrawerOpen;
-    if (isDrawerOpen) {
+  const handleDrawerOpenChange = (open: boolean) => {
+    isDrawerOpenRef.current = open;
+    if (open) {
       isVisibleRef.current = true;
       setIsVisible(true);
     }
-  }, [isDrawerOpen]);
+  };
 
-  useEffect(() => {
-    isSearchActiveRef.current = isSearchActive;
-    if (isSearchActive) {
+  const handleSearchActiveChange = (active: boolean) => {
+    isSearchActiveRef.current = active;
+    if (active) {
       isVisibleRef.current = true;
       setIsVisible(true);
     }
-  }, [isSearchActive]);
-
-  // Ao mudar de rota: garante header visível, fecha drawer, zera referências e limpa foco residual
-  useEffect(() => {
-    setIsVisible(true);
-    isVisibleRef.current = true;
-    lastScrollYRef.current = typeof window !== "undefined" ? Math.max(0, window.scrollY) : 0;
-    setIsDrawerOpen(false);
-    setIsSearchActive(false);
-
-    if (
-      document.activeElement instanceof HTMLElement &&
-      headerRef.current?.contains(document.activeElement)
-    ) {
-      document.activeElement.blur();
-    }
-  }, [pathname]);
+  };
 
   useEffect(() => {
     let frameId: number | null = null;
@@ -171,36 +161,27 @@ export function Header({ categories }: HeaderProps) {
         <div className="flex items-center gap-3">
           <div className="md:hidden">
             <SidebarDrawer
-              categories={categories as any}
-              onOpenChange={(open) => setIsDrawerOpen(open)}
+              categories={categories}
+              onOpenChange={handleDrawerOpenChange}
             />
           </div>
 
-          <Link href="/" className="flex items-center gap-2.5 group">
-            {/* Símbolo Industrial 'D' */}
-            <div className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-primary text-white flex items-center justify-center font-black text-lg shadow-sm border border-slate-700/50 group-hover:scale-105 transition-transform duration-300">
-              <span className="text-primary dark:text-white">D</span>
-            </div>
-
-            <div className="flex flex-col">
-              <div className="flex items-baseline gap-1">
-                <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white">
-                  DEMIR
-                </span>
-                <span className="font-bold text-xl tracking-tight text-primary">
-                  DIESEL
-                </span>
-              </div>
-              <span className="hidden sm:block text-[9px] font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-400 font-mono -mt-1">
-                Peças & Tecnologia
-              </span>
-            </div>
+          <Link href="/" className="group flex shrink-0 items-center" aria-label="Demir Diesel - início">
+            <Image
+              src="/brand/demir-logo.avif"
+              alt="Demir Diesel"
+              width={256}
+              height={99}
+              priority
+              className="h-auto w-[116px] transition-transform duration-300 group-hover:scale-[1.02] sm:w-[138px]"
+              sizes="(max-width: 640px) 116px, 138px"
+            />
           </Link>
         </div>
 
         {/* Centro: Campo de Busca Desktop em Destaque */}
         <div className="flex-1 max-w-xl mx-4 hidden md:block">
-          <SearchInput onSearchActiveChange={(active) => setIsSearchActive(active)} />
+          <SearchInput onSearchActiveChange={handleSearchActiveChange} />
         </div>
 
         {/* Direita: Ações (WhatsApp Especialista, Favoritos, Usuário, Carrinho) */}
@@ -245,68 +226,48 @@ export function Header({ categories }: HeaderProps) {
       <div className="md:hidden px-4 pb-3">
         <SearchInput
           placeholder="Buscar peça, módulo ou referência..."
-          onSearchActiveChange={(active) => setIsSearchActive(active)}
+          onSearchActiveChange={handleSearchActiveChange}
         />
       </div>
 
-      {/* Menu Secundário Desktop */}
-      <nav className="hidden md:flex border-t border-border/50 bg-slate-50/70 dark:bg-slate-800/40">
-        <div className="container mx-auto px-4">
-          <ul className="flex items-center gap-6 h-10 text-xs font-semibold text-slate-600 dark:text-slate-300 w-full overflow-x-auto no-scrollbar">
-            <li>
-              <Link
-                href="/produtos"
-                className="hover:text-primary transition-colors flex items-center gap-1.5 py-1 text-slate-900 dark:text-white"
-              >
-                <span>Todos os Produtos</span>
-                <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.2 rounded-sm font-mono">
-                  Catálogo
-                </span>
-              </Link>
-            </li>
-            <li className="h-3 w-px bg-border/80 shrink-0" />
-            <li>
-              <Link
-                href="/produtos?category=modulos"
-                className="hover:text-primary transition-colors flex items-center gap-1.5"
-              >
-                <Sparkles className="w-3 h-3 text-primary" />
-                <span>Módulos Eletrônicos</span>
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/produtos?category=injecao"
-                className="hover:text-primary transition-colors"
-              >
-                Injeção & Bombas
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/produtos?category=motor"
-                className="hover:text-primary transition-colors"
-              >
-                Componentes de Motor
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/produtos?category=filtros"
-                className="hover:text-primary transition-colors"
-              >
-                Filtros Racor & Ar
-              </Link>
-            </li>
-            <li className="ml-auto">
-              <Link
-                href="/fale-conosco"
-                className="text-primary hover:underline transition-colors"
-              >
-                Laboratório & Oficina
-              </Link>
-            </li>
-          </ul>
+      <nav aria-label="Navegação da loja" className="hidden border-t border-primary/15 bg-card md:block">
+        <div className="container mx-auto flex h-12 items-center gap-2 px-4">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-9 gap-2 px-3 text-xs font-bold text-foreground/80 data-[state=open]:bg-muted">
+                <Boxes className="size-4" /> Departamentos
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" sideOffset={6} className="w-[680px] rounded-md border-t-2 border-t-primary p-0 shadow-xl">
+              <div className="flex items-center justify-between border-b px-4 py-3">
+                <span className="text-xs font-bold uppercase tracking-wide">Todos os departamentos</span>
+                <Link href="/produtos" className="text-xs font-semibold text-primary hover:underline">Ver todos</Link>
+              </div>
+              <div className="grid max-h-[360px] grid-cols-3 gap-x-2 overflow-y-auto p-2">
+                {storeCategories.map((category) => (
+                  <DropdownMenuItem asChild key={category.id} className="p-0">
+                    <Link href={`/produtos?category=${category.slug}`} className="group flex min-w-0 items-center gap-2 border-b border-border/50 px-3 py-2.5">
+                      <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                      <span className="min-w-0 truncate text-xs font-semibold text-foreground">{formatCategoryName(category.name)}</span>
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap no-scrollbar">
+            <NavLink href="/produtos" icon={<PackageSearch className="size-3.5" />}>Catálogo</NavLink>
+            <NavLink href="/produtos?estoque=disponivel" icon={<PackageCheck className="size-3.5" />}>Pronta entrega</NavLink>
+            {storeCategories.slice(0, 3).map((category) => (
+              <NavLink href={`/produtos?category=${category.slug}`} key={category.id}>{formatCategoryName(category.name)}</NavLink>
+            ))}
+          </div>
+
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <NavLink href="/pedidos" icon={<PackageSearch className="size-3.5" />}>Pedidos</NavLink>
+            <NavLink href="/fale-conosco" icon={<Headphones className="size-3.5" />} emphasis>Atendimento</NavLink>
+          </div>
         </div>
       </nav>
     </motion.header>
@@ -314,3 +275,11 @@ export function Header({ categories }: HeaderProps) {
 }
 
 export default Header;
+
+function NavLink({ href, icon, children, emphasis = false }: { href: string; icon?: React.ReactNode; children: React.ReactNode; emphasis?: boolean }) {
+  return (
+    <Button asChild variant="ghost" size="sm" className={`h-9 gap-1.5 rounded-lg px-3 text-xs font-semibold ${emphasis ? "text-primary" : "text-foreground/75"}`}>
+      <Link href={href}>{icon}{children}</Link>
+    </Button>
+  );
+}

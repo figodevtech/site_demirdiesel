@@ -3,49 +3,74 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 
+export interface CartProduct {
+    id: string;
+    price: number;
+    stock: number;
+    name?: string;
+    title?: string;
+    slug?: string;
+    image?: string;
+    brand?: string | null;
+    category?: string;
+    reference?: string | null;
+}
+
 export type CartItem = {
-    product: any; // usando any para flexibilidade com os tipos atuais
+    product: CartProduct;
     quantity: number;
 };
 
 interface CartContextType {
     items: CartItem[];
-    addToCart: (product: any, quantity: number) => void;
+    addToCart: (product: CartProduct, quantity: number) => void;
     removeFromCart: (productId: string) => void;
     updateQuantity: (productId: string, quantity: number) => void;
     clearCart: () => void;
     totalItems: number;
     subtotal: number;
-    shippingInfo: { cep: string, price: number, days: number } | null;
-    setShippingInfo: (info: { cep: string, price: number, days: number } | null) => void;
+    shippingInfo: ShippingInfo | null;
+    setShippingInfo: (info: ShippingInfo | null) => void;
+}
+
+interface ShippingInfo {
+    cep: string;
+    price: number;
+    days: number;
+    method?: "delivery" | "pickup";
+    label?: string;
+    pickupEligible?: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
     const [items, setItems] = useState<CartItem[]>([]);
-    const [shippingInfo, setShippingInfo] = useState<{ cep: string, price: number, days: number } | null>(null);
+    const [shippingInfo, setShippingInfo] = useState<ShippingInfo | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
 
     // Carrega do localStorage ao montar
     useEffect(() => {
-        const savedCart = localStorage.getItem('demirdiesel-cart');
-        const savedShipping = localStorage.getItem('demirdiesel-shipping');
-        if (savedCart) {
-            try {
-                setItems(JSON.parse(savedCart));
-            } catch (e) {
-                console.error("Failed to parse cart:", e);
+        const timer = window.setTimeout(() => {
+            const savedCart = localStorage.getItem('demirdiesel-cart');
+            const savedShipping = localStorage.getItem('demirdiesel-shipping');
+            if (savedCart) {
+                try {
+                    setItems(JSON.parse(savedCart) as CartItem[]);
+                } catch (e) {
+                    console.error("Failed to parse cart:", e);
+                }
             }
-        }
-        if (savedShipping) {
-            try {
-                setShippingInfo(JSON.parse(savedShipping));
-            } catch (e) {
-                console.error("Failed to parse shipping:", e);
+            if (savedShipping) {
+                try {
+                    setShippingInfo(JSON.parse(savedShipping) as ShippingInfo);
+                } catch (e) {
+                    console.error("Failed to parse shipping:", e);
+                }
             }
-        }
-        setIsLoaded(true);
+            setIsLoaded(true);
+        }, 0);
+        return () => window.clearTimeout(timer);
     }, []);
 
     // Salva no localStorage sempre que items mudar (após o carregamento inicial)
@@ -66,7 +91,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
     }, [shippingInfo, isLoaded]);
 
-    const addToCart = (product: any, quantity: number) => {
+    const addToCart = (product: CartProduct, quantity: number) => {
         const stock = Number(product?.stock ?? 0);
         const q = Math.max(1, Number(quantity) || 1);
 

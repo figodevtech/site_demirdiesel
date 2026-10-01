@@ -2,11 +2,12 @@ import React from "react";
 import { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Home, ChevronRight, Check, ShieldCheck, Truck, Wrench, MessageCircle } from "lucide-react";
+import { Home, ChevronRight, Check, ShieldCheck, Truck, MessageCircle } from "lucide-react";
 import { getProductById, getPaginatedProducts, formatProductCondition } from "@/lib/catalog/products";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { ProductActions } from "@/components/product/ProductActions";
 import { ProductCard } from "@/components/product/ProductCard";
+import { ProductDescription } from "@/components/product/ProductDescription";
 import { Badge } from "@/components/ui/badge";
 
 import { siteConfig, buildProductWhatsAppUrl } from "@/lib/site-config";
@@ -100,7 +101,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6 md:py-10 max-w-6xl">
+    <div className="container mx-auto max-w-6xl px-4 pb-8 pt-3 md:pb-10 md:pt-5">
       {/* Schema.org Structured Data */}
       <script
         type="application/ld+json"
@@ -211,7 +212,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           </div>
 
           {/* Preço Comercial */}
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-border/80 space-y-1">
+          <div className="space-y-1 rounded-2xl bg-slate-50 p-4 shadow-md shadow-slate-900/7 dark:bg-slate-900 dark:shadow-black/25">
             {product.price > 0 ? (
               <>
                 <span className="text-xs text-muted-foreground block font-medium">
@@ -247,11 +248,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
           {/* Selos de Confiança Técnica */}
           <div className="grid grid-cols-2 gap-3 pt-2 text-xs">
-            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border/60">
+            <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-2.5 shadow-sm shadow-slate-900/6 dark:bg-slate-900 dark:shadow-black/20">
               <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
               <span className="text-slate-600 dark:text-slate-300">Garantia Técnica</span>
             </div>
-            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border/60">
+            <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-2.5 shadow-sm shadow-slate-900/6 dark:bg-slate-900 dark:shadow-black/20">
               <Truck className="w-4 h-4 text-primary shrink-0" />
               <span className="text-slate-600 dark:text-slate-300">Envio para Todo Brasil</span>
             </div>
@@ -264,7 +265,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-4 space-y-4">
             <h2 className="text-lg font-bold text-foreground">Especificações Técnicas</h2>
-            <div className="rounded-2xl border border-border/80 divide-y divide-border/60 text-xs bg-card overflow-hidden">
+            <div className="divide-y divide-border/40 overflow-hidden rounded-2xl bg-card text-xs shadow-lg shadow-slate-900/8 dark:shadow-black/25">
               <div className="p-3 flex justify-between">
                 <span className="text-muted-foreground">Código Interno</span>
                 <span className="font-mono font-bold text-foreground">#{product.id}</span>
@@ -302,12 +303,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
             </div>
           </div>
 
-          <div className="lg:col-span-8 space-y-4">
-            <h2 className="text-lg font-bold text-foreground">Descrição do Item</h2>
-            <div className="prose prose-slate dark:prose-invert max-w-none text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap bg-card rounded-2xl border border-border/80 p-6">
-              {product.description ||
-                "Componente diesel profissional de alta durabilidade e precisão técnica. Todos os itens comercializados pela Demir Diesel passam por conferência dimensional e inspeção de integridade antes do envio."}
-            </div>
+          <div className="lg:col-span-8">
+            <ProductDescription description={product.description} />
           </div>
         </div>
       </div>

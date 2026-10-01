@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Heart, ShoppingBag, ArrowUpRight } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PublicProduct } from "@/lib/catalog/types";
 import { ProductFallbackImage } from "./ProductFallbackImage";
@@ -46,11 +45,11 @@ export function ProductCard({
   };
 
   return (
-    <div className="group relative flex flex-col h-full bg-card rounded-xl border border-border/70 hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-slate-900/5 overflow-hidden">
+    <article className="group relative flex h-full flex-col overflow-hidden rounded-xl bg-card shadow-md shadow-slate-900/8 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-slate-900/12 dark:shadow-black/25">
       {/* Imagem do Produto com Proporção Otimizada */}
       <Link
         href={`/produto/${product.slug || product.id}`}
-        className="relative block aspect-square w-full bg-slate-50 dark:bg-slate-900/50 p-4 overflow-hidden border-b border-border/40"
+        className="relative block aspect-square w-full overflow-hidden bg-slate-50 p-2 dark:bg-slate-900/50 sm:p-4"
       >
         {hasValidImage ? (
           <Image
@@ -58,7 +57,7 @@ export function ProductCard({
             alt={product.title}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-contain  p-2 group-hover:scale-105 transition-transform duration-500 ease-out"
+            className="object-contain p-1.5 transition-transform duration-500 ease-out group-hover:scale-105 sm:p-2"
             priority={priority}
             onError={() => setImageError(true)}
           />
@@ -103,10 +102,10 @@ export function ProductCard({
       </Link>
 
       {/* Conteúdo Comercial */}
-      <div className="flex flex-col flex-1 p-4 justify-between gap-3">
+      <div className="flex flex-1 flex-col justify-between gap-2.5 p-3 sm:gap-3 sm:p-4">
         <div className="space-y-1.5">
           {/* Categoria & Fabricante */}
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground gap-2">
+          <div className="flex items-center justify-between gap-1 text-[9px] text-muted-foreground sm:gap-2 sm:text-[11px]">
             <span className="truncate font-medium uppercase tracking-wider text-slate-500">
               {product.categoryName}
             </span>
@@ -122,41 +121,41 @@ export function ProductCard({
             href={`/produto/${product.slug || product.id}`}
             className="block group-hover:text-primary transition-colors"
           >
-            <h3 className="font-semibold text-sm line-clamp-2 text-foreground leading-snug">
+            <h3 className="line-clamp-2 min-h-9 text-xs font-semibold leading-snug text-foreground sm:text-sm">
               {product.title}
             </h3>
           </Link>
 
           {product.condition === "USADO" ? (
-            <span className="text-[11px] truncate font-medium uppercase tracking-wider text-slate-500">
+            <span className="hidden truncate text-[11px] font-medium uppercase tracking-wider text-slate-500 sm:block">
               SEMINOVO
             </span>
           ) : product.condition === "RECONDICIONADO" ? (
-            <span className="text-[11px] truncate font-medium uppercase tracking-wider text-slate-500">
+            <span className="hidden truncate text-[11px] font-medium uppercase tracking-wider text-slate-500 sm:block">
               RECONDICIONADO
             </span>
           ) : product.condition === "NOVO" ? (
-            <span className="text-[11px] truncate font-medium uppercase tracking-wider text-slate-500">
+            <span className="hidden truncate text-[11px] font-medium uppercase tracking-wider text-slate-500 sm:block">
               NOVO
             </span>
           ) : null}
 
           {/* Referência Técnica */}
           {product.reference && (
-            <p className="text-[11px] font-mono text-muted-foreground truncate" title={product.reference}>
+            <p className="truncate font-mono text-[9px] text-muted-foreground sm:text-[11px]" title={product.reference}>
               Ref: <span className="text-slate-700 dark:text-slate-300">{product.reference}</span>
             </p>
           )}
         </div>
 
         {/* Preço e Ação */}
-        <div className="pt-2 border-t border-border/50 space-y-3">
-          <div className="flex items-baseline justify-between gap-2">
+        <div className="space-y-3 rounded-lg bg-muted/30 p-2.5">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
             <div>
               {product.price > 0 ? (
                 <>
                   <span className="text-xs text-muted-foreground block font-medium">À vista</span>
-                  <span className="text-lg font-bold text-foreground tracking-tight">
+                  <span className="text-base font-bold tracking-tight text-foreground sm:text-lg">
                     {product.formattedPrice}
                   </span>
                 </>
@@ -170,7 +169,7 @@ export function ProductCard({
               )}
             </div>
 
-            <span className={`text-[11px] font-medium ${product.isAvailable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400 font-semibold"}`}>
+            <span className={`text-[10px] font-medium sm:text-[11px] ${product.isAvailable ? "text-emerald-700 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400 font-semibold"}`}>
               {product.isAvailable ? `Em estoque` : "Sem estoque"}
             </span>
           </div>
@@ -196,8 +195,9 @@ export function ProductCard({
                 onClick={handleQuickAdd}
                 className="w-full font-medium h-9 text-xs gap-2 bg-primary hover:bg-primary/90 text-white shadow-xs"
               >
-                <ShoppingBag className="w-3.5 h-3.5" />
-                Adicionar ao Carrinho
+                <ShoppingBag className="size-3.5" />
+                <span className="sm:hidden">Adicionar</span>
+                <span className="hidden sm:inline">Adicionar ao carrinho</span>
               </Button>
             ) : (
               <Button
@@ -215,7 +215,7 @@ export function ProductCard({
           </div>
         </div>
       </div>
-    </div>
+    </article>
   );
 }
 

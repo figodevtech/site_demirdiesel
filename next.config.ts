@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: __dirname,
+  },
   images: {
     minimumCacheTTL: 2678400,
     formats: ["image/webp", "image/avif"],

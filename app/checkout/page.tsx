@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthContext";
 import { useCart } from "@/components/providers/CartContext";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,9 +18,11 @@ import {
   ExternalLink,
   Lock,
   ArrowLeft,
+  Store,
+  Info,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { isOrderPaid, isOrderAuthorized } from "@/lib/order-status";
+import { isOrderPaid } from "@/lib/order-status";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -30,6 +31,20 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { isPickupEligible, type DeliveryMethod } from "@/lib/shipping";
+import { siteConfig } from "@/lib/site-config";
+
+interface CustomerAddress {
+  id: number;
+  cep: string;
+  logradouro: string;
+  numero: string;
+  complemento?: string | null;
+  bairro: string;
+  cidade: string;
+  estado: string;
+}
 
 export default function CheckoutPage() {
   const { user, profile, isLoading: authLoading } = useAuth();
@@ -37,7 +52,7 @@ export default function CheckoutPage() {
   const router = useRouter();
 
   // Endereço
-  const [addresses, setAddresses] = useState<any[]>([]);
+  const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [loadingAddresses, setLoadingAddresses] = useState(true);
   const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false);
@@ -52,8 +67,7 @@ export default function CheckoutPage() {
 
   // Pedido e Frete
   const [isProcessing, setIsProcessing] = useState(false);
-  const [shippingPrice, setShippingPrice] = useState<number | null>(null);
-  const [calculatingShipping, setCalculatingShipping] = useState(false);
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>("delivery");
 
   // Pagamento
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
@@ -65,33 +79,7 @@ export default function CheckoutPage() {
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
 
-  // Autenticação inicial
-  useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push("/login?redirect=/checkout");
-      } else if (profile?.id) {
-        fetchAddresses();
-      }
-    }
-  }, [user?.id, profile?.id, authLoading, router]);
-
-  const calculateShipping = async (cepValue: string) => {
-    if (!cepValue) return;
-    setCalculatingShipping(true);
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    setShippingPrice(0);
-    setCalculatingShipping(false);
-  };
-
-  useEffect(() => {
-    if (selectedAddressId && addresses.length > 0) {
-      const addr = addresses.find((a) => a.id === selectedAddressId);
-      if (addr) calculateShipping(addr.cep);
-    }
-  }, [selectedAddressId, addresses]);
-
-  const fetchAddresses = async () => {
+  const fetchAddresses = useCallback(async () => {
     if (!profile?.id) return;
     setLoadingAddresses(true);
     try {
@@ -102,15 +90,38 @@ export default function CheckoutPage() {
         .order("id", { ascending: true });
 
       if (error) throw error;
-      setAddresses(data || []);
-      if (data && data.length > 0 && !selectedAddressId) {
-        setSelectedAddressId(data[0].id);
+      const nextAddresses = (data || []) as CustomerAddress[];
+      setAddresses(nextAddresses);
+      if (nextAddresses.length > 0) {
+        setSelectedAddressId((current) => current ?? nextAddresses[0].id);
       }
     } catch (err) {
       console.error(err);
       toast.error("Erro ao carregar endereços.");
     } finally {
       setLoadingAddresses(false);
+    }
+  }, [profile?.id]);
+
+  // Autenticação inicial
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user?.id) {
+      router.push("/login?redirect=/checkout");
+      return;
+    }
+    if (profile?.id) void fetchAddresses();
+  }, [user?.id, profile?.id, authLoading, router, fetchAddresses]);
+
+  const selectedAddress = addresses.find((address) => address.id === selectedAddressId) ?? null;
+  const pickupEligible = selectedAddress
+    ? isPickupEligible({ city: selectedAddress.cidade, state: selectedAddress.estado })
+    : false;
+
+  const selectAddress = (address: CustomerAddress) => {
+    setSelectedAddressId(address.id);
+    if (!isPickupEligible({ city: address.cidade, state: address.estado })) {
+      setDeliveryMethod("delivery");
     }
   };
 
@@ -277,6 +288,7 @@ export default function CheckoutPage() {
       // Envia somente addressId e lista sanitizada de IDs e quantidades (Regra 1)
       const checkoutData = {
         addressId: selectedAddressId,
+        deliveryMethod,
         items: items.map((it) => ({
           productId: it.product.id,
           quantity: it.quantity,
@@ -312,15 +324,15 @@ export default function CheckoutPage() {
         const top = window.screen.height / 2 - height / 2;
         window.open(
           result.url,
-          "PagarMeCheckout",
+          "AsaasCheckout",
           `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes`
         );
       } else {
         throw new Error("URL de pagamento não retornada.");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error(err.message || "Erro ao processar o pagamento.");
+      toast.error(err instanceof Error ? err.message : "Erro ao processar o pagamento.");
     } finally {
       setIsProcessing(false);
     }
@@ -354,9 +366,9 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 md:py-12 max-w-5xl">
+    <div className="container mx-auto max-w-5xl px-4 pb-8 pt-3 md:pb-10 md:pt-5">
       {/* Top Header Seguro */}
-      <div className="flex items-center justify-between pb-6 mb-8 border-b border-border/80">
+      <div className="mb-8 flex items-center justify-between pb-2">
         <div className="flex items-center gap-3">
           <Link
             href="/carrinho"
@@ -370,7 +382,7 @@ export default function CheckoutPage() {
               <Lock className="w-5 h-5 text-primary" />
               <span>Checkout Seguro</span>
             </h1>
-            <span className="text-[11px] text-muted-foreground">Demir Diesel • Pagar.me</span>
+            <span className="text-[11px] text-muted-foreground">Demir Diesel • Asaas</span>
           </div>
         </div>
 
@@ -384,7 +396,7 @@ export default function CheckoutPage() {
         {/* Lado Esquerdo: Endereço & Pagamento */}
         <div className="lg:col-span-8 space-y-6">
           {/* 1. Endereço de Entrega */}
-          <div className="bg-card rounded-2xl border border-border/80 p-6 shadow-2xs space-y-4">
+          <div className="space-y-4 rounded-2xl bg-card p-6 shadow-lg shadow-slate-900/8 dark:shadow-black/25">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">
@@ -428,7 +440,7 @@ export default function CheckoutPage() {
                   return (
                     <div
                       key={addr.id}
-                      onClick={() => setSelectedAddressId(addr.id)}
+                      onClick={() => selectAddress(addr)}
                       className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-xs relative ${
                         isSelected
                           ? "border-primary bg-primary/5 shadow-2xs"
@@ -463,11 +475,52 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          {/* 2. Aguardando Pagamento ou Gatilho */}
-          <div className="bg-card rounded-2xl border border-border/80 p-6 shadow-2xs space-y-4">
+          {/* 2. Forma de recebimento */}
+          <div className="space-y-4 rounded-2xl bg-card p-6 shadow-lg shadow-slate-900/8 dark:shadow-black/25">
+            <div className="flex items-center gap-2">
+              <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">2</div>
+              <div>
+                <h2 className="text-base font-extrabold text-foreground">Como você quer receber?</h2>
+                <p className="text-xs text-muted-foreground">A disponibilidade considera o endereço selecionado.</p>
+              </div>
+            </div>
+
+            <RadioGroup value={deliveryMethod} onValueChange={(value) => setDeliveryMethod(value as DeliveryMethod)} className="grid gap-3 sm:grid-cols-2">
+              <Label htmlFor="delivery-method" className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition-colors ${deliveryMethod === "delivery" ? "border-primary bg-primary/5" : "border-border/80 hover:border-primary/40"}`}>
+                <RadioGroupItem id="delivery-method" value="delivery" className="mt-0.5" />
+                <span className="grid gap-1">
+                  <span className="flex items-center gap-2 text-sm font-bold"><Truck className="size-4 text-primary" /> Receber no endereço</span>
+                  <span className="text-xs font-normal leading-relaxed text-muted-foreground">Frete e prazo confirmados após análise do pedido.</span>
+                </span>
+              </Label>
+
+              <Label htmlFor="pickup-method" className={`flex items-start gap-3 rounded-xl border-2 p-4 transition-colors ${pickupEligible ? "cursor-pointer" : "cursor-not-allowed opacity-55"} ${deliveryMethod === "pickup" ? "border-primary bg-primary/5" : "border-border/80"}`}>
+                <RadioGroupItem id="pickup-method" value="pickup" disabled={!pickupEligible} className="mt-0.5" />
+                <span className="grid gap-1">
+                  <span className="flex items-center gap-2 text-sm font-bold"><Store className="size-4 text-primary" /> Retirar na Demir Diesel</span>
+                  <span className="text-xs font-normal leading-relaxed text-muted-foreground">Grátis, após a confirmação de que o pedido está pronto.</span>
+                </span>
+              </Label>
+            </RadioGroup>
+
+            {pickupEligible ? (
+              <div className="flex gap-2 rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
+                <MapPin className="mt-0.5 size-4 shrink-0 text-primary" />
+                <span><strong className="text-foreground">Local de retirada:</strong> {siteConfig.address.full}</span>
+              </div>
+            ) : (
+              <div className="flex gap-2 rounded-lg border border-dashed px-3 py-2.5 text-xs text-muted-foreground">
+                <Info className="mt-0.5 size-4 shrink-0" />
+                <span>A retirada é liberada para endereços de João Pessoa, Bayeux, Cabedelo, Conde e Santa Rita.</span>
+              </div>
+            )}
+          </div>
+
+          {/* 3. Aguardando Pagamento ou Gatilho */}
+          <div className="space-y-4 rounded-2xl bg-card p-6 shadow-lg shadow-slate-900/8 dark:shadow-black/25">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">
-                2
+                3
               </div>
               <h2 className="font-extrabold text-base text-foreground">
                 Pagamento Integrado (PIX, Cartão de Crédito ou Boleto)
@@ -483,13 +536,13 @@ export default function CheckoutPage() {
                   Aguardando confirmação do pagamento...
                 </h3>
                 <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                  A tela de pagamento do Pagar.me foi aberta em uma nova janela. Conclua o pagamento por PIX, Cartão ou Boleto.
+                  A tela segura do Asaas foi aberta em uma nova janela. Conclua o pagamento por PIX, cartão ou boleto.
                 </p>
                 <div className="flex flex-wrap gap-2 justify-center pt-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open(paymentUrl, "PagarMeCheckout")}
+                    onClick={() => window.open(paymentUrl, "AsaasCheckout")}
                     className="text-xs gap-1 rounded-xl"
                   >
                     <span>Reabrir Tela de Pagamento</span>
@@ -508,7 +561,7 @@ export default function CheckoutPage() {
             ) : (
               <div className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Ao clicar em <strong>Prosseguir para Pagamento</strong>, você será direcionado ao ambiente seguro da Pagar.me para escolher entre PIX (aprovação imediata), Cartão de Crédito (em até 12x) ou Boleto Bancário.
+                  Ao clicar em <strong>Prosseguir para Pagamento</strong>, você será direcionado ao ambiente seguro do Asaas para escolher entre PIX, cartão de crédito ou boleto bancário.
                 </p>
 
                 <Button
@@ -532,7 +585,7 @@ export default function CheckoutPage() {
 
         {/* Lado Direito: Resumo dos Itens e Valores */}
         <div className="lg:col-span-4">
-          <div className="bg-card rounded-2xl border border-border/80 p-6 shadow-2xs space-y-5 sticky top-24">
+          <div className="sticky top-24 space-y-5 rounded-2xl bg-card p-6 shadow-xl shadow-slate-900/10 dark:shadow-black/30">
             <h2 className="font-extrabold text-base text-foreground">Resumo da Compra</h2>
 
             {/* Lista compacta de itens */}
@@ -563,7 +616,7 @@ export default function CheckoutPage() {
               <div className="flex justify-between text-muted-foreground">
                 <span>Frete</span>
                 <span className="font-semibold text-primary">
-                  A calcular (análise de carga)
+                  {deliveryMethod === "pickup" ? "Retirada grátis" : "A calcular (análise de carga)"}
                 </span>
               </div>
               <div className="flex justify-between items-baseline pt-3 border-t border-border/60 text-base">

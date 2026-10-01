@@ -1,37 +1,63 @@
 "use client";
 
-import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, Rows3 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function ProductSort() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentSort = searchParams.get("sort") || "recent";
+  const currentPageSize = searchParams.get("porPagina") || "20";
 
-  const handleSortChange = (newSort: string) => {
+  function handleSortChange(value: string) {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("sort", newSort);
+    params.set("sort", value);
     params.delete("page");
     router.push(`/produtos?${params.toString()}`);
-  };
+  }
+
+  function handlePageSizeChange(value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("porPagina", value);
+    params.delete("page");
+    router.push(`/produtos?${params.toString()}`);
+  }
 
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
-      <span className="text-muted-foreground hidden sm:inline">Ordenar por:</span>
-      <select
-        value={currentSort}
-        onChange={(e) => handleSortChange(e.target.value)}
-        className="rounded-lg border border-border/80 bg-card px-2.5 py-1.5 text-xs font-medium text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary cursor-pointer"
-        aria-label="Ordenação de produtos"
-      >
-        <option value="recent">Mais Recentes</option>
-        <option value="price_asc">Menor Preço</option>
-        <option value="price_desc">Maior Preço</option>
-        <option value="name_asc">Nome (A - Z)</option>
-        <option value="featured">Destaques</option>
-      </select>
+    <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
+      <div className="flex items-center gap-2">
+        <ArrowUpDown className="size-3.5 text-muted-foreground" />
+        <span className="hidden text-muted-foreground lg:inline">Ordenar:</span>
+        <Select value={currentSort} onValueChange={handleSortChange}>
+          <SelectTrigger className="h-9 w-[148px] rounded-lg text-xs" aria-label="Ordenação de produtos">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="recent">Mais recentes</SelectItem>
+            <SelectItem value="price_asc">Menor preço</SelectItem>
+            <SelectItem value="price_desc">Maior preço</SelectItem>
+            <SelectItem value="name_asc">Nome (A–Z)</SelectItem>
+            <SelectItem value="featured">Destaques</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Rows3 className="size-3.5 text-muted-foreground" />
+        <span className="hidden text-muted-foreground lg:inline">Exibir:</span>
+        <Select value={currentPageSize} onValueChange={handlePageSizeChange}>
+          <SelectTrigger className="h-9 w-[104px] rounded-lg text-xs" aria-label="Quantidade de produtos por página">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="12">12 itens</SelectItem>
+            <SelectItem value="20">20 itens</SelectItem>
+            <SelectItem value="36">36 itens</SelectItem>
+            <SelectItem value="48">48 itens</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }

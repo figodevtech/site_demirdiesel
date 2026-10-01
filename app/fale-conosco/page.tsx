@@ -47,7 +47,7 @@ export default function FaleConoscoPage() {
   ];
 
   return (
-    <div className="container mx-auto px-4 py-8 md:py-14 max-w-5xl">
+    <div className="container mx-auto max-w-5xl px-4 pb-10 pt-4 md:pt-6">
       <div className="mb-8 pb-6 border-b border-border/80">
         <span className="text-xs font-bold uppercase tracking-wider text-primary">
           Atendimento & Suporte Técnico

@@ -15,7 +15,7 @@ export default function PoliticaPrivacidadePage() {
         },
         {
             titulo: 'Pagamentos',
-            texto: 'Pagamentos são processados pelo Pagar.me. Não armazenamos dados completos de cartão; apenas tokens e referências necessários para identificar transações.'
+            texto: 'Pagamentos são processados pelo Asaas. Não armazenamos dados completos de cartão; apenas referências necessárias para identificar e conciliar transações.'
         },
         {
             titulo: 'Segurança',
@@ -32,7 +32,7 @@ export default function PoliticaPrivacidadePage() {
     ];
 
     return (
-        <div className="container mx-auto px-4 py-12 max-w-5xl">
+        <div className="container mx-auto max-w-5xl px-4 pb-10 pt-4 md:pt-6">
             <h1 className="text-3xl md:text-4xl font-bold text-secondary mb-3">Política de Privacidade</h1>
             <p className="text-muted-foreground mb-8">Como tratamos e protegemos seus dados pessoais.</p>
 

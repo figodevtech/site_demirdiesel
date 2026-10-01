@@ -17,3 +17,10 @@ export function slugify(text: string | null | undefined): string {
     .replace(/--+/g, "-");
 }
 
+export function formatCategoryName(value: string | null | undefined): string {
+  const normalized = String(value ?? "").trim().toLocaleLowerCase("pt-BR");
+  if (!normalized) return "";
+
+  return normalized.charAt(0).toLocaleUpperCase("pt-BR") + normalized.slice(1);
+}
+

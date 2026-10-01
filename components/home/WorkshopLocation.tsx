@@ -1,5 +1,5 @@
 import React from "react";
-import { MapPin, Phone, Mail, Clock, MessageCircle } from "lucide-react";
+import { MapPin, Phone, Clock } from "lucide-react";
 import { ContactForm } from "./ContactForm";
 import { siteConfig, buildWhatsAppUrl } from "@/lib/site-config";
 
@@ -23,7 +23,7 @@ export function WorkshopLocation() {
           </div>
 
           <div className="space-y-4 pt-2">
-            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border/80">
+            <div className="flex items-start gap-3.5 rounded-xl bg-slate-50 p-3.5 shadow-sm shadow-slate-900/6 dark:bg-slate-900 dark:shadow-black/20">
               <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                 <MapPin className="w-5 h-5" />
               </div>
@@ -36,7 +36,7 @@ export function WorkshopLocation() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="flex items-start gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border/80">
+              <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-3.5 shadow-sm shadow-slate-900/6 dark:bg-slate-900 dark:shadow-black/20">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                   <Clock className="w-4 h-4" />
                 </div>
@@ -46,7 +46,7 @@ export function WorkshopLocation() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border/80">
+              <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-3.5 shadow-sm shadow-slate-900/6 dark:bg-slate-900 dark:shadow-black/20">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                   <Phone className="w-4 h-4" />
                 </div>
@@ -60,7 +60,7 @@ export function WorkshopLocation() {
                       href={buildWhatsAppUrl("Olá, gostaria de falar com a oficina Demir Diesel.")}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-emerald-600 font-semibold hover:underline block mt-0.5"
+                      className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline block mt-0.5"
                     >
                       {siteConfig.whatsappDisplay || "WhatsApp de Atendimento"}
                     </a>
@@ -75,7 +75,7 @@ export function WorkshopLocation() {
           </div>
 
           {/* Iframe Mapa */}
-          <div className="w-full h-64 rounded-2xl overflow-hidden border border-border/80 shadow-xs relative">
+          <div className="relative h-64 w-full overflow-hidden rounded-2xl shadow-lg shadow-slate-900/10 dark:shadow-black/30">
             <iframe
               src="https://maps.google.com/maps?q=R.+Jorn.+Jo%C3%A3o+Jos%C3%A9+Ramalho,+33+-+Costa+e+Silva,+Jo%C3%A3o+Pessoa+-+PB,+58081-110&t=&z=15&ie=UTF8&iwloc=&output=embed"
               width="100%"
@@ -90,7 +90,7 @@ export function WorkshopLocation() {
         </div>
 
         {/* Lado Direito: Formulário de Contato Rápido */}
-        <div className="lg:col-span-6 bg-card rounded-2xl border border-border/80 p-6 md:p-8 shadow-xs">
+        <div className="rounded-2xl bg-card p-6 shadow-lg shadow-slate-900/8 dark:shadow-black/25 md:p-8 lg:col-span-6">
           <div className="mb-6">
             <h3 className="text-xl font-bold text-foreground">Envie uma Solicitação Técnica</h3>
             <p className="text-xs text-muted-foreground mt-1">

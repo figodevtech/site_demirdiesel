@@ -50,7 +50,7 @@ CREATE OR REPLACE FUNCTION public.fn_criar_pedido_site(
     p_subtotal numeric,
     p_total numeric,
     p_canal text DEFAULT 'ONLINE',
-    p_forma_pagamento text DEFAULT 'Pagar.me'
+    p_forma_pagamento text DEFAULT 'Asaas'
 )
 RETURNS integer
 LANGUAGE plpgsql

@@ -2,15 +2,17 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { siteConfig } from "@/lib/site-config";
+import {
+  AsaasApiError,
+  createAsaasCustomer,
+  createAsaasPayment,
+  findAsaasCustomer,
+} from "@/lib/asaas";
+import { getStorePaymentConfig } from "@/lib/store-payment-config";
+import { isPickupEligible, type DeliveryMethod } from "@/lib/shipping";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const RAW_KEY = process.env.PAGARME_SECRET_KEY || process.env.PAGARME_API_KEY || "";
-const PAGARME_API_KEY = RAW_KEY.trim().replace(/^["']|["']$/g, "");
-const IS_TEST = PAGARME_API_KEY.startsWith("sk_test");
-const BASE_URL = IS_TEST ? "https://sdx-api.pagar.me/core/v5" : "https://api.pagar.me/core/v5";
-const PAGARME_API_URL = `${BASE_URL}/paymentlinks`;
 
 interface RequestItem {
   productId?: number | string;
@@ -65,7 +67,7 @@ export async function POST(request: Request) {
     // Buscar perfil de cliente vinculado ao auth.uid()
     const { data: cliente, error: clienteError } = await supabaseAdmin
       .from("cliente")
-      .select("id, nomerazaosocial, email, cpfcnpj, telefone, user_id")
+      .select("id, nomerazaosocial, email, cpfcnpj, telefone, user_id, asaas_customer_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -93,8 +95,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    const docType = cleanDoc.length === 14 ? "company" : "individual";
-
     const cleanPhone = String(cliente.telefone || "").replace(/\D/g, "");
     if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 11) {
       return NextResponse.json(
@@ -105,9 +105,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    const areaCode = cleanPhone.substring(0, 2);
-    const phoneNumber = cleanPhone.substring(2);
-
     const customerName = String(cliente.nomerazaosocial || "").trim();
     if (!customerName) {
       return NextResponse.json(
@@ -132,6 +129,7 @@ export async function POST(request: Request) {
 
     const body = await request.json().catch(() => ({}));
     const { addressId, items } = body || {};
+    const deliveryMethod: DeliveryMethod = body?.deliveryMethod === "pickup" ? "pickup" : "delivery";
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -166,6 +164,19 @@ export async function POST(request: Request) {
       );
     }
 
+    if (
+      deliveryMethod === "pickup" &&
+      !isPickupEligible({ city: addressRow.cidade, state: addressRow.estado })
+    ) {
+      return NextResponse.json(
+        {
+          error: "RETIRADA_INDISPONIVEL",
+          message: "A retirada no local está disponível somente para João Pessoa e cidades próximas habilitadas.",
+        },
+        { status: 400 },
+      );
+    }
+
     // 3. AGRUPAR PRODUTOS DUPLICADOS ANTES DA VALIDAÇÃO (Prioridade 4)
     // Ex: produto 10 qtd 2 + produto 10 qtd 3 => produto 10 qtd 5
     const consolidatedMap = new Map<number, number>();
@@ -196,7 +207,7 @@ export async function POST(request: Request) {
     // 4. CONSULTA AUTORITATIVA NO BANCO DE DADOS
     const { data: dbProducts, error: dbError } = await supabaseAdmin
       .from("produto")
-      .select("id, titulo, tituloMarketplace, precovenda, estoque, is_deleted, exibirPdv")
+      .select("id, titulo, tituloMarketplace, precovenda, estoque, is_deleted, visible")
       .in("id", uniqueProductIds);
 
     if (dbError) {
@@ -207,7 +218,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const dbProductMap = new Map<number, any>();
+    const dbProductMap = new Map<number, NonNullable<typeof dbProducts>[number]>();
     (dbProducts || []).forEach((p) => dbProductMap.set(p.id, p));
 
     // 5. VALIDA CADA ITEM (existência, exclusão, exibição e estoque agregado)
@@ -236,7 +247,7 @@ export async function POST(request: Request) {
 
       const prodName = (p.tituloMarketplace || p.titulo || `Peça #${p.id}`).trim();
 
-      if (p.is_deleted === true || p.exibirPdv === false) {
+      if (p.is_deleted === true || p.visible === false) {
         return NextResponse.json(
           {
             error: "PRODUTO_INDISPONIVEL",
@@ -291,20 +302,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Configuração de parcelamento
-    const maxInstallments = 12;
-    const minInstallmentCents = 5000; // R$ 50,00
-    const possibleInstallments =
-      Math.min(Math.floor(totalCents / minInstallmentCents), maxInstallments) || 1;
-
-    const installmentsConfig = [];
-    for (let i = 1; i <= possibleInstallments; i++) {
-      installmentsConfig.push({ number: i, total: totalCents });
-    }
-    if (installmentsConfig.length === 0) {
-      installmentsConfig.push({ number: 1, total: totalCents });
-    }
-
     // 7. CRIAÇÃO DE PEDIDO ATÔMICA VIA RPC (Prioridade 3)
     const enderecoSnapshot = {
       id: addressRow.id,
@@ -315,6 +312,9 @@ export async function POST(request: Request) {
       cidade: addressRow.cidade,
       estado: addressRow.estado,
       cep: addressRow.cep,
+      deliveryMethod,
+      deliveryLabel: deliveryMethod === "pickup" ? "Retirada no local" : "Entrega no endereço",
+      pickupAddress: deliveryMethod === "pickup" ? siteConfig.address.full : null,
     };
 
     const orderItemsPayload = validatedItems.map((it) => ({
@@ -333,7 +333,7 @@ export async function POST(request: Request) {
       p_subtotal: serverSubtotal,
       p_total: serverTotal,
       p_canal: "ONLINE",
-      p_forma_pagamento: "Pagar.me",
+      p_forma_pagamento: "Asaas",
     });
 
     if (rpcError || !orderId) {
@@ -347,7 +347,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 8. CRIA O LINK DE PAGAMENTO NO PAGAR.ME SOMENTE APÓS SUCESSO DA TRANSAÇÃO
+    // 8. CRIA A COBRANÇA NO ASAAS SOMENTE APÓS O PEDIDO LOCAL SER REGISTRADO
     // SEGURANÇA: return_url estritamente ancorado na URL oficial configurada do site.
     // Allowlist explícita por ambiente para suportar homologação/desenvolvimento sem permitir domínios arbitrários.
     const configuredBaseUrl = siteConfig.url.replace(/\/+$/, "");
@@ -370,131 +370,141 @@ export async function POST(request: Request) {
 
     const returnUrl = `${safeBaseUrl}/sucesso?orderId=${orderId}`;
 
-    const paymentLinkPayload = {
-      name: `Demir Diesel - Pedido #${orderId}`,
-      type: "order",
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      review_informations: true,
-      items: validatedItems.map((it) => ({
-        amount: Math.round(it.unitPrice * 100),
-        name: it.name.slice(0, 100),
-        quantity: it.quantity,
-        description: it.name.slice(0, 100),
-      })),
-      payment_settings: {
-        accepted_payment_methods: ["credit_card", "pix", "boleto"],
-        credit_card_settings: {
-          operation_type: "auth_and_capture",
-          installments: installmentsConfig,
-        },
-        boleto_settings: {
-          due_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        pix_settings: {
-          expires_in: 3600,
-        },
-      },
-      cart_settings: {
-        return_url: returnUrl,
-        shipping_cost: 0,
-        items: validatedItems.map((it) => ({
-          amount: Math.round(it.unitPrice * 100),
-          name: it.name.slice(0, 100),
-          quantity: it.quantity,
-          default_quantity: it.quantity,
-          description: it.name.slice(0, 100),
-        })),
-      },
-      customer_settings: {
-        name: customerName,
-        email: customerEmail,
-        document: cleanDoc,
-        type: docType,
-        phones: {
-          mobile_phone: {
-            country_code: "55",
-            area_code: areaCode,
-            number: phoneNumber,
-          },
-        },
-      },
-      metadata: {
-        customerId: String(cliente.id),
-        orderId: String(orderId),
-      },
-    };
-
-    if (!PAGARME_API_KEY) {
-      console.error("[checkout] PAGARME_API_KEY / PAGARME_SECRET_KEY não configurada.");
-      return NextResponse.json(
-        {
-          error: "PAGARME_NAO_CONFIGURADO",
-          message: "Gateway de pagamentos não configurado no servidor.",
-          orderId,
-        },
-        { status: 500 }
-      );
-    }
-
-    const basicAuth = Buffer.from(`${PAGARME_API_KEY}:`).toString("base64");
-    const pagarmeRes = await fetch(PAGARME_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "User-Agent": "DemirDiesel/1.0",
-        Authorization: `Basic ${basicAuth}`,
-      },
-      body: JSON.stringify(paymentLinkPayload),
-    });
-
-    const pagarmeRaw = await pagarmeRes.text();
-    let pagarmeData: any = {};
     try {
-      pagarmeData = pagarmeRaw ? JSON.parse(pagarmeRaw) : {};
-    } catch {
-      console.error("[checkout] Resposta não-JSON do Pagar.me:", pagarmeRaw);
-    }
+      const externalCustomerReference = `LOJA-CLIENTE-${cliente.id}`;
+      let asaasCustomerId = String(cliente.asaas_customer_id || "").trim();
 
-    if (!pagarmeRes.ok || !pagarmeData.url) {
-      console.error("[checkout] Erro retornado pelo Pagar.me:", pagarmeRes.status, pagarmeData);
+      if (!asaasCustomerId) {
+        const existingCustomer = await findAsaasCustomer(cleanDoc, externalCustomerReference);
+        const asaasCustomer =
+          existingCustomer ||
+          (await createAsaasCustomer({
+            name: customerName,
+            cpfCnpj: cleanDoc,
+            email: customerEmail,
+            mobilePhone: cleanPhone,
+            address: addressRow.logradouro,
+            addressNumber: addressRow.numero,
+            complement: addressRow.complemento || undefined,
+            province: addressRow.bairro,
+            postalCode: String(addressRow.cep || "").replace(/\D/g, ""),
+            externalReference: externalCustomerReference,
+            notificationDisabled: false,
+          }));
 
-      // REGRA: Se a criação do link do Pagar.me falhar:
-      // - não apagar a venda automaticamente;
-      // - manter status PENDENTE e registrar observação do erro de forma segura;
-      // - permitir recuperação/reprocessamento futuro.
-      try {
-        await supabaseAdmin
-          .from("venda")
-          .update({
-            observacao: `[Pagar.me Erro Link] ${new Date().toISOString()} - ${pagarmeData?.message || "Falha ao gerar link de pagamento"}`,
-            updatedat: new Date().toISOString(),
-          })
-          .eq("id", orderId);
-      } catch (logErr) {
-        console.error("[checkout] Falha ao registrar observação de erro na venda:", logErr);
+        asaasCustomerId = asaasCustomer.id;
+        const { error: customerUpdateError } = await supabaseAdmin
+          .from("cliente")
+          .update({ asaas_customer_id: asaasCustomerId, updatedat: new Date().toISOString() })
+          .eq("id", cliente.id);
+
+        if (customerUpdateError) {
+          throw new Error("Falha ao vincular o cliente local ao cadastro do Asaas.");
+        }
       }
 
+      const paymentConfig = await getStorePaymentConfig();
+      if (!paymentConfig.enabled) {
+        throw new Error("O checkout da loja está temporariamente pausado pela administração.");
+      }
+
+      const commissionPercent = paymentConfig.commissionPercent;
+      const commissionWalletId = paymentConfig.commissionWalletId || "";
+      const splitEnabled =
+        paymentConfig.commissionEnabled &&
+        commissionWalletId.length > 0 &&
+        commissionPercent > 0;
+
+      const paymentPayload: Record<string, unknown> = {
+        customer: asaasCustomerId,
+        billingType: "UNDEFINED",
+        value: Number(serverTotal.toFixed(2)),
+        dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .slice(0, 10),
+        description: `Demir Diesel - Pedido #${orderId}`,
+        externalReference: String(orderId),
+        callback: {
+          successUrl: returnUrl,
+          autoRedirect: true,
+        },
+      };
+
+      if (splitEnabled) {
+        paymentPayload.split = [
+          {
+            walletId: commissionWalletId,
+            percentualValue: Number(commissionPercent.toFixed(4)),
+          },
+        ];
+      }
+
+      const payment = await createAsaasPayment(paymentPayload);
+      if (!payment.id || !payment.invoiceUrl) {
+        throw new Error("O Asaas não retornou a identificação ou a URL da cobrança.");
+      }
+
+      const { error: paymentUpdateError } = await supabaseAdmin
+        .from("venda")
+        .update({
+          payment_provider: "ASAAS",
+          gateway_payment_id: payment.id,
+          gateway_checkout_url: payment.invoiceUrl,
+          gateway_status: payment.status || "PENDING",
+          gateway_due_date: payment.dueDate || null,
+          commission_percent: splitEnabled ? commissionPercent : 0,
+          commission_wallet_id: splitEnabled ? commissionWalletId : null,
+          commission_config_revision: paymentConfig.revision,
+          updatedat: new Date().toISOString(),
+        })
+        .eq("id", orderId);
+
+      if (paymentUpdateError) {
+        throw new Error("Cobrança criada, mas não foi possível conciliá-la com o pedido local.");
+      }
+
+      return NextResponse.json({
+        url: payment.invoiceUrl,
+        orderId,
+        total: serverTotal,
+        subtotal: serverSubtotal,
+      });
+    } catch (paymentError) {
+      const message =
+        paymentError instanceof Error
+          ? paymentError.message
+          : "Falha ao gerar a cobrança no Asaas.";
+
+      console.error("[checkout] Erro ao criar cobrança no Asaas:", paymentError);
+      await supabaseAdmin
+        .from("venda")
+        .update({
+          observacao: `[Asaas Erro Cobrança] ${new Date().toISOString()} - ${message}`,
+          updatedat: new Date().toISOString(),
+        })
+        .eq("id", orderId);
+
+      const status =
+        paymentError instanceof AsaasApiError &&
+        paymentError.status >= 400 &&
+        paymentError.status < 500
+          ? 400
+          : 502;
+
       return NextResponse.json(
         {
-          error: "ERRO_PAGARME",
-          message: pagarmeData.message || "Erro ao gerar link de pagamento junto ao Pagar.me.",
+          error: "ERRO_ASAAS",
+          message,
           orderId,
         },
-        { status: pagarmeRes.status >= 400 && pagarmeRes.status < 500 ? 400 : 502 }
+        { status }
       );
     }
-
-    return NextResponse.json({
-      url: pagarmeData.url,
-      orderId,
-      total: serverTotal,
-      subtotal: serverSubtotal,
-    });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[checkout] Exceção no checkout:", err);
+    const message = err instanceof Error ? err.message : "Erro interno de processamento.";
     return NextResponse.json(
-      { error: "ERRO_INTERNO", message: err.message || "Erro interno de processamento." },
+      { error: "ERRO_INTERNO", message },
       { status: 500 }
     );
   }

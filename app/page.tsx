@@ -19,16 +19,16 @@ export default async function HomePage() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* 1. Hero com busca instantânea e métricas */}
-      <HeroSection />
+      <HeroSection featuredProduct={featuredProducts[0] || bestSellerProducts[0]} />
 
       {/* 2. Atalhos das principais linhas diesel */}
       <CategoryShortcuts />
 
-      {/* 2.5 Seção de Mais Vendidos da Demir Diesel */}
-      <BestSellersSection products={bestSellerProducts} />
-
       {/* 3. Vitrine real de peças e módulos */}
       <FeaturedSection products={featuredProducts} />
+
+      {/* 2.5 Seção de Mais Vendidos da Demir Diesel */}
+      <BestSellersSection products={bestSellerProducts} />
 
       {/* 4. Bloco Institucional do Laboratório & Oficina */}
       <DieselLaboratory />

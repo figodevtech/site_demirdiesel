@@ -24,7 +24,7 @@ export function ProductFallbackImage({ className = "", category = "" }: ProductF
       />
 
       <div className="relative z-10 flex flex-col items-center text-center gap-3">
-        <div className="w-14 h-14 rounded-xl bg-white dark:bg-slate-800 shadow-xs border border-slate-200 dark:border-slate-700 flex items-center justify-center text-primary">
+        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white text-primary shadow-md shadow-slate-900/10 dark:bg-slate-800 dark:shadow-black/30">
           {isModule ? (
             <Cpu className="w-7 h-7 stroke-[1.5]" />
           ) : (

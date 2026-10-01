@@ -4,11 +4,14 @@ import { slugify } from "@/lib/utils";
 
 export async function getCategories(): Promise<PublicCategory[]> {
   try {
-    const { data, error } = await supabaseAdmin
-      .from("produtogrupo")
-      .select("id, nome, descricao, ativo")
-      .eq("ativo", true)
-      .order("nome", { ascending: true });
+    const [{ data, error }, productCounts] = await Promise.all([
+      supabaseAdmin
+        .from("produtogrupo")
+        .select("id, nome, descricao, ativo")
+        .eq("ativo", true)
+        .order("nome", { ascending: true }),
+      getPublishedProductCounts(),
+    ]);
 
     if (error || !data) {
       console.error("Erro ao carregar categorias:", error);
@@ -25,17 +28,43 @@ export async function getCategories(): Promise<PublicCategory[]> {
     ];
 
     return data
-      .filter((cat) => cat.nome && !excludedGroups.includes(cat.nome.trim().toUpperCase()))
+      .filter((cat) => cat.nome && !excludedGroups.includes(cat.nome.trim().toUpperCase()) && (productCounts.get(Number(cat.id)) ?? 0) > 0)
       .map((cat) => ({
         id: cat.id,
         name: cat.nome.trim(),
         slug: slugify(cat.nome),
         description: cat.descricao,
+        productCount: productCounts.get(Number(cat.id)) ?? 0,
       }));
   } catch (err) {
     console.error("Exceção ao buscar categorias:", err);
     return [];
   }
+}
+
+async function getPublishedProductCounts() {
+  const counts = new Map<number, number>();
+  const pageSize = 1000;
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabaseAdmin
+      .from("produto")
+      .select("grupo_produto_id")
+      .eq("is_deleted", false)
+      .eq("visible", true)
+      .not("imgUrl", "is", null)
+      .neq("imgUrl", "")
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+    for (const product of data ?? []) {
+      const groupId = Number(product.grupo_produto_id);
+      if (groupId > 0) counts.set(groupId, (counts.get(groupId) ?? 0) + 1);
+    }
+    if ((data ?? []).length < pageSize) break;
+  }
+
+  return counts;
 }
 
 export async function getCategoryBySlug(slug: string): Promise<PublicCategory | null> {

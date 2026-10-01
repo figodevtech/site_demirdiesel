@@ -21,7 +21,7 @@ export function ProductGallery({ images, productTitle, categoryName = "" }: Prod
   return (
     <div className="flex flex-col gap-4">
       {/* Imagem Principal em Destaque */}
-      <div className="relative aspect-square w-full rounded-2xl bg-white dark:bg-slate-900 border border-border/80 overflow-hidden shadow-xs flex items-center justify-center p-4 md:p-8">
+      <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl bg-white p-4 shadow-lg shadow-slate-900/10 dark:bg-slate-900 dark:shadow-black/30 md:p-8">
         {currentImage && !isCurrentError ? (
           <Image
             src={currentImage}

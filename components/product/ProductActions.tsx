@@ -55,8 +55,12 @@ export function ProductActions({ product }: { product: PublicProduct }) {
     setShippingQuote(null);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      const quote = getShippingEstimate(cleanCep);
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const location = response.ok ? await response.json() : null;
+      const quote = getShippingEstimate(cleanCep, {
+        city: location?.localidade,
+        state: location?.uf,
+      });
       setShippingQuote(quote);
       toast.info(quote.message);
     } catch {
@@ -64,10 +68,6 @@ export function ProductActions({ product }: { product: PublicProduct }) {
     } finally {
       setIsSimulating(false);
     }
-  };
-
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
   };
 
   return (
@@ -155,7 +155,7 @@ export function ProductActions({ product }: { product: PublicProduct }) {
           </div>
         ) : isAvailable && !hasPrice ? (
           <div className="space-y-3">
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border/80 space-y-1.5">
+            <div className="space-y-1.5 rounded-xl bg-slate-50 p-4 shadow-md shadow-slate-900/7 dark:bg-slate-900 dark:shadow-black/25">
               <p className="font-semibold text-foreground text-sm">
                 Valor sob consulta técnica comercial
               </p>
@@ -199,7 +199,7 @@ export function ProductActions({ product }: { product: PublicProduct }) {
             </div>
           </div>
         ) : (
-          <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+          <div className="space-y-2 rounded-xl bg-slate-100 p-4 shadow-md shadow-slate-900/7 dark:bg-slate-800/60 dark:shadow-black/25">
             <p className="font-semibold text-rose-600 dark:text-rose-400 text-sm">
               Peça atualmente sem estoque imediato
             </p>
@@ -227,7 +227,7 @@ export function ProductActions({ product }: { product: PublicProduct }) {
             productId={product.id}
             action="disponibilidade"
             className="w-full h-11 justify-center"
-            label="Consultar Disponibilidade no WhatsApp"
+            label="Perguntar quando chega pelo WhatsApp"
           />
         )}
       </div>
@@ -259,7 +259,7 @@ export function ProductActions({ product }: { product: PublicProduct }) {
         </div>
 
         {shippingQuote && (
-          <div className="rounded-xl border border-border/80 bg-slate-50 dark:bg-slate-900/60 p-3 space-y-2 text-xs">
+          <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-xs shadow-md shadow-slate-900/7 dark:bg-slate-900/60 dark:shadow-black/25">
             <p className="text-[11px] text-muted-foreground font-medium pb-1 border-b border-border/40">
               {shippingQuote.message}
             </p>
@@ -268,6 +268,7 @@ export function ProductActions({ product }: { product: PublicProduct }) {
                 <div>
                   <span className="font-semibold text-foreground block">{res.type}</span>
                   <span className="text-[11px] text-muted-foreground">{res.daysText}</span>
+                  {res.id === "pickup" && <span className="mt-0.5 block text-[10px] text-muted-foreground">{res.description}</span>}
                 </div>
                 <span className="font-bold text-primary">{res.formattedPrice}</span>
               </div>

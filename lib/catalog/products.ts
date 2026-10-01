@@ -18,7 +18,7 @@ const PUBLIC_PRODUCT_COLUMNS = `
   imgUrl,
   conservacao,
   destaque,
-  exibirPdv,
+  visible,
   is_deleted,
   status_estoque,
   codigobarras,
@@ -27,6 +27,27 @@ const PUBLIC_PRODUCT_COLUMNS = `
     nome
   )
 `;
+
+type CatalogRow = {
+  id: number;
+  titulo: string | null;
+  tituloMarketplace: string | null;
+  descricaoMarketplace: string | null;
+  precovenda: number | null;
+  estoque: number | null;
+  referencia: string | null;
+  fabricante: string | null;
+  grupo_produto_id: number | null;
+  imgUrl: string | null;
+  conservacao: string | null;
+  destaque: boolean | null;
+  status_estoque: string | null;
+  codigobarras: string | null;
+  produtogrupo:
+    | { id: number; nome: string }
+    | Array<{ id: number; nome: string }>
+    | null;
+};
 
 export function formatBrlCurrency(value: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -94,7 +115,7 @@ export function generateCommercialDescription(params: {
 }
 
 // Converte row do ERP em DTO seguro e limpo para o frontend
-export function mapRowToPublicProduct(row: any, extraImages: string[] = []): PublicProduct {
+export function mapRowToPublicProduct(row: CatalogRow, extraImages: string[] = []): PublicProduct {
   const title = (
     row.tituloMarketplace ||
     row.titulo ||
@@ -117,7 +138,10 @@ export function mapRowToPublicProduct(row: any, extraImages: string[] = []): Pub
   const price = Number(row.precovenda) || 0;
   const stock = Number(row.estoque) || 0;
 
-  const categoryName = row.produtogrupo?.nome?.trim() || "Geral";
+  const category = Array.isArray(row.produtogrupo)
+    ? row.produtogrupo[0]
+    : row.produtogrupo;
+  const categoryName = category?.nome?.trim() || "Geral";
   const categoryId = row.grupo_produto_id ? Number(row.grupo_produto_id) : null;
   const categorySlug = slugify(categoryName);
 
@@ -154,7 +178,7 @@ export function mapRowToPublicProduct(row: any, extraImages: string[] = []): Pub
     formattedPrice: formatBrlCurrency(price),
     stock,
     isAvailable: stock > 0,
-    statusEstoque: (row.status_estoque as any) || (stock > 0 ? "OK" : "ESGOTADO"),
+    statusEstoque: normalizeStockStatus(row.status_estoque, stock),
     reference: row.referencia ? row.referencia.trim() : null,
     brand,
     condition,
@@ -166,6 +190,16 @@ export function mapRowToPublicProduct(row: any, extraImages: string[] = []): Pub
     images: allImages.length > 0 ? allImages : mainImage ? [mainImage] : [],
     barcode: row.codigobarras || null,
   };
+}
+
+function normalizeStockStatus(
+  value: string | null,
+  stock: number,
+): PublicProduct["statusEstoque"] {
+  if (value === "OK" || value === "BAIXO" || value === "CRITICO" || value === "ESGOTADO") {
+    return value;
+  }
+  return stock > 0 ? "OK" : "ESGOTADO";
 }
 
 /**
@@ -180,7 +214,7 @@ export async function getFeaturedProducts(limit = 8): Promise<PublicProduct[]> {
       .from("produto")
       .select(PUBLIC_PRODUCT_COLUMNS)
       .eq("is_deleted", false)
-      .eq("exibirPdv", true)
+      .eq("visible", true)
       .eq("destaque", true)
       .gt("estoque", 0)
       .not("imgUrl", "is", null)
@@ -199,7 +233,7 @@ export async function getFeaturedProducts(limit = 8): Promise<PublicProduct[]> {
       .from("produto")
       .select(PUBLIC_PRODUCT_COLUMNS)
       .eq("is_deleted", false)
-      .eq("exibirPdv", true)
+      .eq("visible", true)
       .gt("estoque", 0)
       .not("imgUrl", "is", null)
       .neq("imgUrl", "")
@@ -217,7 +251,7 @@ export async function getFeaturedProducts(limit = 8): Promise<PublicProduct[]> {
       .from("produto")
       .select(PUBLIC_PRODUCT_COLUMNS)
       .eq("is_deleted", false)
-      .eq("exibirPdv", true)
+      .eq("visible", true)
       .not("imgUrl", "is", null)
       .neq("imgUrl", "")
       .order("em_estoque", { ascending: false })
@@ -268,7 +302,7 @@ export async function getBestSellerProducts(limit = 8): Promise<PublicProduct[]>
         .select(PUBLIC_PRODUCT_COLUMNS)
         .in("id", rankedIds.slice(0, limit * 5))
         .eq("is_deleted", false)
-        .eq("exibirPdv", true)
+        .eq("visible", true)
         .gt("estoque", 0)
         .not("imgUrl", "is", null)
         .neq("imgUrl", "");
@@ -314,7 +348,7 @@ export async function getBestSellerProducts(limit = 8): Promise<PublicProduct[]>
 /**
  * Busca detalhe de um produto por ID ou slug
  * Carrega a galeria completa da tabela produto_imagem ordenada por `ordem`
- * REGRA 7: Produtos sem imagem principal válida retornam null (404 seguro)
+ * Produtos sem imagem principal não são expostos na loja.
  */
 export async function getProductById(idOrSlug: string): Promise<PublicProduct | null> {
   try {
@@ -331,7 +365,7 @@ export async function getProductById(idOrSlug: string): Promise<PublicProduct | 
       .select(PUBLIC_PRODUCT_COLUMNS)
       .eq("id", numericId)
       .eq("is_deleted", false)
-      .eq("exibirPdv", true)
+      .eq("visible", true)
       .not("imgUrl", "is", null)
       .neq("imgUrl", "")
       .single();
@@ -371,7 +405,7 @@ export async function getPaginatedProducts(
       .from("produto")
       .select(PUBLIC_PRODUCT_COLUMNS, { count: "exact" })
       .eq("is_deleted", false)
-      .eq("exibirPdv", true)
+      .eq("visible", true)
       .not("imgUrl", "is", null)
       .neq("imgUrl", "");
 
@@ -521,7 +555,7 @@ export async function getAvailableBrands(): Promise<string[]> {
       .from("produto")
       .select("fabricante")
       .eq("is_deleted", false)
-      .eq("exibirPdv", true)
+      .eq("visible", true)
       .not("imgUrl", "is", null)
       .neq("imgUrl", "")
       .not("fabricante", "is", null);
@@ -540,6 +574,38 @@ export async function getAvailableBrands(): Promise<string[]> {
   } catch (err) {
     console.error("Erro ao buscar marcas:", err);
     return [];
+  }
+}
+
+export async function getAvailablePriceRange(): Promise<{ min: number; max: number }> {
+  try {
+    const baseFilters = (ascending: boolean) =>
+      supabaseAdmin
+        .from("produto")
+        .select("precovenda")
+        .eq("is_deleted", false)
+        .eq("visible", true)
+        .not("imgUrl", "is", null)
+        .neq("imgUrl", "")
+        .gte("precovenda", 0)
+        .order("precovenda", { ascending })
+        .limit(1)
+        .maybeSingle();
+
+    const [minimumResult, maximumResult] = await Promise.all([
+      baseFilters(true),
+      baseFilters(false),
+    ]);
+
+    if (minimumResult.error) throw minimumResult.error;
+    if (maximumResult.error) throw maximumResult.error;
+
+    const min = Math.max(0, Math.floor(Number(minimumResult.data?.precovenda ?? 0)));
+    const max = Math.max(min + 1, Math.ceil(Number(maximumResult.data?.precovenda ?? 1000)));
+    return { min, max };
+  } catch (error) {
+    console.error("Erro ao buscar faixa de preço:", error);
+    return { min: 0, max: 10000 };
   }
 }
 
@@ -562,7 +628,7 @@ export async function getAllProductsForSitemap(): Promise<Array<{ id: number; sl
         .from("produto")
         .select("id, titulo, tituloMarketplace, referencia, updatedat")
         .eq("is_deleted", false)
-        .eq("exibirPdv", true)
+        .eq("visible", true)
         .not("imgUrl", "is", null)
         .neq("imgUrl", "")
         .order("id", { ascending: true })

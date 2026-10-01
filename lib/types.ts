@@ -9,7 +9,7 @@ export interface Produto {
     precocusto: number | null;
     estoqueatual: number;
     estoqueminimo: number;
-    exibirPdv: boolean;
+    visible: boolean;
     ncm: string | null;
     marca: string | null;
     localizacao: string | null;

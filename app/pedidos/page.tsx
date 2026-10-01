@@ -138,9 +138,9 @@ export default function PedidosPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 md:py-12 max-w-5xl">
+    <div className="container mx-auto max-w-5xl px-4 pb-8 pt-3 md:pb-10 md:pt-5">
       {/* Header */}
-      <div className="flex items-center justify-between pb-6 mb-8 border-b border-border/80">
+      <div className="mb-8 flex items-center justify-between pb-2">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground flex items-center gap-2.5">
             <Package className="w-7 h-7 text-primary" />
@@ -196,7 +196,7 @@ export default function PedidosPage() {
             return (
               <div
                 key={order.id}
-                className="bg-card rounded-2xl border border-border/80 overflow-hidden shadow-2xs transition-all"
+                className="overflow-hidden rounded-2xl bg-card shadow-lg shadow-slate-900/8 transition-all dark:shadow-black/25"
               >
                 {/* Header do Card de Pedido */}
                 <div

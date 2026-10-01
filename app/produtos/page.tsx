@@ -2,13 +2,15 @@ import React from "react";
 import Link from "next/link";
 import { SlidersHorizontal, Package, Home, ChevronRight } from "lucide-react";
 import { getCategories } from "@/lib/catalog/categories";
-import { getPaginatedProducts, getAvailableBrands } from "@/lib/catalog/products";
+import { getPaginatedProducts, getAvailableBrands, getAvailablePriceRange } from "@/lib/catalog/products";
 import { ProductCard } from "@/components/product/ProductCard";
 import { ProductFilters } from "@/components/products/ProductFilters";
 import { ProductSort } from "@/components/products/ProductSort";
 import { ProductPagination } from "@/components/products/ProductPagination";
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import type { ProductFilterOptions } from "@/lib/catalog/types";
 
 interface ProductsPageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -22,29 +24,36 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const brand = typeof params.marca === "string" ? params.marca : undefined;
   const condition = typeof params.condicao === "string" ? params.condicao : undefined;
   const inStockOnly = params.estoque === "disponivel";
-  const sort = typeof params.sort === "string" ? (params.sort as any) : "recent";
+  const minPrice = parseOptionalNumber(params.precoMin);
+  const maxPrice = parseOptionalNumber(params.precoMax);
+  const sort = parseSort(params.sort);
   const page = typeof params.page === "string" ? parseInt(params.page, 10) : 1;
+  const pageSize = parsePageSize(params.porPagina);
 
-  const [categories, availableBrands, paginatedResult] = await Promise.all([
+  const [categories, availableBrands, priceRange, paginatedResult] = await Promise.all([
     getCategories(),
     getAvailableBrands(),
+    getAvailablePriceRange(),
     getPaginatedProducts({
       query,
       categorySlug,
       brand,
       condition,
       inStockOnly,
+      minPrice,
+      maxPrice,
       sort,
       page,
-      pageSize: 20,
+      pageSize,
     }),
   ]);
 
   const { products, totalCount, totalPages } = paginatedResult;
   const activeCategoryName = categories.find((c) => c.slug === categorySlug)?.name;
+  const activeFilterCount = [categorySlug, brand, condition, inStockOnly, minPrice != null, maxPrice != null].filter(Boolean).length;
 
   return (
-    <div className="container mx-auto px-4 py-6 md:py-10">
+    <div className="container mx-auto px-4 pb-8 pt-3 md:pb-10 md:pt-5">
       {/* Breadcrumbs discretos */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-4">
         <Link href="/" className="hover:text-foreground flex items-center gap-1">
@@ -87,7 +96,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </div>
 
         {/* Controles: Ordenação & Botão Mobile de Filtros */}
-        <div className="flex items-center justify-between sm:justify-end gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
           <ProductSort />
 
           {/* Gatilho dos Filtros no Mobile (Drawer) */}
@@ -96,20 +105,23 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               <Button
                 variant="outline"
                 size="sm"
-                className="md:hidden flex items-center gap-2 rounded-xl text-xs h-9"
+                className="flex h-9 items-center gap-2 rounded-xl text-xs md:hidden"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
                 <span>Filtros</span>
+                {activeFilterCount > 0 && <Badge className="size-5 justify-center rounded-full p-0 text-[10px]">{activeFilterCount}</Badge>}
               </Button>
             </SheetTrigger>
-            <SheetContent side="bottom" className="h-[80vh] rounded-t-3xl p-6">
-              <SheetHeader className="text-left pb-4 border-b border-border">
-                <SheetTitle className="text-base font-bold">Filtros do Catálogo</SheetTitle>
+            <SheetContent side="right" className="w-[92vw] overflow-hidden p-0 sm:max-w-sm">
+              <SheetHeader className="border-b bg-muted/30 p-5 text-left">
+                <SheetTitle className="text-base font-bold">Filtros do catálogo</SheetTitle>
+                <SheetDescription>Escolha uma ou mais opções para encontrar a peça certa.</SheetDescription>
               </SheetHeader>
-              <div className="overflow-y-auto max-h-[calc(80vh-80px)] pt-4 pb-12">
+              <div className="h-[calc(100dvh-105px)] overflow-y-auto p-5 pb-12">
                 <ProductFilters
                   categories={categories}
                   availableBrands={availableBrands}
+                  priceBounds={priceRange}
                 />
               </div>
             </SheetContent>
@@ -120,10 +132,11 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       {/* Layout com Sidebar Desktop e Grid Principal */}
       <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-8 items-start">
         {/* Sidebar Desktop de Filtros */}
-        <aside className="hidden md:block sticky top-24 bg-card rounded-2xl border border-border/80 p-5 shadow-2xs">
+        <aside className="sticky top-28 hidden max-h-[calc(100dvh-8rem)] overflow-y-auto overscroll-contain pr-1 md:block">
           <ProductFilters
             categories={categories}
             availableBrands={availableBrands}
+            priceBounds={priceRange}
           />
         </aside>
 
@@ -161,4 +174,26 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       </div>
     </div>
   );
+}
+
+function parseOptionalNumber(value: string | string[] | undefined) {
+  if (typeof value !== "string" || value.trim() === "") return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : undefined;
+}
+
+function parseSort(value: string | string[] | undefined): ProductFilterOptions["sort"] {
+  const valid = ["recent", "price_asc", "price_desc", "name_asc", "featured"] as const;
+  return typeof value === "string" && valid.includes(value as (typeof valid)[number])
+    ? (value as (typeof valid)[number])
+    : "recent";
+}
+
+function parsePageSize(value: string | string[] | undefined) {
+  const allowedPageSizes = [12, 20, 36, 48] as const;
+  const parsedValue = typeof value === "string" ? Number(value) : 20;
+
+  return allowedPageSizes.includes(parsedValue as (typeof allowedPageSizes)[number])
+    ? parsedValue
+    : 20;
 }
