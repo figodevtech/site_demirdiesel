@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { Boxes, ChevronRight, Headphones, Heart, MessageCircle, PackageCheck, PackageSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,9 @@ export function Header({ categories }: HeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false);
 
   const { wishlistIds } = useWishlist();
+  const pathname = usePathname();
+  // A tela /buscar tem barra de busca própria no mobile (padrão de app); o header só aparece no desktop.
+  const hideOnMobile = pathname === "/buscar";
 
   const lastScrollYRef = useRef(0);
   const isVisibleRef = useRef(true);
@@ -147,7 +151,7 @@ export function Header({ categories }: HeaderProps) {
         duration: 0.28,
         ease: [0.16, 1, 0.3, 1],
       }}
-      className={`sticky top-0 z-50 w-full pt-[env(safe-area-inset-top,0px)] ${
+      className={`sticky top-0 z-50 w-full pt-[env(safe-area-inset-top,0px)] ${hideOnMobile ? "max-md:hidden" : ""} ${
         isVisible ? "pointer-events-auto" : "pointer-events-none"
       } ${
         isScrolled
@@ -222,8 +226,8 @@ export function Header({ categories }: HeaderProps) {
         </div>
       </div>
 
-      {/* Barra de Busca no Mobile */}
-      <div className="md:hidden px-4 pb-3">
+      {/* Barra de Busca no Mobile (na home o hero já traz a busca em destaque) */}
+      <div className={pathname === "/" ? "hidden" : "md:hidden px-4 pb-3"}>
         <SearchInput
           placeholder="Buscar peça, módulo ou referência..."
           onSearchActiveChange={handleSearchActiveChange}

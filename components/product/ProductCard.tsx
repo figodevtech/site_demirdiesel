@@ -3,13 +3,13 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, Plus, ShoppingCart } from "lucide-react";
+import { Check, Plus, ShoppingCart } from "lucide-react";
 import { PublicProduct } from "@/lib/catalog/types";
 import { ProductFallbackImage } from "./ProductFallbackImage";
-import { useWishlist } from "@/lib/hooks/useWishlist";
 import { useCart } from "@/components/providers/CartContext";
+import { FavoriteButton } from "./FavoriteButton";
 
-const CART_BUTTON_CLASS_NAME = "group/cart inline-flex size-7 shrink-0 items-center justify-center gap-0.5 rounded-full border border-primary/15 bg-primary/10 text-primary shadow-sm shadow-primary/5 transition duration-300 ease-out hover:-translate-y-0.5 hover:scale-110 hover:border-primary/35 hover:bg-primary hover:text-white hover:shadow-md hover:shadow-primary/25 active:scale-95 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:scale-100 disabled:hover:bg-muted disabled:hover:text-muted-foreground disabled:hover:shadow-none motion-reduce:hover:translate-y-0 motion-reduce:hover:scale-100 motion-reduce:active:scale-100";
+const CART_BUTTON_CLASS_NAME = "group/cart relative inline-flex size-8 shrink-0 after:absolute after:-inset-2 after:content-[''] items-center justify-center gap-0.5 rounded-full border border-primary/15 bg-primary/10 text-primary shadow-sm shadow-primary/5 transition duration-300 ease-out hover:-translate-y-0.5 hover:scale-110 hover:border-primary/35 hover:bg-primary hover:text-white hover:shadow-md hover:shadow-primary/25 active:scale-95 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:scale-100 disabled:hover:bg-muted disabled:hover:text-muted-foreground disabled:hover:shadow-none motion-reduce:hover:translate-y-0 motion-reduce:hover:scale-100 motion-reduce:active:scale-100";
 
 interface ProductCardProps {
   product: PublicProduct;
@@ -25,24 +25,17 @@ export function ProductCard({
   badgeText,
 }: ProductCardProps) {
   const { addToCart } = useCart();
-  const { isInWishlist, toggleWishlist, loading: wishlistLoading } = useWishlist();
   const [imageError, setImageError] = useState(false);
-
-  const favorited = isInWishlist(product.id);
+  const [justAdded, setJustAdded] = useState(false);
   const hasValidImage = product.image && product.image.trim() !== "" && !imageError;
 
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (product.isAvailable && product.price > 0) {
-      addToCart(product, 1);
+    if (product.isAvailable && product.price > 0 && addToCart(product, 1) > 0) {
+      setJustAdded(true);
+      window.setTimeout(() => setJustAdded(false), 1400);
     }
-  };
-
-  const handleWishlistClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    toggleWishlist(product.id);
   };
 
   return (
@@ -50,7 +43,7 @@ export function ProductCard({
       {/* Imagem do Produto com Proporção Otimizada */}
       <Link
         href={`/produto/${product.slug || product.id}`}
-        className="relative isolate block aspect-square w-full overflow-hidden bg-slate-50 dark:bg-slate-900/50"
+        className="relative isolate block aspect-square w-full overflow-hidden bg-slate-50 transition-opacity duration-150 active:opacity-85 dark:bg-slate-900/50"
       >
         {hasValidImage ? (
           <Image
@@ -88,18 +81,7 @@ export function ProductCard({
         </div>
 
         {/* Botão de Favoritos */}
-        <button
-          type="button"
-          onClick={handleWishlistClick}
-          disabled={wishlistLoading}
-          aria-label={favorited ? "Remover dos favoritos" : "Salvar nos favoritos"}
-          className="absolute top-2.5 right-2.5 z-10 w-8 h-8 rounded-full bg-white dark:bg-slate-800 border border-border/60 shadow-xs flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"
-        >
-          <Heart
-            className={`w-4 h-4 transition-transform active:scale-125 ${favorited ? "fill-rose-500 text-rose-500" : ""
-              }`}
-          />
-        </button>
+        <FavoriteButton productId={product.id} variant="card" className="absolute top-2 right-2 z-10" />
       </Link>
 
       {/* Conteúdo Comercial */}
@@ -124,10 +106,16 @@ export function ProductCard({
                 disabled={!product.isAvailable}
                 aria-label={`Adicionar ${product.title} ao carrinho`}
                 title={product.isAvailable ? "Adicionar ao carrinho" : "Produto sem estoque"}
-                className={CART_BUTTON_CLASS_NAME}
+                className={`${CART_BUTTON_CLASS_NAME} ${justAdded ? "!border-emerald-600 !bg-emerald-600 !text-white" : ""}`}
               >
+                {justAdded ? (
+                  <Check className="size-4" strokeWidth={3} aria-hidden="true" />
+                ) : (
+                <>
                 <Plus className="size-2 shrink-0 transition-transform duration-300 ease-out group-hover/cart:rotate-90 group-hover/cart:scale-125 group-disabled/cart:transform-none motion-reduce:transform-none" strokeWidth={3} aria-hidden="true" />
                 <ShoppingCart className="size-3 shrink-0 transition-transform duration-300 ease-out group-hover/cart:-rotate-12 group-disabled/cart:transform-none motion-reduce:transform-none" aria-hidden="true" />
+                </>
+                )}
               </button>
             )}
           </div>

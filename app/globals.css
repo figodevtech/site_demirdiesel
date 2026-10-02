@@ -185,9 +185,55 @@ body {
   }
 }
 
+/* Toque: remove o atraso de duplo-toque em controles e evita seleção acidental de texto em botões. */
+:where(a, button, [role="button"], [role="tab"], label, summary, input, select, textarea) {
+  touch-action: manipulation;
+}
+
+@media (hover: none) {
+  :where(button, [role="button"]) {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* Feedback de pressão para elementos tocáveis que não são <Button> (cards, linhas de lista). */
+.pressable {
+  transition: transform 120ms ease-out, opacity 120ms ease-out, background-color 150ms ease-out;
+}
+.pressable:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+/* Skeleton com brilho suave (substitui spinners em listas e páginas). */
+@keyframes demir-shimmer {
+  100% { transform: translateX(100%); }
+}
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--muted);
+}
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent);
+  animation: demir-shimmer 1.4s ease-in-out infinite;
+}
+
 /* App instalado (definido por components/pwa/PwaProvider.tsx). */
 html[data-display-mode="standalone"] {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Conteúdo de vitrine que só faz sentido no navegador (no app a navegação já cobre). */
+@media (max-width: 767px) {
+  html[data-display-mode="standalone"] .pwa-browser-only {
+    display: none;
+  }
 }
 
 html[data-display-mode="standalone"] :is(nav a, [data-slot="button"]) {

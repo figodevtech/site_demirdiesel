@@ -11,8 +11,8 @@ export default async function Footer() {
 
   return (
     <footer className="border-t-4 border-primary bg-secondary text-blue-100 pt-16 pb-12">
-      {/* Faixa de Diferenciais de Engenharia */}
-      <div className="container mx-auto px-4 pb-12 mb-12 border-b border-slate-850">
+      {/* Faixa de Diferenciais de Engenharia (oculta no app instalado: conteúdo de vitrine) */}
+      <div className="pwa-browser-only container mx-auto px-4 pb-12 mb-12 border-b border-slate-850">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="flex items-start gap-4 rounded-2xl bg-slate-900/60 p-4 shadow-lg shadow-black/25">
             <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
@@ -86,7 +86,7 @@ export default async function Footer() {
           </div>
 
           {/* Coluna 2: Principais Categorias */}
-          <div>
+          <div className="pwa-browser-only">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-white mb-4">
               Catálogo Diesel
             </h4>

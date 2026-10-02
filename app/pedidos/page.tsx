@@ -7,8 +7,6 @@ import {
   Package,
   Calendar,
   ChevronDown,
-  ChevronUp,
-  Loader2,
   ArrowLeft,
   Truck,
   Copy,
@@ -22,6 +20,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthContext";
 import { AccountSectionHeader, AccountShell } from "@/components/account/AccountShell";
+import { ListSkeleton } from "@/components/feedback/Skeletons";
 import { supabase } from "@/lib/supabase";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -257,10 +256,7 @@ export default function PedidosPage() {
       />
 
       {loading || authLoading ? (
-        <div className="py-20 text-center flex flex-col items-center justify-center gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          <span className="text-xs text-muted-foreground">Carregando seus pedidos...</span>
-        </div>
+        <ListSkeleton rows={3} />
       ) : orders.length === 0 ? (
         <div className="py-20 px-4 text-center rounded-3xl border border-dashed border-border/80 bg-slate-50/50 dark:bg-slate-900/30 max-w-md mx-auto">
           <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-800 shadow-xs border border-border/60 flex items-center justify-center mx-auto mb-4 text-slate-400">
@@ -296,8 +292,17 @@ export default function PedidosPage() {
               >
                 {/* Header do Card de Pedido */}
                 <div
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
                   onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
-                  className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setExpandedOrderId(isExpanded ? null : order.id);
+                    }
+                  }}
+                  className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 cursor-pointer select-none hover:bg-slate-50/50 active:bg-slate-100/70 dark:hover:bg-slate-800/40 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
@@ -326,18 +331,18 @@ export default function PedidosPage() {
                       </span>
                     </div>
 
-                    <button
-                      type="button"
-                      className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"
+                    <span
+                      aria-hidden="true"
+                      className="size-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"
                     >
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
+                      <ChevronDown className={`size-4 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                    </span>
                   </div>
                 </div>
 
                 {/* Detalhes Expansíveis dos Itens */}
                 {isExpanded && (
-                  <div className="p-4 sm:p-5 border-t border-border/60 bg-slate-50/30 dark:bg-slate-900/30 space-y-4 animate-in fade-in-50 duration-150">
+                  <div className="p-4 sm:p-5 border-t border-border/60 bg-slate-50/30 dark:bg-slate-900/30 space-y-4 animate-in fade-in-50 slide-in-from-top-1 duration-200">
                     <OrderTimeline order={order} />
 
                     <div className="space-y-3">

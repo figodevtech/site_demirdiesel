@@ -4,8 +4,9 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, Trash2, ShoppingBag, Loader2, ArrowLeft, ArrowUpRight } from "lucide-react";
+import { Heart, Trash2, ShoppingBag, ArrowLeft, ArrowUpRight } from "lucide-react";
 import { AccountSectionHeader, AccountShell } from "@/components/account/AccountShell";
+import { ListSkeleton } from "@/components/feedback/Skeletons";
 import { useAuth } from "@/components/providers/AuthContext";
 import { useWishlist } from "@/lib/hooks/useWishlist";
 import { useCart } from "@/components/providers/CartContext";
@@ -151,10 +152,7 @@ export default function FavoritosPage() {
         <CardContent className="p-5 sm:p-6">
 
       {loading || authLoading ? (
-        <div className="py-20 text-center flex flex-col items-center justify-center gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          <span className="text-xs text-muted-foreground">Sincronizando seus favoritos...</span>
-        </div>
+        <ListSkeleton rows={4} variant="row" />
       ) : favorites.length === 0 ? (
         <div className="flex min-h-96 flex-col items-center justify-center px-4 text-center">
           <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">

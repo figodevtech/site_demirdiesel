@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Clock, AlertTriangle, ArrowRight, Package, Home, RefreshCw } from "lucide-react";
+import { motion } from "motion/react";
+import { haptic } from "@/lib/haptics";
 import { useCart } from "@/components/providers/CartContext";
 import { supabase } from "@/lib/supabase";
 
@@ -100,9 +102,15 @@ function SucessoContent() {
         </div>
       ) : orderInfo?.isPaid ? (
         <div className="space-y-5">
-          <div className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center mx-auto border border-emerald-500/30">
+          <motion.div
+            initial={{ scale: 0.6, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 380, damping: 18 }}
+            onAnimationStart={() => haptic("success")}
+            className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center mx-auto border border-emerald-500/30"
+          >
             <CheckCircle2 className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
-          </div>
+          </motion.div>
 
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
@@ -116,13 +124,13 @@ function SucessoContent() {
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
             <Link href="/pedidos">
-              <Button size="lg" className="w-full sm:w-auto font-semibold gap-2 bg-primary text-white">
+              <Button size="lg" className="h-12 w-full rounded-xl sm:w-auto font-semibold gap-2 bg-primary text-white">
                 <Package className="w-4 h-4" />
-                <span>Ver Meus Pedidos</span>
+                <span>Acompanhar meu pedido</span>
               </Button>
             </Link>
             <Link href="/produtos">
-              <Button variant="outline" size="lg" className="w-full sm:w-auto font-medium gap-2">
+              <Button variant="outline" size="lg" className="h-12 w-full rounded-xl sm:w-auto font-medium gap-2">
                 <Home className="w-4 h-4" />
                 <span>Continuar Comprando</span>
               </Button>

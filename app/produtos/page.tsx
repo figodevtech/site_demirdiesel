@@ -7,7 +7,8 @@ import { ProductCard } from "@/components/product/ProductCard";
 import { ProductFilters } from "@/components/products/ProductFilters";
 import { ProductSort } from "@/components/products/ProductSort";
 import { ProductPagination } from "@/components/products/ProductPagination";
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { CatalogPendingArea, CatalogTransitionProvider } from "@/components/products/CatalogTransition";
+import { Sheet, SheetClose, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { ProductFilterOptions } from "@/lib/catalog/types";
@@ -53,6 +54,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const activeFilterCount = [categorySlug, brand, condition, inStockOnly, minPrice != null, maxPrice != null].filter(Boolean).length;
 
   return (
+    <CatalogTransitionProvider>
     <div className="container mx-auto px-4 pb-8 pt-3 md:pb-10 md:pt-5">
       {/* Breadcrumbs discretos */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-4">
@@ -105,24 +107,32 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               <Button
                 variant="outline"
                 size="sm"
-                className="flex h-9 items-center gap-2 rounded-xl text-xs md:hidden"
+                className="flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-semibold md:hidden"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
                 <span>Filtros</span>
                 {activeFilterCount > 0 && <Badge className="size-5 justify-center rounded-full p-0 text-[10px]">{activeFilterCount}</Badge>}
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[92vw] overflow-hidden p-0 sm:max-w-sm">
+            <SheetContent side="right" className="w-[92vw] gap-0 overflow-hidden p-0 sm:max-w-sm">
               <SheetHeader className="border-b bg-muted/30 p-5 text-left">
                 <SheetTitle className="text-base font-bold">Filtros do catálogo</SheetTitle>
                 <SheetDescription>Escolha uma ou mais opções para encontrar a peça certa.</SheetDescription>
               </SheetHeader>
-              <div className="h-[calc(100dvh-105px)] overflow-y-auto p-5 pb-12">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">
                 <ProductFilters
                   categories={categories}
                   availableBrands={availableBrands}
                   priceBounds={priceRange}
                 />
+              </div>
+              {/* Ação principal ao alcance do polegar: fecha o painel e mostra a lista já filtrada. */}
+              <div className="shrink-0 border-t bg-background p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
+                <SheetClose asChild>
+                  <Button className="h-12 w-full rounded-xl text-sm font-bold">
+                    Ver {totalCount} {totalCount === 1 ? "produto" : "produtos"}
+                  </Button>
+                </SheetClose>
               </div>
             </SheetContent>
           </Sheet>
@@ -141,7 +151,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </aside>
 
         {/* Área do Grid de Produtos */}
-        <div className="space-y-8">
+        <CatalogPendingArea className="space-y-8">
           {products.length === 0 ? (
             <div className="py-20 px-4 text-center rounded-2xl border border-dashed border-border/80 bg-slate-50/50 dark:bg-slate-900/30">
               <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-3">
@@ -160,7 +170,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
                 {products.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}
@@ -170,9 +180,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               <ProductPagination currentPage={page} totalPages={totalPages} />
             </>
           )}
-        </div>
+        </CatalogPendingArea>
       </div>
     </div>
+    </CatalogTransitionProvider>
   );
 }
 

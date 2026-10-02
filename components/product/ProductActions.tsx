@@ -2,20 +2,22 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Truck, Loader2, Check, Heart, Plus, Minus } from "lucide-react";
+import { ShoppingCart, Truck, Loader2, Check, Plus, Minus } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useCart } from "@/components/providers/CartContext";
-import { useWishlist } from "@/lib/hooks/useWishlist";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WhatsAppButton } from "./WhatsAppButton";
+import { FavoriteButton } from "./FavoriteButton";
+import { cepDigits, formatCep, mobileInput } from "@/lib/forms/mobile-inputs";
+import { haptic } from "@/lib/haptics";
 import { PublicProduct } from "@/lib/catalog/types";
 import { getShippingEstimate, ShippingQuoteResult } from "@/lib/shipping";
 import { useVirtualKeyboardOpen } from "@/hooks/use-virtual-keyboard";
 
 export function ProductActions({ product }: { product: PublicProduct }) {
   const { addToCart } = useCart();
-  const { toggleWishlist, isInWishlist, loading: wishlistLoading } = useWishlist();
   const [quantity, setQuantity] = useState(1);
   const isKeyboardOpen = useVirtualKeyboardOpen();
   const [cep, setCep] = useState("");
@@ -23,7 +25,6 @@ export function ProductActions({ product }: { product: PublicProduct }) {
   const [isAdded, setIsAdded] = useState(false);
   const [shippingQuote, setShippingQuote] = useState<ShippingQuoteResult | null>(null);
 
-  const favorited = isInWishlist(product.id);
   const maxStock = Math.max(0, Number(product.stock) || 0);
   const isAvailable = product.isAvailable && maxStock > 0;
   const hasPrice = product.price > 0;
@@ -37,21 +38,21 @@ export function ProductActions({ product }: { product: PublicProduct }) {
       toast.info("Produto com valor sob consulta. Entre em contato pelo WhatsApp.");
       return;
     }
-    addToCart(product, quantity);
+    // Feedback (toast "Ver carrinho" + haptic) vem do CartContext.
+    if (addToCart(product, quantity) <= 0) return;
     setIsAdded(true);
-    toast.success("Produto adicionado ao carrinho!");
-
-    setTimeout(() => {
-      setIsAdded(false);
-    }, 2000);
+    window.setTimeout(() => setIsAdded(false), 1800);
   };
 
-  const handleShippingSim = async () => {
-    const cleanCep = cep.replace(/\D/g, "");
+  const handleShippingSim = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    const cleanCep = cepDigits(cep);
     if (cleanCep.length < 8) {
+      haptic("error");
       toast.warning("Digite um CEP válido com 8 dígitos.");
       return;
     }
+    (document.activeElement as HTMLElement | null)?.blur();
 
     setIsSimulating(true);
     setShippingQuote(null);
@@ -64,7 +65,6 @@ export function ProductActions({ product }: { product: PublicProduct }) {
         state: location?.uf,
       });
       setShippingQuote(quote);
-      toast.info(quote.message);
     } catch {
       toast.error("Não foi possível consultar as condições de envio.");
     } finally {
@@ -87,22 +87,35 @@ export function ProductActions({ product }: { product: PublicProduct }) {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-lg"
-                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  className="size-10 rounded-lg"
+                  onClick={() => {
+                    haptic("selection");
+                    setQuantity((q) => Math.max(1, q - 1));
+                  }}
                   disabled={quantity <= 1}
                   aria-label="Diminuir quantidade"
                 >
                   <Minus className="w-3.5 h-3.5" />
                 </Button>
-                <span className="w-10 text-center font-mono font-semibold text-sm">
+                <motion.span
+                  key={quantity}
+                  initial={{ y: -4, opacity: 0.4 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ duration: 0.15 }}
+                  className="w-9 text-center font-mono text-base font-semibold tabular-nums"
+                  aria-live="polite"
+                >
                   {quantity}
-                </span>
+                </motion.span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-lg"
-                  onClick={() => setQuantity((q) => Math.min(maxStock, q + 1))}
+                  className="size-10 rounded-lg"
+                  onClick={() => {
+                    haptic("selection");
+                    setQuantity((q) => Math.min(maxStock, q + 1));
+                  }}
                   disabled={quantity >= maxStock}
                   aria-label="Aumentar quantidade"
                 >
@@ -113,46 +126,30 @@ export function ProductActions({ product }: { product: PublicProduct }) {
               {/* Botão de Compra Principal */}
               <Button
                 size="lg"
-                className={`flex-1 font-semibold text-sm h-11 gap-2 shadow-sm transition-all duration-300 ${
+                className={`flex-1 font-semibold text-sm h-12 gap-2 shadow-sm transition-colors duration-200 ${
                   isAdded
                     ? "bg-emerald-600 hover:bg-emerald-700 text-white"
                     : "bg-primary hover:bg-primary/90 text-white"
                 }`}
                 onClick={handleAddToCart}
-                disabled={isAdded}
               >
-                {isAdded ? (
-                  <>
-                    <Check className="w-4 h-4" /> Adicionado ao Carrinho!
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="w-4 h-4" /> Adicionar ao Carrinho
-                  </>
-                )}
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={isAdded ? "added" : "add"}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex items-center gap-2"
+                  >
+                    {isAdded ? <Check className="size-4" /> : <ShoppingCart className="size-4" />}
+                    {isAdded ? "Adicionado!" : "Adicionar ao Carrinho"}
+                  </motion.span>
+                </AnimatePresence>
               </Button>
 
               {/* Botão de Favoritos */}
-              <Button
-                size="lg"
-                variant="outline"
-                className={`w-11 h-11 px-0 rounded-xl border border-border/80 transition-colors ${
-                  favorited
-                    ? "bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100 dark:bg-rose-950/30 dark:border-rose-900"
-                    : "hover:bg-slate-100 text-slate-500"
-                }`}
-                onClick={() => toggleWishlist(product.id)}
-                disabled={wishlistLoading}
-                aria-label={favorited ? "Remover dos favoritos" : "Salvar nos favoritos"}
-              >
-                {wishlistLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Heart
-                    className={`w-4 h-4 ${favorited ? "fill-current" : ""}`}
-                  />
-                )}
-              </Button>
+              <FavoriteButton productId={product.id} className="size-12" />
             </div>
           </div>
         ) : isAvailable && !hasPrice ? (
@@ -178,26 +175,7 @@ export function ProductActions({ product }: { product: PublicProduct }) {
               />
 
               {/* Botão de Favoritos */}
-              <Button
-                size="lg"
-                variant="outline"
-                className={`w-12 h-12 px-0 rounded-xl border border-border/80 transition-colors ${
-                  favorited
-                    ? "bg-rose-50 border-rose-200 text-rose-500 hover:bg-rose-100 dark:bg-rose-950/30 dark:border-rose-900"
-                    : "hover:bg-slate-100 text-slate-500"
-                }`}
-                onClick={() => toggleWishlist(product.id)}
-                disabled={wishlistLoading}
-                aria-label={favorited ? "Remover dos favoritos" : "Salvar nos favoritos"}
-              >
-                {wishlistLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Heart
-                    className={`w-4 h-4 ${favorited ? "fill-current" : ""}`}
-                  />
-                )}
-              </Button>
+              <FavoriteButton productId={product.id} className="size-12" />
             </div>
           </div>
         ) : (
@@ -241,24 +219,25 @@ export function ProductActions({ product }: { product: PublicProduct }) {
           <span>Calcular Frete & Prazo de Entrega</span>
         </div>
 
-        <div className="flex gap-2 max-w-sm">
+        <form onSubmit={handleShippingSim} className="flex gap-2 max-w-sm">
           <Input
+            {...mobileInput.cep}
+            enterKeyHint="go"
+            aria-label="CEP para calcular o frete"
             placeholder="00000-000"
             value={cep}
-            onChange={(e) => setCep(e.target.value)}
-            maxLength={9}
-            className="h-9 text-sm"
+            onChange={(e) => setCep(formatCep(e.target.value))}
+            className="h-11 text-sm font-mono tracking-wide"
           />
           <Button
+            type="submit"
             variant="secondary"
-            size="sm"
-            onClick={handleShippingSim}
             disabled={isSimulating}
-            className="h-9 font-medium px-4 text-xs"
+            className="h-11 min-w-24 font-semibold px-4 text-sm"
           >
-            {isSimulating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Calcular"}
+            {isSimulating ? <Loader2 className="size-4 animate-spin" /> : "Calcular"}
           </Button>
-        </div>
+        </form>
 
         {shippingQuote && (
           <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-xs shadow-md shadow-slate-900/7 dark:bg-slate-900/60 dark:shadow-black/25">
@@ -301,11 +280,24 @@ export function ProductActions({ product }: { product: PublicProduct }) {
           </div>
           {hasPrice && isAvailable ? (
             <Button
-              size="sm"
               onClick={handleAddToCart}
-              className="h-10 px-5 text-xs font-semibold bg-primary text-white shadow-xs"
+              className={`h-12 min-w-36 gap-2 rounded-xl px-5 text-sm font-bold text-white shadow-md transition-colors duration-200 ${
+                isAdded ? "bg-emerald-600 hover:bg-emerald-600" : "bg-primary shadow-primary/25"
+              }`}
             >
-              Comprar
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                  key={isAdded ? "added" : "buy"}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.15 }}
+                  className="flex items-center gap-2"
+                >
+                  {isAdded ? <Check className="size-4" /> : <ShoppingCart className="size-4" />}
+                  {isAdded ? "Adicionado" : "Adicionar"}
+                </motion.span>
+              </AnimatePresence>
             </Button>
           ) : (
             <WhatsAppButton
@@ -315,7 +307,7 @@ export function ProductActions({ product }: { product: PublicProduct }) {
               action={!hasPrice && isAvailable ? "valor" : "disponibilidade"}
               size="sm"
               variant="default"
-              className="h-10 px-4 text-xs bg-primary hover:bg-primary/90 text-white font-semibold"
+              className="h-12 rounded-xl px-5 text-sm bg-primary hover:bg-primary/90 text-white font-bold"
               label={!hasPrice && isAvailable ? "Consultar Valor" : "Consultar"}
             />
           )}

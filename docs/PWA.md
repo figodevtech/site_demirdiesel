@@ -293,6 +293,44 @@ Requisitos atendidos: HTTPS (Vercel), manifest válido, SW ativo com handler de 
 
 ---
 
+## 12. Experiência de app (UX mobile)
+
+Princípio: **todo toque relevante produz algo na tela em menos de ~100 ms**.
+
+| Fluxo | O que foi feito |
+| --- | --- |
+| Navegação | `app/produtos/loading.tsx` e `app/produto/[id]/loading.tsx` mostram skeletons com o layout real no instante do toque (medido: ~60 ms). Filtros/ordenação/paginação usam `CatalogTransitionProvider`: barra de progresso + grade esmaecida, sem trocar a tela por skeleton e sem fechar o painel de filtros. |
+| BottomNav | Início · Buscar · Favoritos · Carrinho · Conta. Fundo sólido (sem blur), pílula da aba ativa animada (`motion` `layoutId`), ícone com estado pressionado, badge que "pula" ao mudar, recolhe só quando o teclado está realmente aberto (`visualViewport`). |
+| Busca | `/buscar` é uma tela de app (o header some no mobile): buscas recentes, mais procurados, categorias. `useCatalogSearch`: debounce 200 ms, cancela requisições antigas, cache em memória e mantém a lista anterior esmaecida enquanto carrega (sem flicker). O termo fica na URL — ao voltar de um produto a busca reaparece na hora. |
+| Produto | Galeria com swipe nativo (scroll-snap) e indicador; CTA fixo "Adicionar" (48px) com confirmação animada; favorito otimista com "pop"; CEP com teclado numérico, máscara e Enter = calcular. |
+| Carrinho | Skeleton até ler o `localStorage` (acabou o flash de "carrinho vazio"); stepper de 40px com número animado; remover com animação e **Desfazer**; barra "Finalizar compra" com total acima da BottomNav. |
+| Checkout | Barra fixa com total + "Pagar com Pix/Cartão/Boleto" ao alcance do polegar; endereços como cartões tocáveis com skeleton; cadastro de endereço em **bottom sheet** no celular, CEP que preenche o endereço sozinho ao completar 8 dígitos e foca o "Número"; teclados/autocomplete corretos (`lib/forms/mobile-inputs.ts`). |
+| Feedback | Toasts claros com ação ("Ver carrinho", "Desfazer", "Entrar"); `.pressable` e `:active` funcionando no iOS (listener `touchstart`); `touch-action: manipulation`; sheets em 250/200 ms; skeletons com shimmer em pedidos, endereços, favoritos e conta. |
+| App instalado | Faixa promocional e lista de categorias do rodapé ocultas (`.pwa-browser-only`); "voltar" seguro (`useSafeBack`) quando o app abre direto numa tela pelo atalho. |
+
+### Haptics (preparado para Capacitor)
+
+`lib/haptics.ts` expõe `haptic("selection" | "light" | "medium" | "success" | "error")`, já chamado
+em: troca de aba, adicionar/remover do carrinho, quantidade, favoritar, finalizar compra/pagar,
+erros de validação e pagamento confirmado.
+
+- Hoje (web): `navigator.vibrate` curto **somente no app instalado no Android** e respeitando
+  `prefers-reduced-motion`. No navegador e no iOS web não faz nada.
+- Capacitor: registre um adapter no boot — nenhum componente precisa mudar:
+
+  ```ts
+  import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
+  import { setHapticsAdapter } from "@/lib/haptics";
+
+  setHapticsAdapter((kind) => {
+    if (kind === "success") return Haptics.notification({ type: NotificationType.Success });
+    if (kind === "error") return Haptics.notification({ type: NotificationType.Error });
+    return Haptics.impact({ style: kind === "medium" ? ImpactStyle.Medium : ImpactStyle.Light });
+  });
+  ```
+
+---
+
 ## Publicação futura
 
 ### Google Play (Trusted Web Activity)

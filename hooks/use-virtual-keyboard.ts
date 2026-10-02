@@ -19,8 +19,16 @@ function isTextEntry(element: Element | null) {
   return element instanceof HTMLInputElement && !NON_TEXT_INPUTS.has(element.type)
 }
 
+// Altura mínima "roubada" da tela para considerar que o teclado está visível.
+const KEYBOARD_MIN_HEIGHT = 120
+
 function getSnapshot() {
-  return window.matchMedia("(pointer: coarse)").matches && isTextEntry(document.activeElement)
+  if (!window.matchMedia("(pointer: coarse)").matches || !isTextEntry(document.activeElement)) return false
+  const viewport = window.visualViewport
+  // Sem visualViewport (navegadores antigos): campo focado já basta.
+  if (!viewport) return true
+  // Foco programático sem teclado (ex.: autofocus no iOS) não esconde as barras.
+  return document.documentElement.clientHeight - viewport.height > KEYBOARD_MIN_HEIGHT
 }
 
 function subscribe(callback: () => void) {
@@ -32,16 +40,18 @@ function subscribe(callback: () => void) {
   }
   document.addEventListener("focusin", callback)
   document.addEventListener("focusout", deferred)
+  window.visualViewport?.addEventListener("resize", callback)
   return () => {
     window.clearTimeout(timer)
     document.removeEventListener("focusin", callback)
     document.removeEventListener("focusout", deferred)
+    window.visualViewport?.removeEventListener("resize", callback)
   }
 }
 
 /**
- * true enquanto um campo de texto está focado em dispositivo touch, ou seja,
- * quando o teclado virtual provavelmente está aberto. Usado para recolher barras fixas
+ * true enquanto o teclado virtual está aberto (campo de texto focado em tela touch e a
+ * viewport visual reduzida pelo teclado). Usado para recolher barras fixas
  * inferiores (BottomNav, CTA do produto) e não cobrir o campo em edição.
  */
 export function useVirtualKeyboardOpen() {

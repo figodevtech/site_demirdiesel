@@ -7,10 +7,11 @@ import {
   Plus,
   Trash2,
   Edit2,
-  Loader2,
   Building,
 } from "lucide-react";
 import { AccountSectionHeader, AccountShell } from "@/components/account/AccountShell";
+import { ListSkeleton } from "@/components/feedback/Skeletons";
+import { cepDigits, formatCep, mobileInput } from "@/lib/forms/mobile-inputs";
 import { useAuth } from "@/components/providers/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -97,22 +98,30 @@ export default function EnderecosPage() {
     }
   }, [authLoading, fetchAddresses, profile?.id, router, user]);
 
-  const handleCepBlur = async () => {
-    const cleanCep = cep.replace(/\D/g, "");
-    if (cleanCep.length === 8) {
-      try {
-        const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-        const data = await res.json();
-        if (!data.erro) {
-          setLogradouro(data.logradouro || "");
-          setBairro(data.bairro || "");
-          setCidade(data.localidade || "");
-          setEstado(data.uf || "");
-        }
-      } catch (error) {
-        console.error("Erro ao buscar CEP", error);
+  // Preenche o endereço assim que o CEP tem 8 dígitos e foca o "Número".
+  const lookupCep = async (cleanCep: string) => {
+    if (cleanCep.length !== 8) return;
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await res.json();
+      if (!data.erro) {
+        setLogradouro(data.logradouro || "");
+        setBairro(data.bairro || "");
+        setCidade(data.localidade || "");
+        setEstado(data.uf || "");
+        if (data.logradouro) document.getElementById("address-number")?.focus();
+      } else {
+        toast.warning("CEP não encontrado. Preencha o endereço manualmente.");
       }
+    } catch (error) {
+      console.error("Erro ao buscar CEP", error);
     }
+  };
+
+  const handleCepChange = (value: string) => {
+    const formatted = formatCep(value);
+    if (cepDigits(formatted).length === 8 && cepDigits(cep).length !== 8) void lookupCep(cepDigits(formatted));
+    setCep(formatted);
   };
 
   const resetForm = () => {
@@ -218,10 +227,7 @@ export default function EnderecosPage() {
       <Card className="min-h-[32rem] border-0 py-0 shadow-lg shadow-slate-900/8 dark:shadow-black/25">
         <CardContent className="p-5 sm:p-6">
         {loading || authLoading ? (
-        <div className="flex min-h-96 flex-col items-center justify-center gap-3 text-center">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          <span className="text-xs text-muted-foreground">Carregando seus endereços...</span>
-        </div>
+        <ListSkeleton rows={2} />
       ) : addresses.length === 0 ? (
         <div className="flex min-h-96 flex-col items-center justify-center px-4 text-center">
           <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -300,7 +306,7 @@ export default function EnderecosPage() {
 
       {/* Modal Dialog Adicionar/Editar */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogContent mobileSheet className="sm:max-w-md sm:rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">
               {editingId ? "Editar Endereço" : "Novo Endereço de Entrega"}
@@ -311,12 +317,11 @@ export default function EnderecosPage() {
             <div>
               <Label className="text-xs">CEP*</Label>
               <Input
+                {...mobileInput.cep}
                 placeholder="00000-000"
                 value={cep}
-                onChange={(e) => setCep(e.target.value)}
-                onBlur={handleCepBlur}
-                maxLength={9}
-                className="h-9 text-xs"
+                onChange={(e) => handleCepChange(e.target.value)}
+                className="h-11 text-sm font-mono tracking-wide"
               />
             </div>
 
@@ -324,17 +329,20 @@ export default function EnderecosPage() {
               <div className="col-span-2">
                 <Label className="text-xs">Logradouro / Rua*</Label>
                 <Input
+                  {...mobileInput.street}
                   value={logradouro}
                   onChange={(e) => setLogradouro(e.target.value)}
-                  className="h-9 text-xs"
+                  className="h-11 text-sm"
                 />
               </div>
               <div>
                 <Label className="text-xs">Número*</Label>
                 <Input
+                  id="address-number"
+                  {...mobileInput.number}
                   value={numero}
                   onChange={(e) => setNumero(e.target.value)}
-                  className="h-9 text-xs"
+                  className="h-11 text-sm"
                 />
               </div>
             </div>
@@ -342,37 +350,40 @@ export default function EnderecosPage() {
             <div>
               <Label className="text-xs">Complemento</Label>
               <Input
+                {...mobileInput.complement}
                 value={complemento}
                 onChange={(e) => setComplemento(e.target.value)}
                 placeholder="Ex: Galpão B, Sala 4"
-                className="h-9 text-xs"
+                className="h-11 text-sm"
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="col-span-2 sm:col-span-1">
                 <Label className="text-xs">Bairro*</Label>
                 <Input
+                  {...mobileInput.district}
                   value={bairro}
                   onChange={(e) => setBairro(e.target.value)}
-                  className="h-9 text-xs"
+                  className="h-11 text-sm"
                 />
               </div>
               <div>
                 <Label className="text-xs">Cidade*</Label>
                 <Input
+                  {...mobileInput.city}
                   value={cidade}
                   onChange={(e) => setCidade(e.target.value)}
-                  className="h-9 text-xs"
+                  className="h-11 text-sm"
                 />
               </div>
               <div>
                 <Label className="text-xs">Estado (UF)*</Label>
                 <Input
+                  {...mobileInput.state}
                   value={estado}
-                  maxLength={2}
                   onChange={(e) => setEstado(e.target.value.toUpperCase())}
-                  className="h-9 text-xs"
+                  className="h-11 text-sm uppercase"
                 />
               </div>
             </div>
@@ -382,18 +393,16 @@ export default function EnderecosPage() {
             <Button
               type="button"
               variant="outline"
-              size="sm"
               onClick={() => setIsDialogOpen(false)}
-              className="text-xs rounded-xl"
+              className="h-11 text-sm rounded-xl"
             >
               Cancelar
             </Button>
             <Button
               type="button"
-              size="sm"
               onClick={handleSave}
               disabled={saving}
-              className="text-xs rounded-xl font-semibold"
+              className="h-12 text-sm rounded-xl font-semibold sm:h-11"
             >
               {saving ? "Salvando..." : "Salvar Endereço"}
             </Button>

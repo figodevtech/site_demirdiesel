@@ -26,6 +26,8 @@ import {
 } from "@/lib/auth-utils";
 import { ensureCustomerProfile } from "@/lib/customer-profile";
 import { supabase } from "@/lib/supabase";
+import { FormSkeleton } from "@/components/feedback/Skeletons";
+import { mobileInput } from "@/lib/forms/mobile-inputs";
 
 type PersonType = "FISICA" | "JURIDICA";
 
@@ -169,11 +171,8 @@ export default function ContaPage() {
 
   if (authLoading || isPreparingProfile) {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
-        <Loader2 className="size-6 animate-spin text-primary" />
-        <span className="text-xs text-muted-foreground">
-          Preparando seu perfil...
-        </span>
+      <div className="container mx-auto max-w-3xl px-4 py-6">
+        <FormSkeleton fields={4} />
       </div>
     );
   }
@@ -221,6 +220,7 @@ export default function ContaPage() {
                 </Label>
                 <Input
                   id="account-name"
+                  {...mobileInput.name}
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   className="h-11"
@@ -272,7 +272,7 @@ export default function ContaPage() {
                       setPhone(formatPhone(event.target.value))
                     }
                     className="h-11 pl-10 font-mono"
-                    inputMode="tel"
+                    {...mobileInput.phone}
                     required
                   />
                 </div>

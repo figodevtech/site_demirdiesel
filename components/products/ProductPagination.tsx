@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useCatalogNavigation } from "./CatalogTransition";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -11,7 +12,7 @@ interface ProductPaginationProps {
 }
 
 export function ProductPagination({ currentPage, totalPages }: ProductPaginationProps) {
-  const router = useRouter();
+  const { navigate } = useCatalogNavigation();
   const searchParams = useSearchParams();
 
   if (totalPages <= 1) return null;
@@ -19,7 +20,7 @@ export function ProductPagination({ currentPage, totalPages }: ProductPagination
   const navigateToPage = (page: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("page", page.toString());
-    router.push(`/produtos?${params.toString()}`);
+    navigate(`/produtos?${params.toString()}`);
   };
 
   return (

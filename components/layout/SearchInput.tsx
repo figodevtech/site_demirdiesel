@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import Link from "next/link";
 import { Search, Loader2, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { PublicProduct } from "@/lib/catalog/types";
 import { cn } from "@/lib/utils";
+import { useCatalogSearch } from "@/hooks/use-catalog-search";
+import { mobileInput } from "@/lib/forms/mobile-inputs";
+import { addRecentSearch } from "@/lib/search/recent-searches";
 
 interface SearchInputProps {
   className?: string;
@@ -27,58 +29,34 @@ export function SearchInput({
 }: SearchInputProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<PublicProduct[]>([]);
-  const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { results, status } = useCatalogSearch(query);
+  const loading = status === "loading";
 
   useEffect(() => {
     const isActive = isFocused || isOpen || query.trim().length > 0;
     onSearchActiveChange?.(isActive);
   }, [isFocused, isOpen, query, onSearchActiveChange]);
 
-  // Debounced search
-  useEffect(() => {
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    const timeout = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/catalog/search?q=${encodeURIComponent(trimmed)}`);
-        const json = await res.json();
-        setResults(json.results || []);
-        setIsOpen(true);
-      } catch (err) {
-        console.error("Erro na busca rápida:", err);
-      } finally {
-        setLoading(false);
-      }
-    }, 250);
-
-    return () => clearTimeout(timeout);
-  }, [query]);
-
   // Click outside listener
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    function handleClickOutside(e: PointerEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
       setIsOpen(false);
+      addRecentSearch(query);
+      (document.activeElement as HTMLElement | null)?.blur();
       if (onSelectResult) onSelectResult();
       router.push(`/produtos?q=${encodeURIComponent(query.trim())}`);
     }
@@ -86,6 +64,7 @@ export function SearchInput({
 
   const handleSelectProduct = (slugOrId: string) => {
     setIsOpen(false);
+    addRecentSearch(query);
     if (onSelectResult) onSelectResult();
     router.push(`/produto/${slugOrId}`);
   };
@@ -95,14 +74,18 @@ export function SearchInput({
       <form onSubmit={handleSubmit} className="relative group">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 dark:text-slate-400 group-focus-within:text-primary transition-colors pointer-events-none" />
         <Input
-          type="search"
+          {...mobileInput.search}
+          aria-label="Buscar peças"
           placeholder={placeholder}
           value={query}
           autoFocus={autoFocus}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setIsOpen(e.target.value.trim().length >= 2);
+          }}
           onFocus={() => {
             setIsFocused(true);
-            if (results.length > 0) setIsOpen(true);
+            if (query.trim().length >= 2) setIsOpen(true);
           }}
           onBlur={() => {
             setIsFocused(false);
@@ -120,10 +103,10 @@ export function SearchInput({
       </form>
 
       {/* Dropdown de Resultados Rápidos */}
-      {isOpen && (results.length > 0 || query.trim().length >= 2) && (
+      {isOpen && query.trim().length >= 2 && (results.length > 0 || !loading) && (
         <div className="absolute left-0 right-0 top-full z-50 mt-2 divide-y divide-border/40 overflow-hidden rounded-xl bg-white shadow-xl shadow-slate-900/12 animate-in fade-in-50 zoom-in-95 duration-150 dark:bg-slate-900 dark:shadow-black/35">
           {results.length > 0 ? (
-            <div className="py-2 max-h-[360px] overflow-y-auto no-scrollbar">
+            <div className={`py-2 max-h-[min(360px,55dvh)] overflow-y-auto overscroll-contain no-scrollbar transition-opacity duration-150 ${loading ? "opacity-60" : ""}`}>
               <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                 Peças Encontradas ({results.length})
               </div>
@@ -132,7 +115,7 @@ export function SearchInput({
                   key={product.id}
                   type="button"
                   onClick={() => handleSelectProduct(product.slug || product.id)}
-                  className="w-full px-3 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors group"
+                  className="w-full min-h-12 px-3 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50 active:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors group"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors truncate">
@@ -172,6 +155,10 @@ export function SearchInput({
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
+            </div>
+          ) : status === "error" ? (
+            <div className="p-4 text-center text-xs text-muted-foreground">
+              Não foi possível buscar agora. Verifique sua conexão.
             </div>
           ) : !loading && query.trim().length >= 2 ? (
             <div className="p-4 text-center">

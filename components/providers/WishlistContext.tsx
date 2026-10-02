@@ -1,9 +1,11 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/components/providers/AuthContext";
 import { toast } from "sonner";
+import { haptic } from "@/lib/haptics";
 
 interface WishlistContextType {
   wishlistIds: number[];
@@ -18,6 +20,8 @@ const WishlistContext = createContext<WishlistContextType | undefined>(undefined
 
 export function WishlistProvider({ children }: { children: React.ReactNode }) {
   const { user, profile } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
   const [wishlistIds, setWishlistIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -53,7 +57,11 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
 
   const toggleWishlist = async (produtoId: string | number) => {
     if (!user || !profile) {
-      toast.error("Faça login para adicionar produtos aos favoritos.");
+      toast("Entre para salvar favoritos", {
+        id: "wishlist-login",
+        description: "Seus favoritos ficam salvos na sua conta.",
+        action: { label: "Entrar", onClick: () => router.push(`/login?redirect=${encodeURIComponent(pathname)}`) },
+      });
       return;
     }
 
@@ -64,6 +72,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     }
 
     const isFavorited = wishlistIds.includes(idAsNumber);
+    haptic(isFavorited ? "selection" : "light");
 
     // Atualização otimista imediata compartilhada por todos os cards
     setWishlistIds((prev) =>
@@ -84,7 +93,6 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
           setWishlistIds((prev) => [...prev, idAsNumber]);
           throw error;
         }
-        toast.success("Removido dos favoritos.");
       } else {
         const { error } = await supabase.from("favorito").insert({
           cliente_id: profile.id,
@@ -94,14 +102,12 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           if (error.code === "23505") {
             // Violação de chave duplicada (já adicionado)
-            toast.success("Já está nos seus favoritos!");
+            // Já estava salvo: o estado otimista já está correto.
           } else {
             // Reverte otimismo em caso de falha
             setWishlistIds((prev) => prev.filter((id) => id !== idAsNumber));
             throw error;
           }
-        } else {
-          toast.success("Adicionado aos favoritos!");
         }
       }
     } catch (error: any) {

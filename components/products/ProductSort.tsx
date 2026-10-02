@@ -1,11 +1,12 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useCatalogNavigation } from "./CatalogTransition";
 import { ArrowUpDown, Rows3 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function ProductSort() {
-  const router = useRouter();
+  const { navigate } = useCatalogNavigation();
   const searchParams = useSearchParams();
   const currentSort = searchParams.get("sort") || "recent";
   const currentPageSize = searchParams.get("porPagina") || "20";
@@ -14,14 +15,14 @@ export function ProductSort() {
     const params = new URLSearchParams(searchParams.toString());
     params.set("sort", value);
     params.delete("page");
-    router.push(`/produtos?${params.toString()}`);
+    navigate(`/produtos?${params.toString()}`, { scroll: false });
   }
 
   function handlePageSizeChange(value: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("porPagina", value);
     params.delete("page");
-    router.push(`/produtos?${params.toString()}`);
+    navigate(`/produtos?${params.toString()}`, { scroll: false });
   }
 
   return (

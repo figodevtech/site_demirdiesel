@@ -39,6 +39,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { isPickupEligible, type DeliveryMethod } from "@/lib/shipping";
 import { siteConfig } from "@/lib/site-config";
 import { isStandaloneDisplayMode } from "@/lib/pwa/display-mode";
+import { motion } from "motion/react";
+import { useVirtualKeyboardOpen } from "@/hooks/use-virtual-keyboard";
+import { cepDigits, formatCep, mobileInput } from "@/lib/forms/mobile-inputs";
+import { haptic } from "@/lib/haptics";
 import { Badge } from "@/components/ui/badge";
 import {
   PAYMENT_METHOD_LABELS,
@@ -127,6 +131,9 @@ export default function CheckoutPage() {
   const [loadingCards, setLoadingCards] = useState(false);
   const [selectedSavedCardId, setSelectedSavedCardId] = useState("new");
   const clearedRef = useRef(false);
+  const numeroInputRef = useRef<HTMLInputElement>(null);
+  const [isLookingUpCep, setIsLookingUpCep] = useState(false);
+  const isKeyboardOpen = useVirtualKeyboardOpen();
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
@@ -198,28 +205,41 @@ export default function CheckoutPage() {
     : false;
 
   const selectAddress = (address: CustomerAddress) => {
+    if (address.id !== selectedAddressId) haptic("selection");
     setSelectedAddressId(address.id);
     if (!isPickupEligible({ city: address.cidade, state: address.estado })) {
       setDeliveryMethod("delivery");
     }
   };
 
-  const handleCepBlur = async () => {
-    const cleanCep = cep.replace(/\D/g, "");
-    if (cleanCep.length >= 8) {
-      try {
-        const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-        const data = await res.json();
-        if (!data.erro) {
-          setLogradouro(data.logradouro || "");
-          setBairro(data.bairro || "");
-          setCidade(data.localidade || "");
-          setEstado(data.uf || "");
-        }
-      } catch (error) {
-        console.error("Erro ao buscar CEP", error);
+  // Preenche o endereço assim que o CEP tem 8 dígitos e leva o foco para o "Número"
+  // (único campo que o cliente ainda precisa digitar na maioria dos casos).
+  const lookupCep = async (cleanCep: string) => {
+    if (cleanCep.length !== 8) return;
+    setIsLookingUpCep(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await res.json();
+      if (!data.erro) {
+        setLogradouro(data.logradouro || "");
+        setBairro(data.bairro || "");
+        setCidade(data.localidade || "");
+        setEstado(data.uf || "");
+        if (data.logradouro) numeroInputRef.current?.focus();
+      } else {
+        toast.warning("CEP não encontrado. Preencha o endereço manualmente.");
       }
+    } catch (error) {
+      console.error("Erro ao buscar CEP", error);
+    } finally {
+      setIsLookingUpCep(false);
     }
+  };
+
+  const handleCepChange = (value: string) => {
+    const formatted = formatCep(value);
+    setCep(formatted);
+    if (cepDigits(formatted).length === 8 && cepDigits(cep).length !== 8) void lookupCep(cepDigits(formatted));
   };
 
   const handleSaveAddress = async () => {
@@ -435,6 +455,7 @@ export default function CheckoutPage() {
   };
 
   const finalTotal = subtotal;
+  const canPay = !isProcessing && Boolean(selectedAddressId) && items.length > 0;
   const selectedPaymentOption =
     PAYMENT_OPTIONS.find((option) => option.value === paymentMethod) ?? PAYMENT_OPTIONS[0];
 
@@ -442,9 +463,15 @@ export default function CheckoutPage() {
   if (paymentStatus === "paid") {
     return (
       <div className="container mx-auto px-4 py-16 text-center max-w-lg">
-        <div className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center mx-auto mb-6 text-emerald-600">
+        <motion.div
+          initial={{ scale: 0.6, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 380, damping: 18 }}
+          onAnimationStart={() => haptic("success")}
+          className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center mx-auto mb-6 text-emerald-600"
+        >
           <CheckCircle2 className="w-10 h-10 stroke-[2.5]" />
-        </div>
+        </motion.div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-2">
           Pagamento Confirmado!
         </h1>
@@ -452,11 +479,11 @@ export default function CheckoutPage() {
           Seu pedido #{currentOrderId} foi recebido com sucesso e já está sendo preparado pela equipe da Demir Diesel.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button asChild variant="default" className="rounded-xl font-semibold">
-            <Link href="/pedidos">Ver Meus Pedidos</Link>
+          <Button asChild variant="default" className="h-12 rounded-xl font-semibold">
+            <Link href="/pedidos">Acompanhar meu pedido</Link>
           </Button>
-          <Button asChild variant="outline" className="rounded-xl">
-            <Link href="/">Voltar à Página Inicial</Link>
+          <Button asChild variant="outline" className="h-12 rounded-xl">
+            <Link href="/">Voltar à página inicial</Link>
           </Button>
         </div>
       </div>
@@ -464,13 +491,13 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-5xl px-4 pb-8 pt-3 md:pb-10 md:pt-5">
+    <div className="container mx-auto max-w-5xl px-4 pb-32 pt-3 md:pt-5 lg:pb-10">
       {/* Top Header Seguro */}
       <div className="mb-8 flex items-center justify-between pb-2">
         <div className="flex items-center gap-3">
           <Link
             href="/carrinho"
-            className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-foreground"
+            className="size-10 shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 hover:text-foreground active:scale-95 transition-transform"
             aria-label="Voltar ao carrinho"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -486,7 +513,8 @@ export default function CheckoutPage() {
 
         <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-full border border-emerald-600/20">
           <ShieldCheck className="w-4 h-4" />
-          <span>Ambiente Criptografado</span>
+          <span className="hidden sm:inline">Ambiente Criptografado</span>
+          <span className="sm:hidden">Seguro</span>
         </div>
       </div>
 
@@ -507,7 +535,7 @@ export default function CheckoutPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setIsAddressDialogOpen(true)}
-                className="text-xs h-8 rounded-lg gap-1 border-dashed"
+                className="text-xs h-10 rounded-xl gap-1 border-dashed px-3"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Novo Endereço</span>
@@ -515,9 +543,14 @@ export default function CheckoutPage() {
             </div>
 
             {loadingAddresses ? (
-              <div className="p-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                <span>Carregando seus endereços...</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-busy="true" aria-label="Carregando endereços">
+                {[0, 1].map((index) => (
+                  <div key={index} className="space-y-2 rounded-xl border-2 border-border/60 p-4">
+                    <div className="skeleton-shimmer h-4 w-3/4 rounded" />
+                    <div className="skeleton-shimmer h-3 w-1/2 rounded" />
+                    <div className="skeleton-shimmer h-3 w-1/3 rounded" />
+                  </div>
+                ))}
               </div>
             ) : addresses.length === 0 ? (
               <div className="p-6 text-center rounded-xl bg-slate-50 dark:bg-slate-900 border border-dashed border-border text-xs space-y-3">
@@ -536,10 +569,12 @@ export default function CheckoutPage() {
                 {addresses.map((addr) => {
                   const isSelected = selectedAddressId === addr.id;
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={addr.id}
                       onClick={() => selectAddress(addr)}
-                      className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-xs relative ${
+                      aria-pressed={isSelected}
+                      className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-150 cursor-pointer text-xs relative active:scale-[0.99] ${
                         isSelected
                           ? "border-primary bg-primary/5 shadow-2xs"
                           : "border-border/80 hover:border-slate-400 bg-card"
@@ -566,7 +601,7 @@ export default function CheckoutPage() {
                         {addr.bairro} • {addr.cidade} - {addr.estado}
                       </span>
                       <span className="font-mono text-slate-500 block mt-0.5">CEP: {addr.cep}</span>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -785,8 +820,8 @@ export default function CheckoutPage() {
                 <Button
                   size="lg"
                   onClick={handleCheckout}
-                  disabled={isProcessing || !selectedAddressId || items.length === 0}
-                  className="w-full h-12 text-sm font-bold gap-2 rounded-xl bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20"
+                  disabled={!canPay}
+                  className="hidden w-full h-12 text-sm font-bold gap-2 rounded-xl bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20 lg:flex"
                 >
                   {isProcessing ? (
                     <>
@@ -849,8 +884,52 @@ export default function CheckoutPage() {
       </div>
 
       {/* Modal para Adicionar Novo Endereço */}
+      {/* Barra de pagamento fixa (mobile/tablet): total + ação principal sempre ao alcance do polegar. */}
+      {!isWaitingPayment && items.length > 0 && (
+        <div
+          inert={isKeyboardOpen}
+          className={`fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pl-[calc(1rem+env(safe-area-inset-left,0px))] pr-[calc(1rem+env(safe-area-inset-right,0px))] shadow-[0_-6px_20px_rgba(15,23,42,0.08)] transition-transform duration-200 ease-out lg:hidden dark:bg-slate-900 ${
+            isKeyboardOpen ? "pointer-events-none translate-y-full" : "translate-y-0"
+          }`}
+        >
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+            <div className="min-w-0">
+              <span className="block text-[11px] text-muted-foreground">
+                {deliveryMethod === "pickup" ? "Total · retirada grátis" : "Total · frete a calcular"}
+              </span>
+              <span className="block text-lg font-extrabold tabular-nums text-foreground">{formatCurrency(finalTotal)}</span>
+            </div>
+            <Button
+              size="lg"
+              onClick={() => {
+                if (!selectedAddressId) {
+                  haptic("error");
+                  toast.error("Selecione ou cadastre um endereço de entrega.");
+                  return;
+                }
+                haptic("medium");
+                void handleCheckout();
+              }}
+              disabled={isProcessing || items.length === 0}
+              className="h-12 min-w-40 shrink-0 gap-2 rounded-xl px-5 text-sm font-bold shadow-md shadow-primary/25"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" /> Processando...
+                </>
+              ) : (
+                <>
+                  <Lock className="size-4" />
+                  Pagar com {PAYMENT_METHOD_LABELS[selectedPaymentOption.value]}
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Dialog open={isAddressDialogOpen} onOpenChange={setIsAddressDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogContent mobileSheet className="sm:max-w-md sm:rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">Novo Endereço de Entrega</DialogTitle>
           </DialogHeader>
@@ -858,31 +937,38 @@ export default function CheckoutPage() {
           <div className="space-y-3 text-xs pt-2">
             <div>
               <Label className="text-xs">CEP*</Label>
-              <Input
-                placeholder="00000-000"
-                value={cep}
-                onChange={(e) => setCep(e.target.value)}
-                onBlur={handleCepBlur}
-                maxLength={9}
-                className="h-9 text-xs"
-              />
+              <div className="relative">
+                <Input
+                  {...mobileInput.cep}
+                  placeholder="00000-000"
+                  value={cep}
+                  onChange={(e) => handleCepChange(e.target.value)}
+                  className="h-11 text-sm font-mono tracking-wide"
+                />
+                {isLookingUpCep && (
+                  <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-primary" aria-label="Buscando endereço" />
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
               <div className="col-span-2">
                 <Label className="text-xs">Logradouro / Rua*</Label>
                 <Input
+                  {...mobileInput.street}
                   value={logradouro}
                   onChange={(e) => setLogradouro(e.target.value)}
-                  className="h-9 text-xs"
+                  className="h-11 text-sm"
                 />
               </div>
               <div>
                 <Label className="text-xs">Número*</Label>
                 <Input
+                  ref={numeroInputRef}
+                  {...mobileInput.number}
                   value={numero}
                   onChange={(e) => setNumero(e.target.value)}
-                  className="h-9 text-xs"
+                  className="h-11 text-sm"
                 />
               </div>
             </div>
@@ -890,37 +976,40 @@ export default function CheckoutPage() {
             <div>
               <Label className="text-xs">Complemento</Label>
               <Input
+                {...mobileInput.complement}
                 value={complemento}
                 onChange={(e) => setComplemento(e.target.value)}
                 placeholder="Ex: Galpão 3, Apto 101"
-                className="h-9 text-xs"
+                className="h-11 text-sm"
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="col-span-2 sm:col-span-1">
                 <Label className="text-xs">Bairro*</Label>
                 <Input
+                  {...mobileInput.district}
                   value={bairro}
                   onChange={(e) => setBairro(e.target.value)}
-                  className="h-9 text-xs"
+                  className="h-11 text-sm"
                 />
               </div>
               <div>
                 <Label className="text-xs">Cidade*</Label>
                 <Input
+                  {...mobileInput.city}
                   value={cidade}
                   onChange={(e) => setCidade(e.target.value)}
-                  className="h-9 text-xs"
+                  className="h-11 text-sm"
                 />
               </div>
               <div>
                 <Label className="text-xs">Estado (UF)*</Label>
                 <Input
+                  {...mobileInput.state}
                   value={estado}
-                  maxLength={2}
                   onChange={(e) => setEstado(e.target.value.toUpperCase())}
-                  className="h-9 text-xs"
+                  className="h-11 text-sm uppercase"
                 />
               </div>
             </div>
@@ -930,18 +1019,16 @@ export default function CheckoutPage() {
             <Button
               type="button"
               variant="outline"
-              size="sm"
               onClick={() => setIsAddressDialogOpen(false)}
-              className="text-xs rounded-xl"
+              className="h-11 text-sm rounded-xl"
             >
               Cancelar
             </Button>
             <Button
               type="button"
-              size="sm"
               onClick={handleSaveAddress}
               disabled={savingAddress}
-              className="text-xs rounded-xl font-semibold"
+              className="h-12 text-sm rounded-xl font-semibold sm:h-11"
             >
               {savingAddress ? "Salvando..." : "Salvar Endereço"}
             </Button>

@@ -1,7 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { haptic } from '@/lib/haptics';
 
 export interface CartProduct {
     id: string;
@@ -23,8 +25,11 @@ export type CartItem = {
 
 interface CartContextType {
     items: CartItem[];
-    addToCart: (product: CartProduct, quantity: number) => void;
-    removeFromCart: (productId: string) => void;
+    /** false até o carrinho salvo no aparelho ser lido (evita mostrar "vazio" por um instante). */
+    isLoaded: boolean;
+    /** Retorna a quantidade efetivamente adicionada (0 se não havia estoque). */
+    addToCart: (product: CartProduct, quantity: number, options?: { silent?: boolean }) => number;
+    removeFromCart: (productId: string, options?: { silent?: boolean }) => void;
     updateQuantity: (productId: string, quantity: number) => void;
     clearCart: () => void;
     totalItems: number;
@@ -48,6 +53,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const [items, setItems] = useState<CartItem[]>([]);
     const [shippingInfo, setShippingInfo] = useState<ShippingInfo | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
+    const router = useRouter();
+    const pathname = usePathname();
+    const itemsRef = useRef(items);
+
+    useEffect(() => {
+        itemsRef.current = items;
+    }, [items]);
 
     // Carrega do localStorage ao montar
     useEffect(() => {
@@ -91,71 +103,106 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
     }, [shippingInfo, isLoaded]);
 
-    const addToCart = (product: CartProduct, quantity: number) => {
+    const addToCart = (product: CartProduct, quantity: number, options?: { silent?: boolean }) => {
         const stock = Number(product?.stock ?? 0);
         const q = Math.max(1, Number(quantity) || 1);
+        const current = itemsRef.current;
+        const existing = current.find(item => item.product.id === product.id);
+        const existingQty = existing ? Number(existing.quantity) || 0 : 0;
 
-        setItems(current => {
-            const existing = current.find(item => item.product.id === product.id);
-            const existingQty = existing ? Number(existing.quantity) || 0 : 0;
-
-            if (Number.isFinite(stock) && stock > 0) {
-                const canAdd = Math.max(0, stock - existingQty);
-                const willAdd = Math.min(q, canAdd);
-
-                if (willAdd <= 0) {
-                    toast.error('Quantidade indisponível em estoque.');
-                    return current;
-                }
-
-                if (willAdd < q) {
-                    toast.warning(`Apenas ${canAdd} unidade(s) disponível(is) em estoque.`);
-                }
-
-                if (existing) {
-                    return current.map(item =>
-                        item.product.id === product.id
-                            ? { ...item, quantity: existingQty + willAdd }
-                            : item
-                    );
-                }
-
-                return [...current, { product, quantity: willAdd }];
-            }
-
+        if (!Number.isFinite(stock) || stock <= 0) {
+            haptic('error');
             toast.error('Produto sem estoque.');
-            return current;
-        });
+            return 0;
+        }
+
+        const canAdd = Math.max(0, stock - existingQty);
+        const willAdd = Math.min(q, canAdd);
+
+        if (willAdd <= 0) {
+            haptic('error');
+            toast.error('Quantidade indisponível em estoque.');
+            return 0;
+        }
+
+        const next = existing
+            ? current.map(item =>
+                item.product.id === product.id ? { ...item, quantity: existingQty + willAdd } : item
+            )
+            : [...current, { product, quantity: willAdd }];
+        itemsRef.current = next;
+        setItems(next);
+        haptic('success');
+
+        if (willAdd < q) {
+            toast.warning(`Apenas ${canAdd} unidade(s) disponível(is) em estoque.`);
+        } else if (!options?.silent) {
+            toast.success('Adicionado ao carrinho', {
+                id: 'cart-added',
+                description: product.title || product.name,
+                action: pathname === '/carrinho'
+                    ? undefined
+                    : { label: 'Ver carrinho', onClick: () => router.push('/carrinho') },
+            });
+        }
+
+        return willAdd;
     };
 
     const updateQuantity = (productId: string, quantity: number) => {
         const q = Math.max(1, Number(quantity) || 1);
-        setItems(current =>
-            current.flatMap(item => {
-                if (item.product.id !== productId) return [item];
+        const item = itemsRef.current.find(entry => entry.product.id === productId);
+        if (!item) return;
 
-                const stock = Number(item.product?.stock ?? 0);
-                if (Number.isFinite(stock) && stock <= 0) {
-                    toast.error('Produto sem estoque.');
-                    return [];
-                }
+        const stock = Number(item.product?.stock ?? 0);
+        if (Number.isFinite(stock) && stock <= 0) {
+            toast.error('Produto sem estoque.');
+            removeFromCart(productId, { silent: true });
+            return;
+        }
 
-                if (Number.isFinite(stock) && stock > 0) {
-                    const clamped = Math.min(q, stock);
-                    if (clamped < q) toast.warning(`Estoque máximo: ${stock}.`);
-                    return [{ ...item, quantity: clamped }];
-                }
+        const clamped = Number.isFinite(stock) && stock > 0 ? Math.min(q, stock) : q;
+        if (clamped < q) toast.warning(`Estoque máximo: ${stock}.`);
+        if (clamped === item.quantity) return;
 
-                return [{ ...item, quantity: q }];
-            })
+        haptic('selection');
+        const next = itemsRef.current.map(entry =>
+            entry.product.id === productId ? { ...entry, quantity: clamped } : entry
         );
+        itemsRef.current = next;
+        setItems(next);
     };
 
-    const removeFromCart = (productId: string) => {
-        setItems(current => current.filter(item => item.product.id !== productId));
+    const removeFromCart = (productId: string, options?: { silent?: boolean }) => {
+        const current = itemsRef.current;
+        const index = current.findIndex(item => item.product.id === productId);
+        if (index < 0) return;
+
+        const removed = current[index];
+        const next = current.filter(item => item.product.id !== productId);
+        itemsRef.current = next;
+        setItems(next);
+        if (options?.silent) return;
+
+        haptic('light');
+        toast('Item removido do carrinho', {
+            id: `cart-removed-${productId}`,
+            description: removed.product.title || removed.product.name,
+            action: {
+                label: 'Desfazer',
+                onClick: () => {
+                    const restored = [...itemsRef.current];
+                    if (restored.some(item => item.product.id === productId)) return;
+                    restored.splice(Math.min(index, restored.length), 0, removed);
+                    itemsRef.current = restored;
+                    setItems(restored);
+                },
+            },
+        });
     };
 
     const clearCart = () => {
+        itemsRef.current = [];
         setItems([]);
     };
 
@@ -163,7 +210,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const subtotal = items.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
 
     return (
-        <CartContext.Provider value={{ items, addToCart, removeFromCart, updateQuantity, clearCart, totalItems, subtotal, shippingInfo, setShippingInfo }}>
+        <CartContext.Provider value={{ items, isLoaded, addToCart, removeFromCart, updateQuantity, clearCart, totalItems, subtotal, shippingInfo, setShippingInfo }}>
             {children}
         </CartContext.Provider>
     );

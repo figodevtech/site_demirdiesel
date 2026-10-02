@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useCatalogNavigation } from "./CatalogTransition";
 import { Check, Filter, Search, X } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,7 @@ const CONDITIONS = [
 ];
 
 export function ProductFilters({ categories, availableBrands = [], priceBounds, onApply }: ProductFiltersProps) {
-  const router = useRouter();
+  const { navigate: navigateCatalog } = useCatalogNavigation();
   const searchParams = useSearchParams();
   const category = searchParams.get("category");
   const condition = searchParams.get("condicao");
@@ -66,7 +67,7 @@ export function ProductFilters({ categories, availableBrands = [], priceBounds, 
     const params = new URLSearchParams(searchParams.toString());
     params.delete("page");
     mutator(params);
-    router.push(params.size ? `/produtos?${params.toString()}` : "/produtos");
+    navigateCatalog(params.size ? `/produtos?${params.toString()}` : "/produtos", { scroll: false });
     onApply?.();
   }
 
@@ -134,8 +135,8 @@ export function ProductFilters({ categories, availableBrands = [], priceBounds, 
           <AccordionItem value="condition">
             <AccordionTrigger className="py-3.5 font-semibold hover:no-underline">Condição da peça</AccordionTrigger>
             <AccordionContent className="flex flex-wrap gap-2">
-              <Button size="sm" variant={!condition ? "default" : "outline"} className="h-8 text-xs" onClick={() => updateParam("condicao", null)}>Todas</Button>
-              {CONDITIONS.map((item) => <Button key={item.value} size="sm" variant={condition === item.value ? "default" : "outline"} className="h-8 text-xs" onClick={() => updateParam("condicao", condition === item.value ? null : item.value)}>{item.label}</Button>)}
+              <Button size="sm" variant={!condition ? "default" : "outline"} className="h-10 px-3.5 text-xs md:h-8" onClick={() => updateParam("condicao", null)}>Todas</Button>
+              {CONDITIONS.map((item) => <Button key={item.value} size="sm" variant={condition === item.value ? "default" : "outline"} className="h-10 px-3.5 text-xs md:h-8" onClick={() => updateParam("condicao", condition === item.value ? null : item.value)}>{item.label}</Button>)}
             </AccordionContent>
           </AccordionItem>
 
@@ -178,11 +179,11 @@ export function ProductFilters({ categories, availableBrands = [], priceBounds, 
 }
 
 function Options({ allLabel, current, options, onChange }: { allLabel: string; current: string | null; options: Array<{ label: string; value: string }>; onChange: (value: string | null) => void }) {
-  return <div className="max-h-52 space-y-0.5 overflow-y-auto pr-1"><Option label={allLabel} selected={!current} onClick={() => onChange(null)} />{options.map((item) => { const selected = current?.toLocaleLowerCase("pt-BR") === item.value.toLocaleLowerCase("pt-BR"); return <Option key={item.value} label={item.label} selected={selected} onClick={() => onChange(selected ? null : item.value)} />; })}</div>;
+  return <div className="space-y-0.5 pr-1 md:max-h-52 md:overflow-y-auto"><Option label={allLabel} selected={!current} onClick={() => onChange(null)} />{options.map((item) => { const selected = current?.toLocaleLowerCase("pt-BR") === item.value.toLocaleLowerCase("pt-BR"); return <Option key={item.value} label={item.label} selected={selected} onClick={() => onChange(selected ? null : item.value)} />; })}</div>;
 }
 
 function Option({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
-  return <Button type="button" variant="ghost" size="sm" onClick={onClick} className={`h-8 w-full justify-between px-2 text-xs font-normal ${selected ? "bg-primary/10 font-semibold text-primary hover:bg-primary/15 hover:text-primary" : "text-muted-foreground"}`}><span className="truncate">{label}</span>{selected && <Check className="size-3.5 shrink-0" />}</Button>;
+  return <Button type="button" variant="ghost" size="sm" onClick={onClick} className={`h-10 w-full justify-between px-2 text-sm font-normal md:h-8 md:text-xs ${selected ? "bg-primary/10 font-semibold text-primary hover:bg-primary/15 hover:text-primary" : "text-muted-foreground"}`}><span className="truncate">{label}</span>{selected && <Check className="size-3.5 shrink-0" />}</Button>;
 }
 
 function FilterSearch({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {

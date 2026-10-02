@@ -88,16 +88,16 @@ export default function SidebarDrawer({ categories, onOpenChange }: SidebarProps
                         <div>
                             <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Minha Conta</h4>
                             <nav className="space-y-1">
-                                <Link href="/conta" onClick={() => setOpen(false)} className="flex items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors">
+                                <Link href="/conta" onClick={() => setOpen(false)} className="flex min-h-11 items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted active:bg-muted transition-colors">
                                     <User size={16} /> Perfil
                                 </Link>
-                                <Link href="/pedidos" onClick={() => setOpen(false)} className="flex items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors">
+                                <Link href="/pedidos" onClick={() => setOpen(false)} className="flex min-h-11 items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted active:bg-muted transition-colors">
                                     <Package size={16} /> Meus Pedidos
                                 </Link>
-                                <Link href="/enderecos" onClick={() => setOpen(false)} className="flex items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors">
+                                <Link href="/enderecos" onClick={() => setOpen(false)} className="flex min-h-11 items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted active:bg-muted transition-colors">
                                     <MapPin size={16} /> Endereços
                                 </Link>
-                                <Link href="/favoritos" onClick={() => setOpen(false)} className="flex items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors">
+                                <Link href="/favoritos" onClick={() => setOpen(false)} className="flex min-h-11 items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted active:bg-muted transition-colors">
                                     <Heart size={16} /> Lista de Desejos
                                 </Link>
                             </nav>
@@ -145,7 +145,7 @@ export default function SidebarDrawer({ categories, onOpenChange }: SidebarProps
                     <div>
                         <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Ajuda</h4>
                         <nav className="space-y-1">
-                            <Link href="/duvidas-frequentes" onClick={() => setOpen(false)} className="flex items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors">
+                            <Link href="/duvidas-frequentes" onClick={() => setOpen(false)} className="flex min-h-11 items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted active:bg-muted transition-colors">
                                 <HelpCircle size={16} /> Central de Ajuda
                             </Link>
                             <a
