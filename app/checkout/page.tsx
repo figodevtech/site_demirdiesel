@@ -20,6 +20,10 @@ import {
   ArrowLeft,
   Store,
   Info,
+  QrCode,
+  CreditCard,
+  Barcode,
+  Zap,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { isOrderPaid } from "@/lib/order-status";
@@ -34,6 +38,39 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { isPickupEligible, type DeliveryMethod } from "@/lib/shipping";
 import { siteConfig } from "@/lib/site-config";
+import { Badge } from "@/components/ui/badge";
+import {
+  PAYMENT_METHOD_LABELS,
+  type AsaasBillingType,
+} from "@/lib/payment-methods";
+
+const PAYMENT_OPTIONS: Array<{
+  value: AsaasBillingType;
+  description: string;
+  detail: string;
+  icon: typeof QrCode;
+  badge?: string;
+}> = [
+  {
+    value: "PIX",
+    description: "Aprova\u00e7\u00e3o em poucos segundos",
+    detail: "Pague pelo aplicativo do seu banco.",
+    icon: QrCode,
+    badge: "Mais r\u00e1pido",
+  },
+  {
+    value: "CREDIT_CARD",
+    description: "Pagamento protegido pelo Asaas",
+    detail: "Informe os dados do cart\u00e3o no ambiente seguro.",
+    icon: CreditCard,
+  },
+  {
+    value: "BOLETO",
+    description: "Vencimento em at\u00e9 3 dias",
+    detail: "A compensa\u00e7\u00e3o pode levar at\u00e9 3 dias \u00fateis.",
+    icon: Barcode,
+  },
+];
 
 interface CustomerAddress {
   id: number;
@@ -74,6 +111,7 @@ export default function CheckoutPage() {
   const [isWaitingPayment, setIsWaitingPayment] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<number | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid">("pending");
+  const [paymentMethod, setPaymentMethod] = useState<AsaasBillingType>("PIX");
   const clearedRef = useRef(false);
 
   const formatCurrency = (val: number) =>
@@ -280,6 +318,16 @@ export default function CheckoutPage() {
       return;
     }
 
+    const width = 600;
+    const height = 750;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    const paymentWindow = window.open(
+      "",
+      "AsaasCheckout",
+      `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes`,
+    );
+
     setIsProcessing(true);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -289,6 +337,7 @@ export default function CheckoutPage() {
       const checkoutData = {
         addressId: selectedAddressId,
         deliveryMethod,
+        billingType: paymentMethod,
         items: items.map((it) => ({
           productId: it.product.id,
           quantity: it.quantity,
@@ -317,20 +366,17 @@ export default function CheckoutPage() {
           setCurrentOrderId(result.orderId);
         }
 
-        // Abre em janela modal/popup amigável
-        const width = 600;
-        const height = 750;
-        const left = window.screen.width / 2 - width / 2;
-        const top = window.screen.height / 2 - height / 2;
-        window.open(
-          result.url,
-          "AsaasCheckout",
-          `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes`
-        );
+        if (paymentWindow) {
+          paymentWindow.location.href = result.url;
+        } else {
+          window.location.assign(result.url);
+        }
       } else {
+        paymentWindow?.close();
         throw new Error("URL de pagamento não retornada.");
       }
     } catch (err: unknown) {
+      paymentWindow?.close();
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Erro ao processar o pagamento.");
     } finally {
@@ -339,6 +385,8 @@ export default function CheckoutPage() {
   };
 
   const finalTotal = subtotal;
+  const selectedPaymentOption =
+    PAYMENT_OPTIONS.find((option) => option.value === paymentMethod) ?? PAYMENT_OPTIONS[0];
 
   // Tela de Pagamento Aprovado
   if (paymentStatus === "paid") {
@@ -516,27 +564,30 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          {/* 3. Aguardando Pagamento ou Gatilho */}
+          {/* 3. Forma de pagamento */}
           <div className="space-y-4 rounded-2xl bg-card p-6 shadow-lg shadow-slate-900/8 dark:shadow-black/25">
-            <div className="flex items-center gap-2">
+            <div className="flex items-start gap-2">
               <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">
                 3
               </div>
-              <h2 className="font-extrabold text-base text-foreground">
-                Pagamento Integrado (PIX, Cartão de Crédito ou Boleto)
-              </h2>
+              <div>
+                <h2 className="font-extrabold text-base text-foreground">Forma de pagamento</h2>
+                <p className="text-xs text-muted-foreground">
+                  Escolha como deseja concluir sua compra no ambiente seguro do Asaas.
+                </p>
+              </div>
             </div>
 
             {isWaitingPayment && paymentUrl ? (
-              <div className="p-6 rounded-xl bg-slate-50 dark:bg-slate-900 border border-primary/30 space-y-4 text-center">
+              <div className="space-y-4 rounded-xl bg-primary/5 p-6 text-center shadow-sm ring-1 ring-primary/20">
                 <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
                   <Loader2 className="w-5 h-5 animate-spin" />
                 </div>
                 <h3 className="font-bold text-base text-foreground">
-                  Aguardando confirmação do pagamento...
+                  Aguardando confirma&ccedil;&atilde;o por {PAYMENT_METHOD_LABELS[paymentMethod]}
                 </h3>
                 <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                  A tela segura do Asaas foi aberta em uma nova janela. Conclua o pagamento por PIX, cartão ou boleto.
+                  A tela segura do Asaas foi aberta em uma nova janela. Conclua o pagamento para que o pedido seja liberado.
                 </p>
                 <div className="flex flex-wrap gap-2 justify-center pt-2">
                   <Button
@@ -559,10 +610,64 @@ export default function CheckoutPage() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  Ao clicar em <strong>Prosseguir para Pagamento</strong>, você será direcionado ao ambiente seguro do Asaas para escolher entre PIX, cartão de crédito ou boleto bancário.
-                </p>
+              <div className="space-y-4">
+                <RadioGroup
+                  value={paymentMethod}
+                  onValueChange={(value) => setPaymentMethod(value as AsaasBillingType)}
+                  className="grid gap-3 md:grid-cols-3"
+                >
+                  {PAYMENT_OPTIONS.map((option) => {
+                    const Icon = option.icon;
+                    const selected = paymentMethod === option.value;
+
+                    return (
+                      <Label
+                        key={option.value}
+                        htmlFor={`payment-${option.value}`}
+                        className={`relative flex cursor-pointer flex-col gap-3 rounded-xl p-4 shadow-sm ring-1 transition-all ${
+                          selected
+                            ? "bg-primary/5 ring-2 ring-primary"
+                            : "bg-card ring-border/70 hover:ring-primary/40"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <Icon className="size-5" />
+                          </span>
+                          <RadioGroupItem
+                            id={`payment-${option.value}`}
+                            value={option.value}
+                            aria-label={PAYMENT_METHOD_LABELS[option.value]}
+                          />
+                        </div>
+                        <span className="grid gap-1">
+                          <span className="flex flex-wrap items-center gap-2 text-sm font-bold text-foreground">
+                            {PAYMENT_METHOD_LABELS[option.value]}
+                            {option.badge && (
+                              <Badge className="border-0 bg-emerald-100 text-[10px] text-emerald-700 hover:bg-emerald-100">
+                                <Zap className="size-3" />
+                                {option.badge}
+                              </Badge>
+                            )}
+                          </span>
+                          <span className="text-xs font-medium text-foreground/80">
+                            {option.description}
+                          </span>
+                          <span className="text-[11px] font-normal leading-relaxed text-muted-foreground">
+                            {option.detail}
+                          </span>
+                        </span>
+                      </Label>
+                    );
+                  })}
+                </RadioGroup>
+
+                <div className="flex items-start gap-2 rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
+                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                  <span>
+                    A Demir Diesel n&atilde;o armazena os dados do seu cart&atilde;o. O pagamento &eacute; processado diretamente pelo Asaas.
+                  </span>
+                </div>
 
                 <Button
                   size="lg"
@@ -575,7 +680,7 @@ export default function CheckoutPage() {
                       <Loader2 className="w-4 h-4 animate-spin" /> Processando Pedido...
                     </>
                   ) : (
-                    <span>Prosseguir para Pagamento Seguro</span>
+                    <span>Pagar com {selectedPaymentOption ? PAYMENT_METHOD_LABELS[selectedPaymentOption.value] : "Asaas"}</span>
                   )}
                 </Button>
               </div>

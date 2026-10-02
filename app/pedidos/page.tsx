@@ -1,13 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Package,
   Calendar,
-  CheckCircle2,
-  Clock,
   ChevronDown,
   ChevronUp,
   Loader2,
@@ -16,35 +14,48 @@ import {
   Copy,
 } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthContext";
+import { AccountSectionHeader, AccountShell } from "@/components/account/AccountShell";
 import { supabase } from "@/lib/supabase";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { isOrderPaid, isOrderAuthorized, isOrderCancelled } from "@/lib/order-status";
 
+interface OrderProduct {
+  titulo: string | null;
+  tituloMarketplace: string | null;
+  fabricante: string | null;
+}
+
+interface OrderItem {
+  id: number;
+  venda_id: number;
+  quantidade: number;
+  valor_total: number;
+  produto: OrderProduct | null;
+}
+
+interface CustomerOrder {
+  id: number;
+  status: string | null;
+  datavenda: string | null;
+  createdat: string | null;
+  valortotal: number | null;
+  codigo_rastreio: string | null;
+  items: OrderItem[];
+}
+
 export default function PedidosPage() {
   const { user, profile, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
 
-  useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push("/login?redirect=/pedidos");
-      } else if (profile?.id) {
-        fetchOrders();
-      } else {
-        setLoading(false);
-      }
-    }
-  }, [user?.id, profile?.id, authLoading, router]);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     if (!profile?.id) return;
     setLoading(true);
     try {
@@ -82,8 +93,8 @@ export default function PedidosPage() {
         `)
         .in("venda_id", saleIds);
 
-      const itemsBySale: Record<number, any[]> = {};
-      (itemsData || []).forEach((item: any) => {
+      const itemsBySale: Record<number, OrderItem[]> = {};
+      ((itemsData || []) as unknown as OrderItem[]).forEach((item) => {
         if (!itemsBySale[item.venda_id]) itemsBySale[item.venda_id] = [];
         itemsBySale[item.venda_id].push(item);
       });
@@ -93,21 +104,32 @@ export default function PedidosPage() {
         items: itemsBySale[sale.id] || [],
       }));
 
-      setOrders(fullOrders);
+      setOrders(fullOrders as CustomerOrder[]);
     } catch (err) {
       console.error("Erro ao carregar pedidos:", err);
       toast.error("Erro ao carregar seus pedidos.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push("/login?redirect=/pedidos");
+    } else if (profile?.id) {
+      void fetchOrders();
+    } else {
+      setLoading(false);
+    }
+  }, [authLoading, fetchOrders, profile?.id, router, user]);
 
   const copyTracking = (code: string) => {
     navigator.clipboard.writeText(code);
     toast.success("Código de rastreio copiado!");
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string | null) => {
     const s = String(status || "").toUpperCase();
     if (isOrderPaid(s)) {
       return (
@@ -138,27 +160,17 @@ export default function PedidosPage() {
   };
 
   return (
-    <div className="container mx-auto max-w-5xl px-4 pb-8 pt-3 md:pb-10 md:pt-5">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between pb-2">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground flex items-center gap-2.5">
-            <Package className="w-7 h-7 text-primary" />
-            <span>Meus Pedidos</span>
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Histórico completo de compras e status de envio
-          </p>
-        </div>
-
-        <Link
-          href="/produtos"
-          className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Voltar à Loja</span>
-        </Link>
-      </div>
+    <AccountShell>
+      <AccountSectionHeader
+        icon={Package}
+        title="Meus pedidos"
+        description="Acompanhe suas compras, pagamentos e entregas."
+        action={
+          <Button asChild variant="outline" className="h-10 w-full gap-2 sm:w-auto">
+            <Link href="/produtos"><ArrowLeft className="size-4" />Voltar à loja</Link>
+          </Button>
+        }
+      />
 
       {loading || authLoading ? (
         <div className="py-20 text-center flex flex-col items-center justify-center gap-3">
@@ -248,7 +260,7 @@ export default function PedidosPage() {
                       </h4>
 
                       <div className="divide-y divide-border/50 text-xs">
-                        {order.items.map((item: any) => (
+                        {order.items.map((item) => (
                           <div key={item.id} className="py-2.5 first:pt-0 flex items-center justify-between gap-4">
                             <div className="min-w-0 flex-1">
                               <span className="font-semibold text-foreground truncate block">
@@ -278,7 +290,9 @@ export default function PedidosPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => copyTracking(order.codigo_rastreio)}
+                          onClick={() => {
+                            if (order.codigo_rastreio) copyTracking(order.codigo_rastreio);
+                          }}
                           className="h-7 text-xs text-emerald-700 hover:bg-emerald-100"
                         >
                           <Copy className="w-3.5 h-3.5 mr-1" /> Copiar
@@ -292,6 +306,6 @@ export default function PedidosPage() {
           })}
         </div>
       )}
-    </div>
+    </AccountShell>
   );
 }

@@ -5,9 +5,8 @@ import { Toaster } from "@/components/ui/sonner";
 import Navbar from "@/components/layout/Navbar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import Footer from "@/components/layout/Footer";
-import { CartProvider } from "@/components/providers/CartContext";
 import { AuthProvider } from "@/components/providers/AuthContext";
-import { WishlistProvider } from "@/components/providers/WishlistContext";
+import { RouteShell } from "@/components/layout/RouteShell";
 import { Analytics } from "@vercel/analytics/react";
 import { siteConfig } from "@/lib/site-config";
 import "./globals.css";
@@ -108,19 +107,16 @@ export default function RootLayout({
           shadow="0 0 10px #0A7AAC,0 0 5px #0A7AAC"
         />
         <AuthProvider>
-          <WishlistProvider>
-            <CartProvider>
-              <Navbar />
-              <main className="flex-1 w-full flex flex-col pb-16 md:pb-0">
-                {children}
-              </main>
-              <Footer />
-              <BottomNav />
-              <Toaster position="top-right" richColors />
-              <Analytics />
-            </CartProvider>
-          </WishlistProvider>
+          <RouteShell
+            navbar={<Navbar />}
+            footer={<Footer />}
+            bottomNav={<BottomNav />}
+          >
+            {children}
+          </RouteShell>
         </AuthProvider>
+        <Toaster position="top-right" richColors />
+        <Analytics />
       </body>
     </html>
   );

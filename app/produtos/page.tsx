@@ -132,7 +132,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       {/* Layout com Sidebar Desktop e Grid Principal */}
       <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-8 items-start">
         {/* Sidebar Desktop de Filtros */}
-        <aside className="sticky top-28 hidden max-h-[calc(100dvh-8rem)] overflow-y-auto overscroll-contain pr-1 md:block">
+        <aside className="sticky top-24 hidden h-[calc(100dvh-7rem)] overflow-hidden pr-1 md:block">
           <ProductFilters
             categories={categories}
             availableBrands={availableBrands}

@@ -10,6 +10,10 @@ import {
 } from "@/lib/asaas";
 import { getStorePaymentConfig } from "@/lib/store-payment-config";
 import { isPickupEligible, type DeliveryMethod } from "@/lib/shipping";
+import {
+  isAsaasBillingType,
+  PAYMENT_METHOD_LABELS,
+} from "@/lib/payment-methods";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -130,6 +134,19 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const { addressId, items } = body || {};
     const deliveryMethod: DeliveryMethod = body?.deliveryMethod === "pickup" ? "pickup" : "delivery";
+    const billingType = body?.billingType;
+
+    if (!isAsaasBillingType(billingType)) {
+      return NextResponse.json(
+        {
+          error: "FORMA_PAGAMENTO_INVALIDA",
+          message: "Selecione Pix, cart\u00e3o de cr\u00e9dito ou boleto para continuar.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const paymentMethodLabel = PAYMENT_METHOD_LABELS[billingType];
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -333,7 +350,7 @@ export async function POST(request: Request) {
       p_subtotal: serverSubtotal,
       p_total: serverTotal,
       p_canal: "ONLINE",
-      p_forma_pagamento: "Asaas",
+      p_forma_pagamento: paymentMethodLabel,
     });
 
     if (rpcError || !orderId) {
@@ -417,7 +434,7 @@ export async function POST(request: Request) {
 
       const paymentPayload: Record<string, unknown> = {
         customer: asaasCustomerId,
-        billingType: "UNDEFINED",
+        billingType,
         value: Number(serverTotal.toFixed(2)),
         dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
           .toISOString()
@@ -452,6 +469,7 @@ export async function POST(request: Request) {
           gateway_checkout_url: payment.invoiceUrl,
           gateway_status: payment.status || "PENDING",
           gateway_due_date: payment.dueDate || null,
+          forma_pagamento: paymentMethodLabel,
           commission_percent: splitEnabled ? commissionPercent : 0,
           commission_wallet_id: splitEnabled ? commissionWalletId : null,
           commission_config_revision: paymentConfig.revision,
@@ -468,6 +486,8 @@ export async function POST(request: Request) {
         orderId,
         total: serverTotal,
         subtotal: serverSubtotal,
+        billingType,
+        paymentMethod: paymentMethodLabel,
       });
     } catch (paymentError) {
       const message =

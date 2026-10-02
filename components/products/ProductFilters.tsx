@@ -91,8 +91,8 @@ export function ProductFilters({ categories, availableBrands = [], priceBounds, 
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+    <div className="flex max-h-full min-h-0 flex-col gap-4">
+      <div className="flex shrink-0 items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary"><Filter className="size-4" /></span>
           <div><h2 className="text-sm font-bold">Filtrar produtos</h2><p className="text-[11px] text-muted-foreground">Refine o catálogo</p></div>
@@ -101,7 +101,7 @@ export function ProductFilters({ categories, availableBrands = [], priceBounds, 
       </div>
 
       {activeFilters.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 border-y py-3">
+        <div className="flex shrink-0 flex-wrap gap-1.5 border-y py-3">
           {activeFilters.map((item) => (
             <Badge key={item.key} variant="secondary" className="gap-1 rounded-md py-1 pl-2 pr-1 font-medium">
               {item.label}
@@ -111,7 +111,7 @@ export function ProductFilters({ categories, availableBrands = [], priceBounds, 
         </div>
       )}
 
-      <div className="rounded-xl bg-card px-3 shadow-md shadow-slate-900/8 dark:shadow-black/25">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl bg-card px-3 shadow-md shadow-slate-900/8 dark:shadow-black/25">
         <Accordion type="multiple" defaultValue={["categories", "availability", "condition", "price", "brands"]}>
           <AccordionItem value="categories">
             <AccordionTrigger className="py-3.5 font-semibold hover:no-underline">Categorias</AccordionTrigger>

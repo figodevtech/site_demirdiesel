@@ -1,20 +1,20 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   MapPin,
   Plus,
   Trash2,
   Edit2,
   Loader2,
-  ArrowLeft,
   Building,
 } from "lucide-react";
+import { AccountSectionHeader, AccountShell } from "@/components/account/AccountShell";
 import { useAuth } from "@/components/providers/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -25,13 +25,35 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+interface CustomerAddress {
+  id: number;
+  cep: string;
+  logradouro: string;
+  numero: string;
+  complemento: string | null;
+  bairro: string;
+  cidade: string;
+  estado: string;
+}
 
 export default function EnderecosPage() {
   const { user, profile, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  const [addresses, setAddresses] = useState<any[]>([]);
+  const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [addressToDelete, setAddressToDelete] = useState<CustomerAddress | null>(null);
 
   // Form state
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -44,19 +66,8 @@ export default function EnderecosPage() {
   const [estado, setEstado] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push("/login?redirect=/enderecos");
-      } else if (profile?.id) {
-        fetchAddresses();
-      } else {
-        setLoading(false);
-      }
-    }
-  }, [user?.id, profile?.id, authLoading, router]);
-
-  const fetchAddresses = async () => {
+  const fetchAddresses = useCallback(async () => {
+    if (!profile?.id) return;
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -66,14 +77,25 @@ export default function EnderecosPage() {
         .order("id", { ascending: true });
 
       if (error) throw error;
-      setAddresses(data || []);
+      setAddresses((data || []) as CustomerAddress[]);
     } catch (err) {
       console.error(err);
       toast.error("Erro ao carregar endereços.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push("/login?redirect=/enderecos");
+    } else if (profile?.id) {
+      void fetchAddresses();
+    } else {
+      setLoading(false);
+    }
+  }, [authLoading, fetchAddresses, profile?.id, router, user]);
 
   const handleCepBlur = async () => {
     const cleanCep = cep.replace(/\D/g, "");
@@ -104,7 +126,7 @@ export default function EnderecosPage() {
     setEstado("");
   };
 
-  const handleEdit = (addr: any) => {
+  const handleEdit = (addr: CustomerAddress) => {
     setEditingId(addr.id);
     setCep(addr.cep);
     setLogradouro(addr.logradouro);
@@ -117,7 +139,6 @@ export default function EnderecosPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Tem certeza que deseja excluir este endereço?")) return;
     try {
       const { error } = await supabase.from("cliente_endereco").delete().eq("id", id);
       if (error) throw error;
@@ -126,6 +147,8 @@ export default function EnderecosPage() {
     } catch (err) {
       console.error(err);
       toast.error("Erro ao excluir endereço.");
+    } finally {
+      setAddressToDelete(null);
     }
   };
 
@@ -173,43 +196,39 @@ export default function EnderecosPage() {
   };
 
   return (
-    <div className="container mx-auto max-w-5xl px-4 pb-8 pt-3 md:pb-10 md:pt-5">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between pb-2">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground flex items-center gap-2.5">
-            <MapPin className="w-7 h-7 text-primary" />
-            <span>Endereços de Entrega</span>
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Cadastre os locais de entrega para agilizar suas compras
-          </p>
-        </div>
-
+    <AccountShell>
+      <AccountSectionHeader
+        icon={MapPin}
+        title="Endereços de entrega"
+        description="Cadastre os locais de entrega para agilizar suas compras."
+        action={
         <Button
           onClick={() => {
             resetForm();
             setIsDialogOpen(true);
           }}
-          className="rounded-xl text-xs font-semibold h-9 gap-1.5"
+          className="h-10 w-full gap-2 font-semibold sm:w-auto"
         >
-          <Plus className="w-4 h-4" />
-          <span>Novo Endereço</span>
+          <Plus className="size-4" />
+          <span>Novo endereço</span>
         </Button>
-      </div>
+        }
+      />
 
-      {loading || authLoading ? (
-        <div className="py-20 text-center flex flex-col items-center justify-center gap-3">
+      <Card className="min-h-[32rem] border-0 py-0 shadow-lg shadow-slate-900/8 dark:shadow-black/25">
+        <CardContent className="p-5 sm:p-6">
+        {loading || authLoading ? (
+        <div className="flex min-h-96 flex-col items-center justify-center gap-3 text-center">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
           <span className="text-xs text-muted-foreground">Carregando seus endereços...</span>
         </div>
       ) : addresses.length === 0 ? (
-        <div className="py-20 px-4 text-center rounded-3xl border border-dashed border-border/80 bg-slate-50/50 dark:bg-slate-900/30 max-w-md mx-auto">
-          <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-800 shadow-xs border border-border/60 flex items-center justify-center mx-auto mb-4 text-slate-400">
-            <Building className="w-6 h-6 stroke-[1.5]" />
+        <div className="flex min-h-96 flex-col items-center justify-center px-4 text-center">
+          <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <Building className="size-7 stroke-[1.5]" />
           </div>
           <h2 className="text-base font-bold text-foreground">Nenhum endereço cadastrado</h2>
-          <p className="text-xs text-muted-foreground mt-1 mb-6">
+          <p className="mb-6 mt-2 max-w-md text-sm text-muted-foreground">
             Adicione o endereço da sua oficina, frota ou residência para entrega das peças.
           </p>
           <Button
@@ -217,17 +236,18 @@ export default function EnderecosPage() {
               resetForm();
               setIsDialogOpen(true);
             }}
-            className="rounded-xl px-6 font-semibold text-xs h-9"
+            className="h-10 gap-2 px-6 font-semibold"
           >
-            Cadastrar Endereço
+            <Plus className="size-4" />
+            Cadastrar endereço
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {addresses.map((addr) => (
             <div
               key={addr.id}
-              className="flex flex-col justify-between gap-4 rounded-2xl bg-card p-5 shadow-lg shadow-slate-900/8 dark:shadow-black/25"
+              className="flex min-h-40 flex-col justify-between gap-4 rounded-2xl bg-muted/35 p-5 shadow-sm"
             >
               <div>
                 <div className="flex items-start justify-between gap-2">
@@ -235,22 +255,26 @@ export default function EnderecosPage() {
                     {addr.logradouro}, {addr.numero}
                   </h3>
                   <div className="flex items-center gap-1">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon"
                       onClick={() => handleEdit(addr)}
-                      className="p-1.5 text-slate-400 hover:text-primary transition-colors"
-                      aria-label="Editar"
+                      className="size-8 text-muted-foreground hover:text-primary"
+                      aria-label="Editar endereço"
                     >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
+                      <Edit2 className="size-4" />
+                    </Button>
+                    <Button
                       type="button"
-                      onClick={() => handleDelete(addr.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors"
-                      aria-label="Excluir"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setAddressToDelete(addr)}
+                      className="size-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      aria-label="Excluir endereço"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                      <Trash2 className="size-4" />
+                    </Button>
                   </div>
                 </div>
 
@@ -271,6 +295,8 @@ export default function EnderecosPage() {
           ))}
         </div>
       )}
+        </CardContent>
+      </Card>
 
       {/* Modal Dialog Adicionar/Editar */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -374,6 +400,35 @@ export default function EnderecosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      <AlertDialog
+        open={Boolean(addressToDelete)}
+        onOpenChange={(open) => {
+          if (!open) setAddressToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir endereço?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {addressToDelete
+                ? `${addressToDelete.logradouro}, ${addressToDelete.numero} será removido da sua conta.`
+                : "Este endereço será removido da sua conta."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (addressToDelete) void handleDelete(addressToDelete.id);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </AccountShell>
   );
 }

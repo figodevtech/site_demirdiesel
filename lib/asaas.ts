@@ -30,6 +30,12 @@ export interface AsaasPayment {
   externalReference?: string;
 }
 
+export interface AsaasCardToken {
+  creditCardToken: string;
+  creditCardNumber?: string;
+  creditCardBrand?: string;
+}
+
 interface AsaasList<T> {
   data?: T[];
 }
@@ -117,6 +123,13 @@ export async function createAsaasCustomer(payload: Record<string, unknown>) {
 
 export async function createAsaasPayment(payload: Record<string, unknown>) {
   return asaasRequest<AsaasPayment>("/payments", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function tokenizeAsaasCreditCard(payload: Record<string, unknown>) {
+  return asaasRequest<AsaasCardToken>("/creditCard/tokenizeCreditCard", {
     method: "POST",
     body: JSON.stringify(payload),
   });

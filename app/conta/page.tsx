@@ -1,194 +1,306 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { User as UserIcon, Save, Loader2, ArrowLeft, Shield, Mail, Phone } from "lucide-react";
+import {
+  FileText,
+  Loader2,
+  Mail,
+  Phone,
+  Save,
+  Shield,
+  User as UserIcon,
+} from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/components/providers/AuthContext";
+import { AccountSectionHeader, AccountShell } from "@/components/account/AccountShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  cleanCpfCnpj,
+  formatCpfCnpj,
+  formatPhone,
+  isValidCpfCnpj,
+} from "@/lib/auth-utils";
+import { ensureCustomerProfile } from "@/lib/customer-profile";
 import { supabase } from "@/lib/supabase";
+
+type PersonType = "FISICA" | "JURIDICA";
+
+function userMetadataValue(
+  metadata: Record<string, unknown> | undefined,
+  key: string,
+) {
+  const value = metadata?.[key];
+  return typeof value === "string" ? value : "";
+}
 
 export default function ContaPage() {
   const { user, profile, isLoading: authLoading, refreshProfile } = useAuth();
   const router = useRouter();
-
+  const attemptedProfileUserId = useRef<string | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [document, setDocument] = useState("");
+  const [personType, setPersonType] = useState<PersonType>("FISICA");
+  const [isPreparingProfile, setIsPreparingProfile] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push("/login?redirect=/conta");
-      } else if (profile?.id) {
-        setName(profile.nomerazaosocial || "");
-        setPhone(profile.telefone || "");
-      }
+    if (authLoading) return;
+    if (!user) {
+      router.replace("/login?redirect=/conta");
+      return;
     }
-  }, [user?.id, profile?.id, authLoading, router]);
 
-  if (authLoading) {
+    const metadata = user.user_metadata as Record<string, unknown> | undefined;
+    const metadataType =
+      userMetadataValue(metadata, "person_type") === "JURIDICA"
+        ? "JURIDICA"
+        : "FISICA";
+
+    setName(profile?.nomerazaosocial || userMetadataValue(metadata, "name"));
+    setPhone(profile?.telefone || userMetadataValue(metadata, "phone"));
+    setDocument(
+      formatCpfCnpj(
+        profile?.cpfcnpj || userMetadataValue(metadata, "cpf_cnpj"),
+      ),
+    );
+    setPersonType(
+      profile?.tipopessoa === "JURIDICA"
+        ? "JURIDICA"
+        : profile?.tipopessoa === "FISICA"
+          ? "FISICA"
+          : metadataType,
+    );
+
+    if (!profile?.id && attemptedProfileUserId.current !== user.id) {
+      attemptedProfileUserId.current = user.id;
+      setIsPreparingProfile(true);
+      void ensureCustomerProfile(user)
+        .then(() => refreshProfile())
+        .catch((error) => {
+          console.error("Erro ao preparar perfil:", error);
+          toast.error("Não foi possível concluir seu perfil automaticamente.");
+        })
+        .finally(() => setIsPreparingProfile(false));
+    }
+  }, [
+    authLoading,
+    profile?.cpfcnpj,
+    profile?.id,
+    profile?.nomerazaosocial,
+    profile?.telefone,
+    profile?.tipopessoa,
+    refreshProfile,
+    router,
+    user,
+  ]);
+
+  async function handleSave(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!user) return;
+
+    if (!name.trim() || !phone.trim() || !document) {
+      toast.warning("Preencha nome, telefone e CPF/CNPJ.");
+      return;
+    }
+
+    if (!isValidCpfCnpj(document, personType)) {
+      toast.error(personType === "FISICA" ? "CPF inválido." : "CNPJ inválido.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const cleanDocument = cleanCpfCnpj(document);
+
+      if (!profile?.id) {
+        await ensureCustomerProfile(user, {
+          name,
+          personType,
+          document: cleanDocument,
+          email: user.email || "",
+          phone,
+        });
+      }
+
+      const [{ error: profileError }, { error: metadataError }] =
+        await Promise.all([
+          supabase
+            .from("cliente")
+            .update({
+              nomerazaosocial: name.trim(),
+              telefone: phone.trim(),
+              tipopessoa: personType,
+              cpfcnpj: cleanDocument,
+              updatedat: new Date().toISOString(),
+            })
+            .eq("user_id", user.id),
+          supabase.auth.updateUser({
+            data: {
+              name: name.trim(),
+              phone: phone.trim(),
+              person_type: personType,
+              cpf_cnpj: cleanDocument,
+            },
+          }),
+        ]);
+
+      if (profileError) throw profileError;
+      if (metadataError) throw metadataError;
+
+      await refreshProfile();
+      toast.success("Perfil atualizado com sucesso!");
+    } catch (error: unknown) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : "";
+      toast.error(
+        message.includes("duplicate") || message.includes("unique")
+          ? "Este CPF/CNPJ já está associado a outra conta."
+          : "Erro ao atualizar seus dados.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (authLoading || isPreparingProfile) {
     return (
-      <div className="py-24 text-center flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-        <span className="text-xs text-muted-foreground">Carregando seu perfil...</span>
+      <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
+        <Loader2 className="size-6 animate-spin text-primary" />
+        <span className="text-xs text-muted-foreground">
+          Preparando seu perfil...
+        </span>
       </div>
     );
   }
 
   if (!user) return null;
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    try {
-      const { error } = await supabase
-        .from("cliente")
-        .update({
-          nomerazaosocial: name,
-          telefone: phone,
-        })
-        .eq("user_id", user.id);
-
-      if (error) throw error;
-
-      toast.success("Perfil atualizado com sucesso!");
-      await refreshProfile();
-    } catch (err) {
-      console.error(err);
-      toast.error("Erro ao atualizar seus dados.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   return (
-    <div className="container mx-auto max-w-3xl px-4 pb-8 pt-3 md:pb-10 md:pt-5">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between pb-2">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground flex items-center gap-2.5">
-            <UserIcon className="w-7 h-7 text-primary" />
-            <span>Meu Perfil</span>
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Gerencie seus dados de identificação e contato
-          </p>
-        </div>
+    <AccountShell>
+      <AccountSectionHeader
+        icon={UserIcon}
+        title="Meu perfil"
+        description="Gerencie seus dados de identificação e contato."
+      />
 
-        <Link
-          href="/pedidos"
-          className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
-        >
-          <span>Meus Pedidos</span>
-        </Link>
-      </div>
-
-      <div className="rounded-2xl bg-card p-6 shadow-lg shadow-slate-900/8 dark:shadow-black/25 md:p-8">
+      <div className="min-h-[32rem] rounded-2xl bg-card p-5 shadow-lg shadow-slate-900/8 dark:shadow-black/25 sm:p-6 lg:p-8">
         <form onSubmit={handleSave} className="space-y-6">
-          <div className="space-y-4">
-            {/* E-mail (somente leitura) */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                E-mail da Conta
-              </Label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <Input
-                  value={user.email || ""}
-                  disabled
-                  className="pl-9 bg-slate-50 dark:bg-slate-900 border-slate-200 text-xs text-muted-foreground cursor-not-allowed"
-                />
-              </div>
-              <span className="text-[10px] text-muted-foreground block">
-                O e-mail é utilizado para login e notificações de faturamento.
-              </span>
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label>Tipo de pessoa</Label>
+              <Tabs
+                value={personType}
+                onValueChange={(value) => setPersonType(value as PersonType)}
+              >
+                <TabsList className="grid h-11 w-full grid-cols-2 bg-muted/70 p-1">
+                  <TabsTrigger
+                    value="FISICA"
+                    className="h-9 font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                  >
+                    Pessoa física
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="JURIDICA"
+                    className="h-9 font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                  >
+                    Pessoa jurídica
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
 
-            {/* Documento e Tipo */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  CPF / CNPJ
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="account-name">
+                  {personType === "FISICA" ? "Nome completo" : "Razão social"}
                 </Label>
                 <Input
-                  value={profile?.cpfcnpj || "—"}
-                  disabled
-                  className="bg-slate-50 dark:bg-slate-900 border-slate-200 text-xs font-mono text-muted-foreground cursor-not-allowed"
+                  id="account-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  className="h-11"
+                  required
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="account-email">E-mail da conta</Label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="account-email"
+                    value={user.email || ""}
+                    disabled
+                    className="h-11 bg-muted/60 pl-10 text-muted-foreground"
+                  />
+                </div>
+              </div>
+            </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Classificação Fiscal
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="account-document">
+                  {personType === "FISICA" ? "CPF" : "CNPJ"}
                 </Label>
-                <Input
-                  value={profile?.tipopessoa === "FISICA" ? "Pessoa Física (CPF)" : "Pessoa Jurídica (CNPJ)"}
-                  disabled
-                  className="bg-slate-50 dark:bg-slate-900 border-slate-200 text-xs text-muted-foreground cursor-not-allowed"
-                />
+                <div className="relative">
+                  <FileText className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="account-document"
+                    value={document}
+                    onChange={(event) =>
+                      setDocument(formatCpfCnpj(event.target.value))
+                    }
+                    className="h-11 pl-10 font-mono"
+                    inputMode="numeric"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="account-phone">Telefone / WhatsApp</Label>
+                <div className="relative">
+                  <Phone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="account-phone"
+                    value={phone}
+                    onChange={(event) =>
+                      setPhone(formatPhone(event.target.value))
+                    }
+                    className="h-11 pl-10 font-mono"
+                    inputMode="tel"
+                    required
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Nome / Razão Social */}
-            <div className="space-y-1.5">
-              <Label htmlFor="name" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Nome Completo ou Razão Social
-              </Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Seu nome ou nome da empresa"
-                className="text-xs h-10"
-              />
-            </div>
-
-            {/* Telefone */}
-            <div className="space-y-1.5">
-              <Label htmlFor="phone" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Telefone / WhatsApp
-              </Label>
-              <div className="relative">
-                <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <Input
-                  id="phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="(00) 00000-0000"
-                  className="pl-9 text-xs h-10 font-mono"
-                />
-              </div>
-            </div>
           </div>
 
-          <div className="pt-4 border-t border-border/60 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Dados protegidos por criptografia</span>
+          <div className="flex flex-col gap-4 border-t border-border/60 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Shield className="size-4 text-emerald-600" />
+              Dados protegidos por criptografia
             </span>
-
             <Button
               type="submit"
               disabled={isSaving}
-              className="text-xs font-semibold h-10 px-5 rounded-xl gap-2 bg-primary hover:bg-primary/90 text-white"
+              className="h-11 w-full gap-2 font-semibold sm:w-auto"
             >
               {isSaving ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Salvando...
-                </>
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                <>
-                  <Save className="w-3.5 h-3.5" /> Salvar Alterações
-                </>
+                <Save className="size-4" />
               )}
+              {isSaving ? "Salvando..." : "Salvar alterações"}
             </Button>
           </div>
         </form>
       </div>
-    </div>
+    </AccountShell>
   );
 }

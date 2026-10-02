@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, Trash2, ShoppingBag, Loader2, ArrowLeft, Package, ArrowUpRight } from "lucide-react";
+import { Heart, Trash2, ShoppingBag, Loader2, ArrowLeft, ArrowUpRight } from "lucide-react";
+import { AccountSectionHeader, AccountShell } from "@/components/account/AccountShell";
 import { useAuth } from "@/components/providers/AuthContext";
 import { useWishlist } from "@/lib/hooks/useWishlist";
 import { useCart } from "@/components/providers/CartContext";
@@ -12,6 +13,33 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ProductFallbackImage } from "@/components/product/ProductFallbackImage";
+import { Card, CardContent } from "@/components/ui/card";
+
+interface FavoriteItem {
+  id: string;
+  title: string;
+  price: number;
+  stock: number;
+  isAvailable: boolean;
+  brand: string | null;
+  reference: string | null;
+  category: string;
+  image: string;
+}
+
+interface FavoriteRelation {
+  produto_id: number;
+  produto: {
+    titulo: string | null;
+    tituloMarketplace: string | null;
+    precovenda: number | null;
+    estoque: number | null;
+    referencia: string | null;
+    fabricante: string | null;
+    imgUrl: string | null;
+    produtogrupo: { nome: string | null } | null;
+  } | null;
+}
 
 export default function FavoritosPage() {
   const { user, profile, isLoading: authLoading } = useAuth();
@@ -19,21 +47,10 @@ export default function FavoritosPage() {
   const { addToCart } = useCart();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [favorites, setFavorites] = useState<any[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
 
-  useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push("/login?redirect=/favoritos");
-      } else if (profile?.id) {
-        fetchFavorites();
-      } else {
-        setLoading(false);
-      }
-    }
-  }, [user?.id, profile?.id, authLoading, router]);
-
-  const fetchFavorites = async () => {
+  const fetchFavorites = useCallback(async () => {
+    if (!profile?.id) return;
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -58,7 +75,7 @@ export default function FavoritosPage() {
 
       if (error) throw error;
 
-      const formatted = (data || []).map((item: any) => {
+      const formatted = ((data || []) as unknown as FavoriteRelation[]).map((item) => {
         const p = item.produto;
         const stock = Number(p?.estoque) || 0;
         return {
@@ -68,7 +85,7 @@ export default function FavoritosPage() {
           stock,
           isAvailable: stock > 0,
           brand: p?.fabricante || null,
-          reference: p?.referencia,
+          reference: p?.referencia ?? null,
           category: p?.produtogrupo?.nome || "Geral",
           image: p?.imgUrl || "",
         };
@@ -81,14 +98,21 @@ export default function FavoritosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) router.push("/login?redirect=/favoritos");
+    else if (profile?.id) void fetchFavorites();
+    else setLoading(false);
+  }, [authLoading, fetchFavorites, profile?.id, router, user]);
 
   const handleRemove = async (productId: string) => {
     await toggleWishlist(productId);
     setFavorites((prev) => prev.filter((p) => p.id !== productId));
   };
 
-  const handleAddToCart = (item: any) => {
+  const handleAddToCart = (item: FavoriteItem) => {
     if (item.price <= 0) {
       toast.info("Este item é sob consulta. Entre em contato pelo WhatsApp para consultar o valor.");
       return;
@@ -111,27 +135,20 @@ export default function FavoritosPage() {
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
 
   return (
-    <div className="container mx-auto max-w-5xl px-4 pb-8 pt-3 md:pb-10 md:pt-5">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between pb-2">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground flex items-center gap-2.5">
-            <Heart className="w-7 h-7 text-rose-500 fill-rose-500/20" />
-            <span>Peças Favoritas</span>
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            {favorites.length} {favorites.length === 1 ? "item salvo" : "itens salvos"}
-          </p>
-        </div>
+    <AccountShell>
+      <AccountSectionHeader
+        icon={Heart}
+        title="Favoritos"
+        description={`${favorites.length} ${favorites.length === 1 ? "item salvo" : "itens salvos"}`}
+        action={
+          <Button asChild variant="outline" className="h-10 w-full gap-2 sm:w-auto">
+            <Link href="/produtos"><ArrowLeft className="size-4" />Explorar catálogo</Link>
+          </Button>
+        }
+      />
 
-        <Link
-          href="/produtos"
-          className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Explorar Catálogo</span>
-        </Link>
-      </div>
+      <Card className="min-h-[32rem] border-0 py-0 shadow-lg shadow-slate-900/8 dark:shadow-black/25">
+        <CardContent className="p-5 sm:p-6">
 
       {loading || authLoading ? (
         <div className="py-20 text-center flex flex-col items-center justify-center gap-3">
@@ -139,9 +156,9 @@ export default function FavoritosPage() {
           <span className="text-xs text-muted-foreground">Sincronizando seus favoritos...</span>
         </div>
       ) : favorites.length === 0 ? (
-        <div className="py-20 px-4 text-center rounded-3xl border border-dashed border-border/80 bg-slate-50/50 dark:bg-slate-900/30 max-w-md mx-auto">
-          <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-800 shadow-xs border border-border/60 flex items-center justify-center mx-auto mb-4 text-slate-400">
-            <Heart className="w-6 h-6 stroke-[1.5]" />
+        <div className="flex min-h-96 flex-col items-center justify-center px-4 text-center">
+          <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <Heart className="size-7 stroke-[1.5]" />
           </div>
           <h2 className="text-base font-bold text-foreground">Sua lista está vazia</h2>
           <p className="text-xs text-muted-foreground mt-1 mb-6">
@@ -152,7 +169,7 @@ export default function FavoritosPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {favorites.map((product) => (
             <div
               key={product.id}
@@ -258,6 +275,8 @@ export default function FavoritosPage() {
           ))}
         </div>
       )}
-    </div>
+        </CardContent>
+      </Card>
+    </AccountShell>
   );
 }
