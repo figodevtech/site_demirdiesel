@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { getAsaasPayment } from "@/lib/asaas";
 
 import {
   isOrderPaid,
@@ -11,6 +12,15 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function localStatus(asaasStatus: string) {
+  const status = asaasStatus.trim().toUpperCase();
+  if (["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"].includes(status)) return "PAGO";
+  if (["REFUNDED", "REFUND_REQUESTED", "CHARGEBACK_REQUESTED", "CHARGEBACK_DISPUTE", "DELETED"].includes(status)) {
+    return "CANCELADO";
+  }
+  return "PENDENTE";
+}
 
 /**
  * Autentica o usuário no servidor (cookies ou Bearer token)
@@ -83,7 +93,7 @@ export async function GET(request: Request) {
     // venda.id = orderId AND venda.clienteid = cliente.id
     const { data: order, error } = await supabaseAdmin
       .from("venda")
-      .select("id, status, valortotal, forma_pagamento, datavenda, createdat")
+      .select("id, status, valortotal, forma_pagamento, datavenda, createdat, payment_provider, gateway_payment_id")
       .eq("id", orderId)
       .eq("clienteid", cliente.id)
       .maybeSingle();
@@ -93,7 +103,29 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
     }
 
-    const normalizedStatus = String(order.status || "").trim().toUpperCase();
+    let normalizedStatus = String(order.status || "").trim().toUpperCase();
+
+    if (isOrderPending(normalizedStatus) && order.payment_provider === "ASAAS" && order.gateway_payment_id) {
+      try {
+        const payment = await getAsaasPayment(order.gateway_payment_id);
+        const gatewayStatus = String(payment.status || "PENDING").trim().toUpperCase();
+        const nextStatus = localStatus(gatewayStatus);
+        if (nextStatus !== "PENDENTE") {
+          const { error: syncError } = await supabaseAdmin.rpc("fn_processar_evento_pagamento_asaas", {
+            p_event_id: `STATUS-CHECK-${payment.id}-${gatewayStatus}`,
+            p_event_type: "STATUS_CHECK",
+            p_payment_id: payment.id,
+            p_venda_id: order.id,
+            p_gateway_status: gatewayStatus,
+            p_novo_status: nextStatus,
+            p_forma_pagamento: order.forma_pagamento || "Asaas",
+          });
+          if (!syncError) normalizedStatus = nextStatus;
+        }
+      } catch (syncError) {
+        console.warn("[api/pedidos/status] Não foi possível reconciliar com o Asaas:", syncError);
+      }
+    }
     const isPaid = isOrderPaid(normalizedStatus);
     const isAuthorized = isOrderAuthorized(normalizedStatus);
     const isPending = isOrderPending(normalizedStatus);
@@ -111,7 +143,7 @@ export async function GET(request: Request) {
       paymentMethod: order.forma_pagamento || "Asaas",
       date: order.datavenda || order.createdat,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[api/pedidos/status] Erro:", err);
     return NextResponse.json({ error: "Erro interno ao consultar status" }, { status: 500 });
   }

@@ -16,6 +16,18 @@ type StoreOrderRow = {
   gateway_payment_id?: string | null;
   datavenda?: string | null;
   createdat?: string | null;
+  status_entrega?: string | null;
+  codigo_rastreio?: string | null;
+  transportadora?: string | null;
+  url_rastreio?: string | null;
+  nfe_numero?: string | null;
+  nfe_serie?: string | null;
+  nfe_chave_acesso?: string | null;
+  danfe_url?: string | null;
+  separacao_em?: string | null;
+  faturado_em?: string | null;
+  enviado_em?: string | null;
+  entregue_em?: string | null;
   cliente?: {
     id: number;
     tipopessoa: 'FISICA' | 'JURIDICA';
@@ -58,7 +70,10 @@ export async function GET(request: NextRequest) {
     .from("venda")
     .select(`
       id, status, sub_total, valortotal, forma_pagamento, endereco_entrega_snapshot,
-      canal, codigo_rastreio, payment_provider, gateway_payment_id, datavenda, createdat,
+      canal, status_entrega, codigo_rastreio, transportadora, url_rastreio,
+      nfe_numero, nfe_serie, nfe_chave_acesso, danfe_url,
+      separacao_em, faturado_em, enviado_em, entregue_em,
+      payment_provider, gateway_payment_id, datavenda, createdat,
       cliente:clienteid ( id, tipopessoa, cpfcnpj, nomerazaosocial, email, telefone ),
       itens:vendaproduto (
         produtoid, quantidade, sub_total, valor_total, valor_desconto, valor_frete,
@@ -85,6 +100,22 @@ export async function GET(request: NextRequest) {
     gatewayPaymentId: order.gateway_payment_id || null,
     createdAt: order.datavenda || order.createdat,
     shippingAddress: order.endereco_entrega_snapshot || {},
+    fulfillment: {
+      status: order.status_entrega || null,
+      trackingCode: order.codigo_rastreio || null,
+      carrier: order.transportadora || null,
+      trackingUrl: order.url_rastreio || null,
+      invoice: {
+        number: order.nfe_numero || null,
+        series: order.nfe_serie || null,
+        accessKey: order.nfe_chave_acesso || null,
+        danfeUrl: order.danfe_url || null,
+      },
+      separationAt: order.separacao_em || null,
+      invoicedAt: order.faturado_em || null,
+      shippedAt: order.enviado_em || null,
+      deliveredAt: order.entregue_em || null,
+    },
     customer: {
       id: Number(order.cliente?.id || 0),
       type: order.cliente?.tipopessoa,

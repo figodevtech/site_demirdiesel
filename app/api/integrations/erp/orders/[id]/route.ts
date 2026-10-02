@@ -51,7 +51,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (value.trackingCode !== undefined) payload.codigo_rastreio = value.trackingCode || null;
   if (value.carrier !== undefined) payload.transportadora = value.carrier || null;
   if (value.trackingUrl !== undefined) payload.url_rastreio = value.trackingUrl || null;
+  if (value.deliveryStatus === "SEPARACAO") payload.separacao_em = now;
   if (value.deliveryStatus === "ENVIADO") payload.enviado_em = now;
+  if (value.deliveryStatus === "ENTREGUE") payload.entregue_em = now;
   if (value.invoice) {
     payload.nfe_numero = value.invoice.number || null;
     payload.nfe_serie = value.invoice.series || null;
@@ -65,7 +67,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .from("venda")
     .update(payload)
     .eq("id", orderId)
-    .select("id, status_entrega, codigo_rastreio, nfe_numero, nfe_chave_acesso")
+    .eq("status", "PAGO")
+    .eq("canal", "ONLINE")
+    .select("id, status_entrega, codigo_rastreio, transportadora, url_rastreio, nfe_numero, nfe_serie, nfe_chave_acesso, danfe_url, separacao_em, faturado_em, enviado_em, entregue_em")
     .maybeSingle();
 
   if (error) {
