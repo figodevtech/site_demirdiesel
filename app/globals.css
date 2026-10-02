@@ -229,6 +229,14 @@ html[data-display-mode="standalone"] {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Barra de progresso de navegação (NextTopLoader) só no desktop; no mobile o feedback
+   vem dos skeletons e do esmaecimento das listas. */
+@media (max-width: 767px) {
+  #nprogress {
+    display: none !important;
+  }
+}
+
 /* Conteúdo de vitrine que só faz sentido no navegador (no app a navegação já cobre). */
 @media (max-width: 767px) {
   html[data-display-mode="standalone"] .pwa-browser-only {

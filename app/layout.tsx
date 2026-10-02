@@ -1,13 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
-import { Toaster } from "@/components/ui/sonner";
 import Navbar from "@/components/layout/Navbar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import Footer from "@/components/layout/Footer";
 import { AuthProvider } from "@/components/providers/AuthContext";
 import { RouteShell } from "@/components/layout/RouteShell";
-import { Analytics } from "@vercel/analytics/react";
+import { Analytics } from "@vercel/analytics/next";
 import { PwaProvider } from "@/components/pwa/PwaProvider";
 import { siteConfig } from "@/lib/site-config";
 import { PWA_THEME_COLOR } from "@/lib/pwa/config";
@@ -132,7 +131,6 @@ export default function RootLayout({
           </RouteShell>
           <PwaProvider />
         </AuthProvider>
-        <Toaster position="top-right" richColors theme="light" />
         <Analytics />
       </body>
     </html>
