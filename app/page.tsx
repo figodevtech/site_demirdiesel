@@ -15,11 +15,14 @@ export default async function HomePage() {
     getFeaturedProducts(10),
     getBestSellerProducts(10),
   ]);
+  const heroProducts = [...featuredProducts, ...bestSellerProducts]
+    .filter((product, index, products) => products.findIndex((item) => item.id === product.id) === index)
+    .slice(0, 3);
 
   return (
     <div className="flex flex-col min-h-screen">
       {/* 1. Hero com busca instantânea e métricas */}
-      <HeroSection featuredProduct={featuredProducts[0] || bestSellerProducts[0]} />
+      <HeroSection featuredProducts={heroProducts} />
 
       {/* 2. Atalhos das principais linhas diesel */}
       <CategoryShortcuts />

@@ -113,7 +113,7 @@ export function BestSellersSection({
           }}
           className="w-full"
         >
-          <CarouselContent className="-ml-3 sm:-ml-4">
+          <CarouselContent className="-ml-3 pt-1 pb-6 sm:-ml-4">
             {products.map((product, idx) => (
               <CarouselItem
                 key={product.id}

@@ -1,12 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, CreditCard, PackageCheck, ShieldCheck, Truck } from "lucide-react";
+import { CreditCard, PackageCheck, ShieldCheck, Truck } from "lucide-react";
 import { SearchInput } from "@/components/layout/SearchInput";
-import { ProductFallbackImage } from "@/components/product/ProductFallbackImage";
+import { HeroProductStack } from "./HeroProductStack";
 import type { PublicProduct } from "@/lib/catalog/types";
-import cardStyles from "./HeroProductCard.module.css";
 
 const QUICK_TAGS = [
   { label: "Módulos", query: "modulo" },
@@ -23,11 +21,7 @@ const BENEFITS = [
   { icon: PackageCheck, label: "Estoque atualizado" },
 ];
 
-export function HeroSection({ featuredProduct }: { featuredProduct?: PublicProduct }) {
-  const productHref = featuredProduct
-    ? "/produto/" + (featuredProduct.slug || featuredProduct.id)
-    : "/produtos";
-
+export function HeroSection({ featuredProducts = [] }: { featuredProducts?: PublicProduct[] }) {
   return (
     <section className="relative overflow-hidden border-b border-secondary bg-secondary text-white">
       <div className="pointer-events-none absolute -right-32 -top-48 size-[34rem] rounded-full bg-primary/25 blur-3xl" />
@@ -68,56 +62,7 @@ export function HeroSection({ featuredProduct }: { featuredProduct?: PublicProdu
           </div>
         </div>
 
-        <div className={cardStyles.scene}>
-          <div className={cardStyles.floating}>
-            <div className={cardStyles.tilt}>
-              <Link
-                className={`${cardStyles.surface} relative grid min-h-44 grid-cols-[1fr_1.15fr] rounded-2xl text-slate-950 md:grid-cols-1`}
-                href={productHref}
-              >
-                <div className={`${cardStyles.media} relative min-h-44 md:h-48`}>
-                  <div className={`${featuredProduct?.image ? cardStyles.image : ""} absolute inset-0`}>
-                    {featuredProduct?.image ? (
-                      <Image
-                        alt={featuredProduct.title}
-                        className="object-cover"
-                        fill
-                        priority
-                        sizes="(max-width: 767px) 150px, (max-width: 1023px) 276px, 312px"
-                        src={featuredProduct.image}
-                      />
-                    ) : (
-                      <ProductFallbackImage category={featuredProduct?.categoryName} className="rounded-2xl" />
-                    )}
-                  </div>
-                  <span className={`${cardStyles.badge} absolute left-3 top-3 rounded-full bg-emerald-700 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white`}>
-                    Em estoque
-                  </span>
-                </div>
-                <div className={`${cardStyles.content} flex min-w-0 flex-col justify-center p-4`}>
-                  <p className={`${cardStyles.text} text-[10px] font-bold uppercase tracking-[0.16em] text-primary`}>
-                    Destaque da loja
-                  </p>
-                  <h2 className={`${cardStyles.text} mt-2 line-clamp-2 text-sm font-bold leading-snug sm:text-base`}>
-                    {featuredProduct?.title || "Confira nosso catálogo completo"}
-                  </h2>
-                  {featuredProduct?.reference ? (
-                    <p className={`${cardStyles.text} mt-1 truncate font-mono text-[10px] text-slate-500`}>
-                      Ref. {featuredProduct.reference}
-                    </p>
-                  ) : null}
-                  <p className={`${cardStyles.text} mt-3 text-lg font-black text-slate-950 sm:text-xl`}>
-                    {featuredProduct?.price ? featuredProduct.formattedPrice : "Ver produtos"}
-                  </p>
-                  <span className={`${cardStyles.cta} mt-3 text-xs font-bold`}>
-                    <span className={cardStyles.ctaLabel}>Ver produto</span>
-                    <ArrowRight className="relative z-10 size-3.5 shrink-0" />
-                  </span>
-                </div>
-              </Link>
-            </div>
-          </div>
-        </div>
+        <HeroProductStack products={featuredProducts} />
       </div>
 
       <div className="border-t border-white/10 bg-white/5">
