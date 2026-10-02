@@ -83,6 +83,16 @@ interface CustomerAddress {
   estado: string;
 }
 
+interface SavedCard {
+  id: string;
+  brand: string;
+  lastFour: string;
+  holderName: string;
+  expiryMonth: string;
+  expiryYear: string;
+  isDefault: boolean;
+}
+
 export default function CheckoutPage() {
   const { user, profile, isLoading: authLoading } = useAuth();
   const { items, subtotal, clearCart } = useCart();
@@ -112,6 +122,9 @@ export default function CheckoutPage() {
   const [currentOrderId, setCurrentOrderId] = useState<number | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid">("pending");
   const [paymentMethod, setPaymentMethod] = useState<AsaasBillingType>("PIX");
+  const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
+  const [loadingCards, setLoadingCards] = useState(false);
+  const [selectedSavedCardId, setSelectedSavedCardId] = useState("new");
   const clearedRef = useRef(false);
 
   const formatCurrency = (val: number) =>
@@ -141,6 +154,30 @@ export default function CheckoutPage() {
     }
   }, [profile?.id]);
 
+  const fetchSavedCards = useCallback(async () => {
+    if (!user?.id) return;
+    setLoadingCards(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const response = await fetch("/api/account/cards", {
+        cache: "no-store",
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Falha ao carregar cartões.");
+      const cards = (result.cards || []) as SavedCard[];
+      setSavedCards(cards);
+      const preferred = cards.find((card) => card.isDefault) || cards[0];
+      setSelectedSavedCardId(preferred?.id || "new");
+    } catch (error) {
+      console.error("Erro ao carregar cartões salvos:", error);
+    } finally {
+      setLoadingCards(false);
+    }
+  }, [user?.id]);
+
   // Autenticação inicial
   useEffect(() => {
     if (authLoading) return;
@@ -148,8 +185,11 @@ export default function CheckoutPage() {
       router.push("/login?redirect=/checkout");
       return;
     }
-    if (profile?.id) void fetchAddresses();
-  }, [user?.id, profile?.id, authLoading, router, fetchAddresses]);
+    if (profile?.id) {
+      void fetchAddresses();
+      void fetchSavedCards();
+    }
+  }, [user?.id, profile?.id, authLoading, router, fetchAddresses, fetchSavedCards]);
 
   const selectedAddress = addresses.find((address) => address.id === selectedAddressId) ?? null;
   const pickupEligible = selectedAddress
@@ -318,15 +358,18 @@ export default function CheckoutPage() {
       return;
     }
 
+    const useSavedCard = paymentMethod === "CREDIT_CARD" && selectedSavedCardId !== "new";
     const width = 600;
     const height = 750;
     const left = window.screen.width / 2 - width / 2;
     const top = window.screen.height / 2 - height / 2;
-    const paymentWindow = window.open(
-      "",
-      "AsaasCheckout",
-      `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes`,
-    );
+    const paymentWindow = useSavedCard
+      ? null
+      : window.open(
+          "",
+          "AsaasCheckout",
+          `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes`,
+        );
 
     setIsProcessing(true);
     try {
@@ -338,6 +381,7 @@ export default function CheckoutPage() {
         addressId: selectedAddressId,
         deliveryMethod,
         billingType: paymentMethod,
+        savedCardId: useSavedCard ? selectedSavedCardId : undefined,
         items: items.map((it) => ({
           productId: it.product.id,
           quantity: it.quantity,
@@ -359,17 +403,19 @@ export default function CheckoutPage() {
         throw new Error(result.message || result.error || "Erro ao processar checkout");
       }
 
-      if (result.url) {
-        setPaymentUrl(result.url);
+      if (result.url || result.directPayment) {
+        setPaymentUrl(result.url || null);
         setIsWaitingPayment(true);
         if (result.orderId) {
           setCurrentOrderId(result.orderId);
         }
 
-        if (paymentWindow) {
+        if (result.url && paymentWindow) {
           paymentWindow.location.href = result.url;
-        } else {
+        } else if (result.url) {
           window.location.assign(result.url);
+        } else {
+          void checkOrderStatus();
         }
       } else {
         paymentWindow?.close();
@@ -578,7 +624,7 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {isWaitingPayment && paymentUrl ? (
+            {isWaitingPayment ? (
               <div className="space-y-4 rounded-xl bg-primary/5 p-6 text-center shadow-sm ring-1 ring-primary/20">
                 <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -587,18 +633,22 @@ export default function CheckoutPage() {
                   Aguardando confirma&ccedil;&atilde;o por {PAYMENT_METHOD_LABELS[paymentMethod]}
                 </h3>
                 <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                  A tela segura do Asaas foi aberta em uma nova janela. Conclua o pagamento para que o pedido seja liberado.
+                  {paymentUrl
+                    ? "A tela segura do Asaas foi aberta em uma nova janela. Conclua o pagamento para que o pedido seja liberado."
+                    : "O Asaas está processando a cobrança no cartão salvo. Esta tela será atualizada assim que o pagamento for confirmado."}
                 </p>
                 <div className="flex flex-wrap gap-2 justify-center pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(paymentUrl, "AsaasCheckout")}
-                    className="text-xs gap-1 rounded-xl"
-                  >
-                    <span>Reabrir Tela de Pagamento</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </Button>
+                  {paymentUrl && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(paymentUrl, "AsaasCheckout")}
+                      className="text-xs gap-1 rounded-xl"
+                    >
+                      <span>Reabrir Tela de Pagamento</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
                   <Button
                     variant="secondary"
                     size="sm"
@@ -661,6 +711,65 @@ export default function CheckoutPage() {
                     );
                   })}
                 </RadioGroup>
+
+                {paymentMethod === "CREDIT_CARD" && (
+                  <div className="space-y-3 rounded-xl bg-muted/35 p-4 ring-1 ring-border/60">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold text-foreground">Qual cartão deseja usar?</p>
+                        <p className="text-[11px] text-muted-foreground">Cartões tokenizados com segurança pelo Asaas.</p>
+                      </div>
+                      <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
+                        <Link href="/conta/cartoes">Gerenciar</Link>
+                      </Button>
+                    </div>
+
+                    {loadingCards ? (
+                      <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
+                        <Loader2 className="size-4 animate-spin" /> Carregando cartões...
+                      </div>
+                    ) : (
+                      <RadioGroup
+                        value={selectedSavedCardId}
+                        onValueChange={setSelectedSavedCardId}
+                        className="grid gap-2"
+                      >
+                        {savedCards.map((card) => (
+                          <Label
+                            key={card.id}
+                            htmlFor={`saved-card-${card.id}`}
+                            className={`flex cursor-pointer items-center gap-3 rounded-xl bg-card p-3 shadow-sm ring-1 transition-all ${
+                              selectedSavedCardId === card.id ? "ring-2 ring-primary" : "ring-border/70"
+                            }`}
+                          >
+                            <RadioGroupItem id={`saved-card-${card.id}`} value={card.id} />
+                            <CreditCard className="size-5 text-primary" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-bold">{card.brand} •••• {card.lastFour}</span>
+                              <span className="block text-[11px] text-muted-foreground">
+                                {card.holderName} · vence {card.expiryMonth}/{card.expiryYear.slice(-2)}
+                              </span>
+                            </span>
+                            {card.isDefault && <Badge variant="secondary">Principal</Badge>}
+                          </Label>
+                        ))}
+                        <Label
+                          htmlFor="saved-card-new"
+                          className={`flex cursor-pointer items-center gap-3 rounded-xl bg-card p-3 shadow-sm ring-1 transition-all ${
+                            selectedSavedCardId === "new" ? "ring-2 ring-primary" : "ring-border/70"
+                          }`}
+                        >
+                          <RadioGroupItem id="saved-card-new" value="new" />
+                          <Plus className="size-5 text-primary" />
+                          <span>
+                            <span className="block text-sm font-bold">Usar outro cartão</span>
+                            <span className="block text-[11px] text-muted-foreground">Preencher no ambiente seguro do Asaas</span>
+                          </span>
+                        </Label>
+                      </RadioGroup>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex items-start gap-2 rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
                   <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />

@@ -12,6 +12,13 @@ import {
   ArrowLeft,
   Truck,
   Copy,
+  CheckCircle2,
+  Circle,
+  FileText,
+  Home,
+  Store,
+  Boxes,
+  ExternalLink,
 } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthContext";
 import { AccountSectionHeader, AccountShell } from "@/components/account/AccountShell";
@@ -42,7 +49,82 @@ interface CustomerOrder {
   createdat: string | null;
   valortotal: number | null;
   codigo_rastreio: string | null;
+  status_entrega: "SEPARACAO" | "FATURADO" | "ENVIADO" | "ENTREGUE" | null;
+  transportadora: string | null;
+  url_rastreio: string | null;
+  nfe_numero: string | null;
+  nfe_serie: string | null;
+  nfe_chave_acesso: string | null;
+  danfe_url: string | null;
+  separacao_em: string | null;
+  faturado_em: string | null;
+  enviado_em: string | null;
+  entregue_em: string | null;
+  endereco_entrega_snapshot: {
+    deliveryMethod?: "delivery" | "pickup" | string | null;
+    deliveryLabel?: string | null;
+    pickupAddress?: string | null;
+  } | null;
   items: OrderItem[];
+}
+
+const fulfillmentRank = {
+  SEPARACAO: 1,
+  FATURADO: 2,
+  ENVIADO: 3,
+  ENTREGUE: 4,
+} as const;
+
+function formatEventDate(value: string | null) {
+  if (!value) return null;
+  return new Date(value).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function OrderTimeline({ order }: { order: CustomerOrder }) {
+  const currentRank = order.status_entrega ? fulfillmentRank[order.status_entrega] : 1;
+  const pickup = order.endereco_entrega_snapshot?.deliveryMethod === "pickup";
+  const steps = [
+    { label: "Pagamento aprovado", detail: "Compra confirmada", rank: 0, icon: CheckCircle2, date: order.datavenda || order.createdat },
+    { label: "Em separação", detail: "Preparando os produtos", rank: 1, icon: Boxes, date: order.separacao_em },
+    { label: "Nota fiscal", detail: "NF-e emitida", rank: 2, icon: FileText, date: order.faturado_em },
+    { label: pickup ? "Pronto para retirada" : "Enviado", detail: pickup ? "Aguardando retirada na loja" : "Pedido em transporte", rank: 3, icon: pickup ? Store : Truck, date: order.enviado_em },
+    { label: pickup ? "Retirado" : "Entregue", detail: pickup ? "Retirada concluída" : "Entrega concluída", rank: 4, icon: Home, date: order.entregue_em },
+  ];
+
+  return (
+    <section className="rounded-xl bg-card p-4 shadow-sm ring-1 ring-border/60">
+      <h4 className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+        Acompanhamento do pedido
+      </h4>
+      <div className="grid gap-3 sm:grid-cols-5 sm:gap-2">
+        {steps.map((step, index) => {
+          const complete = currentRank >= step.rank;
+          const Icon = step.icon;
+          return (
+            <div key={step.label} className="relative flex items-start gap-3 sm:flex-col sm:items-center sm:text-center">
+              {index > 0 && (
+                <span className={`absolute right-[calc(50%+1rem)] top-4 hidden h-0.5 w-[calc(100%-2rem)] sm:block ${complete ? "bg-primary" : "bg-border"}`} />
+              )}
+              <span className={`relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full ${complete ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                {complete ? <Icon className="size-4" /> : <Circle className="size-3" />}
+              </span>
+              <span>
+                <span className={`block text-xs font-bold ${complete ? "text-foreground" : "text-muted-foreground"}`}>{step.label}</span>
+                <span className="block text-[10px] leading-relaxed text-muted-foreground">
+                  {formatEventDate(step.date) || step.detail}
+                </span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
 export default function PedidosPage() {
@@ -63,6 +145,8 @@ export default function PedidosPage() {
         .from("venda")
         .select("*")
         .eq("clienteid", profile.id)
+        .eq("status", "PAGO")
+        .eq("canal", "ONLINE")
         .order("datavenda", { ascending: false, nullsFirst: false })
         .order("createdat", { ascending: false, nullsFirst: false });
 
@@ -184,7 +268,7 @@ export default function PedidosPage() {
           </div>
           <h2 className="text-base font-bold text-foreground">Nenhum pedido encontrado</h2>
           <p className="text-xs text-muted-foreground mt-1 mb-6">
-            Você ainda não realizou compras em nossa plataforma.
+            Seus pedidos aparecerão aqui depois que o pagamento for confirmado.
           </p>
           <Button asChild className="rounded-xl px-6 font-semibold text-xs h-9">
             <Link href="/produtos">Explorar Catálogo</Link>
@@ -254,6 +338,8 @@ export default function PedidosPage() {
                 {/* Detalhes Expansíveis dos Itens */}
                 {isExpanded && (
                   <div className="p-4 sm:p-5 border-t border-border/60 bg-slate-50/30 dark:bg-slate-900/30 space-y-4 animate-in fade-in-50 duration-150">
+                    <OrderTimeline order={order} />
+
                     <div className="space-y-3">
                       <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         Itens do Pedido ({order.items.length})
@@ -278,27 +364,72 @@ export default function PedidosPage() {
                       </div>
                     </div>
 
-                    {/* Snapshot de Entrega e Rastreamento */}
-                    {order.codigo_rastreio && (
-                      <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-600/20 flex items-center justify-between gap-2 text-xs">
-                        <div className="flex items-center gap-2">
-                          <Truck className="w-4 h-4 text-emerald-600" />
-                          <span className="text-emerald-900 dark:text-emerald-300">
-                            Rastreamento: <strong>{order.codigo_rastreio}</strong>
+                    {order.endereco_entrega_snapshot?.deliveryMethod === "pickup" ? (
+                      <div className="flex items-start gap-2 rounded-xl bg-primary/5 p-4 text-xs shadow-sm ring-1 ring-primary/15">
+                        <Store className="mt-0.5 size-4 shrink-0 text-primary" />
+                        <span>
+                          <strong className="block text-foreground">Retirada no local</strong>
+                          <span className="text-muted-foreground">
+                            {order.endereco_entrega_snapshot.pickupAddress || "Aguarde a confirmação de que o pedido está pronto para retirada."}
                           </span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            if (order.codigo_rastreio) copyTracking(order.codigo_rastreio);
-                          }}
-                          className="h-7 text-xs text-emerald-700 hover:bg-emerald-100"
-                        >
-                          <Copy className="w-3.5 h-3.5 mr-1" /> Copiar
-                        </Button>
+                        </span>
                       </div>
-                    )}
+                    ) : null}
+
+                    {/* Snapshot de Entrega e Rastreamento */}
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {order.nfe_numero || order.nfe_chave_acesso ? (
+                        <div className="rounded-xl bg-card p-4 shadow-sm ring-1 ring-border/60">
+                          <div className="mb-2 flex items-center gap-2 text-xs font-bold">
+                            <FileText className="size-4 text-primary" /> Nota fiscal eletrônica
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            NF-e {order.nfe_numero || "—"}{order.nfe_serie ? ` · série ${order.nfe_serie}` : ""}
+                          </p>
+                          {order.nfe_chave_acesso && (
+                            <p className="mt-1 break-all font-mono text-[10px] text-muted-foreground">
+                              Chave: {order.nfe_chave_acesso}
+                            </p>
+                          )}
+                          {order.danfe_url && (
+                            <Button asChild variant="link" size="sm" className="mt-2 h-auto p-0 text-xs">
+                              <a href={order.danfe_url} target="_blank" rel="noreferrer">
+                                Abrir DANFE <ExternalLink className="ml-1 size-3" />
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      ) : null}
+
+                      {order.codigo_rastreio && (
+                        <div className="rounded-xl bg-emerald-50 p-4 text-xs shadow-sm ring-1 ring-emerald-600/20 dark:bg-emerald-950/30">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2">
+                              <Truck className="mt-0.5 size-4 text-emerald-600" />
+                              <span className="text-emerald-900 dark:text-emerald-300">
+                                {order.transportadora && <span className="block">{order.transportadora}</span>}
+                                Código: <strong>{order.codigo_rastreio}</strong>
+                              </span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copyTracking(order.codigo_rastreio!)}
+                              className="h-7 text-xs text-emerald-700 hover:bg-emerald-100"
+                            >
+                              <Copy className="mr-1 size-3.5" /> Copiar
+                            </Button>
+                          </div>
+                          {order.url_rastreio && (
+                            <Button asChild variant="link" size="sm" className="mt-2 h-auto p-0 text-xs text-emerald-700">
+                              <a href={order.url_rastreio} target="_blank" rel="noreferrer">
+                                Acompanhar entrega <ExternalLink className="ml-1 size-3" />
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

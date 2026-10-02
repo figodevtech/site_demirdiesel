@@ -25,6 +25,11 @@ interface RequestItem {
   quantity: number;
 }
 
+function clientIp(request: Request) {
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwarded || request.headers.get("x-real-ip") || "127.0.0.1";
+}
+
 /**
  * Autentica o usuário de forma robusta no servidor:
  * 1. Tenta cookies da sessão Supabase (SSR)
@@ -135,6 +140,7 @@ export async function POST(request: Request) {
     const { addressId, items } = body || {};
     const deliveryMethod: DeliveryMethod = body?.deliveryMethod === "pickup" ? "pickup" : "delivery";
     const billingType = body?.billingType;
+    const savedCardId = String(body?.savedCardId || "").trim();
 
     if (!isAsaasBillingType(billingType)) {
       return NextResponse.json(
@@ -147,6 +153,36 @@ export async function POST(request: Request) {
     }
 
     const paymentMethodLabel = PAYMENT_METHOD_LABELS[billingType];
+
+    if (savedCardId && billingType !== "CREDIT_CARD") {
+      return NextResponse.json(
+        { error: "CARTAO_INVALIDO", message: "Cartão salvo só pode ser usado no pagamento com cartão de crédito." },
+        { status: 400 },
+      );
+    }
+
+    let savedCard: {
+      provider_customer_id: string;
+      provider_card_token: string;
+    } | null = null;
+
+    if (savedCardId) {
+      const { data, error } = await supabaseAdmin
+        .from("customer_payment_card")
+        .select("provider_customer_id, provider_card_token")
+        .eq("id", savedCardId)
+        .eq("cliente_id", cliente.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (error || !data) {
+        return NextResponse.json(
+          { error: "CARTAO_NAO_ENCONTRADO", message: "O cartão salvo selecionado não está mais disponível." },
+          { status: 404 },
+        );
+      }
+      savedCard = data;
+    }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -420,6 +456,10 @@ export async function POST(request: Request) {
         }
       }
 
+      if (savedCard && savedCard.provider_customer_id !== asaasCustomerId) {
+        throw new Error("O cartão salvo não pertence ao cadastro de cobrança atual.");
+      }
+
       const paymentConfig = await getStorePaymentConfig();
       if (!paymentConfig.enabled) {
         throw new Error("O checkout da loja está temporariamente pausado pela administração.");
@@ -441,11 +481,17 @@ export async function POST(request: Request) {
           .slice(0, 10),
         description: `Demir Diesel - Pedido #${orderId}`,
         externalReference: String(orderId),
-        callback: {
+      };
+
+      if (savedCard) {
+        paymentPayload.creditCardToken = savedCard.provider_card_token;
+        paymentPayload.remoteIp = clientIp(request);
+      } else {
+        paymentPayload.callback = {
           successUrl: returnUrl,
           autoRedirect: true,
-        },
-      };
+        };
+      }
 
       if (splitEnabled) {
         paymentPayload.split = [
@@ -457,8 +503,8 @@ export async function POST(request: Request) {
       }
 
       const payment = await createAsaasPayment(paymentPayload);
-      if (!payment.id || !payment.invoiceUrl) {
-        throw new Error("O Asaas não retornou a identificação ou a URL da cobrança.");
+      if (!payment.id || (!savedCard && !payment.invoiceUrl)) {
+        throw new Error("O Asaas não retornou os dados necessários da cobrança.");
       }
 
       const { error: paymentUpdateError } = await supabaseAdmin
@@ -466,7 +512,7 @@ export async function POST(request: Request) {
         .update({
           payment_provider: "ASAAS",
           gateway_payment_id: payment.id,
-          gateway_checkout_url: payment.invoiceUrl,
+          gateway_checkout_url: payment.invoiceUrl || null,
           gateway_status: payment.status || "PENDING",
           gateway_due_date: payment.dueDate || null,
           forma_pagamento: paymentMethodLabel,
@@ -482,7 +528,9 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json({
-        url: payment.invoiceUrl,
+        url: payment.invoiceUrl || null,
+        directPayment: Boolean(savedCard),
+        gatewayStatus: payment.status || "PENDING",
         orderId,
         total: serverTotal,
         subtotal: serverSubtotal,
