@@ -102,7 +102,7 @@ export default function FavoritosPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) router.push("/login?redirect=/favoritos");
+    if (!user) router.replace("/login?redirect=/favoritos");
     else if (profile?.id) void fetchFavorites();
     else setLoading(false);
   }, [authLoading, fetchFavorites, profile?.id, router, user]);

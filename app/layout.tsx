@@ -8,7 +8,9 @@ import Footer from "@/components/layout/Footer";
 import { AuthProvider } from "@/components/providers/AuthContext";
 import { RouteShell } from "@/components/layout/RouteShell";
 import { Analytics } from "@vercel/analytics/react";
+import { PwaProvider } from "@/components/pwa/PwaProvider";
 import { siteConfig } from "@/lib/site-config";
+import { PWA_THEME_COLOR } from "@/lib/pwa/config";
 import "./globals.css";
 
 const inter = Inter({
@@ -24,13 +26,17 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#0F172A",
+  themeColor: PWA_THEME_COLOR,
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
+  // Necessário para env(safe-area-inset-*) funcionar (notch, home indicator, barra de gestos).
+  viewportFit: "cover",
+  colorScheme: "light",
 };
 
 export const metadata: Metadata = {
+  applicationName: "Demir Diesel",
   title: {
     default: "Demir Diesel - Peças, Módulos Eletrônicos & Oficina Especializada",
     template: "%s | Demir Diesel",
@@ -48,6 +54,16 @@ export const metadata: Metadata = {
     "common rail",
   ],
   authors: [{ name: "Demir Diesel" }],
+  appleWebApp: {
+    capable: true,
+    title: "Demir Diesel",
+    // "default" mantém a barra de status opaca sobre o header branco (sem conteúdo por baixo).
+    statusBarStyle: "default",
+  },
+  // Evita que o Safari transforme referências numéricas de peças em links de telefone.
+  formatDetection: {
+    telephone: false,
+  },
   creator: "Demir Diesel",
   metadataBase: new URL(siteConfig.url),
   icons: {
@@ -114,6 +130,7 @@ export default function RootLayout({
           >
             {children}
           </RouteShell>
+          <PwaProvider />
         </AuthProvider>
         <Toaster position="top-right" richColors />
         <Analytics />

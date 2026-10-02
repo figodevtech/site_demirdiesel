@@ -200,7 +200,7 @@ export default function PedidosPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      router.push("/login?redirect=/pedidos");
+      router.replace("/login?redirect=/pedidos");
     } else if (profile?.id) {
       void fetchOrders();
     } else {

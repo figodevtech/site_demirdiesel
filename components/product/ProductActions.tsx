@@ -11,11 +11,13 @@ import { Label } from "@/components/ui/label";
 import { WhatsAppButton } from "./WhatsAppButton";
 import { PublicProduct } from "@/lib/catalog/types";
 import { getShippingEstimate, ShippingQuoteResult } from "@/lib/shipping";
+import { useVirtualKeyboardOpen } from "@/hooks/use-virtual-keyboard";
 
 export function ProductActions({ product }: { product: PublicProduct }) {
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist, loading: wishlistLoading } = useWishlist();
   const [quantity, setQuantity] = useState(1);
+  const isKeyboardOpen = useVirtualKeyboardOpen();
   const [cep, setCep] = useState("");
   const [isSimulating, setIsSimulating] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
@@ -278,7 +280,12 @@ export function ProductActions({ product }: { product: PublicProduct }) {
       </div>
 
       {/* Mobile Sticky Bottom CTA Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-border/80 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+      <div
+        inert={isKeyboardOpen}
+        className={`fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-border/80 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pl-[calc(0.75rem+env(safe-area-inset-left,0px))] pr-[calc(0.75rem+env(safe-area-inset-right,0px))] md:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.1)] transition-transform duration-200 ${
+          isKeyboardOpen ? "pointer-events-none translate-y-full" : "translate-y-0"
+        }`}
+      >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <span className="text-[10px] text-muted-foreground block truncate">{product.title}</span>

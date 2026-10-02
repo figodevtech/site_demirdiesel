@@ -147,7 +147,7 @@ export function Header({ categories }: HeaderProps) {
         duration: 0.28,
         ease: [0.16, 1, 0.3, 1],
       }}
-      className={`sticky top-0 z-50 w-full ${
+      className={`sticky top-0 z-50 w-full pt-[env(safe-area-inset-top,0px)] ${
         isVisible ? "pointer-events-auto" : "pointer-events-none"
       } ${
         isScrolled

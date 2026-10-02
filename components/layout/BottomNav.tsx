@@ -6,11 +6,13 @@ import { usePathname } from "next/navigation";
 import { Home, Package, Search, Heart, ShoppingBag } from "lucide-react";
 import { useCart } from "@/components/providers/CartContext";
 import { useWishlist } from "@/lib/hooks/useWishlist";
+import { useVirtualKeyboardOpen } from "@/hooks/use-virtual-keyboard";
 
 export function BottomNav() {
   const pathname = usePathname();
   const { totalItems } = useCart();
   const { wishlistIds } = useWishlist();
+  const isKeyboardOpen = useVirtualKeyboardOpen();
 
   // Esconder bottom navigation durante checkout e na página de detalhes do produto
   // para dar total visibilidade e prioridade ao CTA de compra fixo mobile (Prioridade 13)
@@ -56,7 +58,11 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Navegação móvel principal"
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-border/80 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom,0px)]"
+      /* Com o teclado virtual aberto a barra recolhe para não cobrir o campo em edição. */
+      inert={isKeyboardOpen}
+      className={`fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-border/80 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] select-none [-webkit-touch-callout:none] transition-transform duration-200 ${
+        isKeyboardOpen ? "pointer-events-none translate-y-full" : "translate-y-0"
+      }`}
     >
       <div className="grid grid-cols-5 h-16 items-center px-2">
         {navItems.map((item) => {

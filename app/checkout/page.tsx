@@ -38,6 +38,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { isPickupEligible, type DeliveryMethod } from "@/lib/shipping";
 import { siteConfig } from "@/lib/site-config";
+import { isStandaloneDisplayMode } from "@/lib/pwa/display-mode";
 import { Badge } from "@/components/ui/badge";
 import {
   PAYMENT_METHOD_LABELS,
@@ -182,7 +183,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user?.id) {
-      router.push("/login?redirect=/checkout");
+      router.replace("/login?redirect=/checkout");
       return;
     }
     if (profile?.id) {
@@ -359,11 +360,14 @@ export default function CheckoutPage() {
     }
 
     const useSavedCard = paymentMethod === "CREDIT_CARD" && selectedSavedCardId !== "new";
+    // No app instalado (PWA) popups são instáveis: o pagamento abre na própria janela e o
+    // Asaas retorna para /sucesso (callback autoRedirect configurado em /api/checkout).
+    const openInSameWindow = isStandaloneDisplayMode();
     const width = 600;
     const height = 750;
     const left = window.screen.width / 2 - width / 2;
     const top = window.screen.height / 2 - height / 2;
-    const paymentWindow = useSavedCard
+    const paymentWindow = useSavedCard || openInSameWindow
       ? null
       : window.open(
           "",

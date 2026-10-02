@@ -89,7 +89,7 @@ export default function EnderecosPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      router.push("/login?redirect=/enderecos");
+      router.replace("/login?redirect=/enderecos");
     } else if (profile?.id) {
       void fetchAddresses();
     } else {

@@ -165,6 +165,37 @@
   padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
 }
 
+/* ------------------------------------------------------------------ */
+/* PWA / mobile                                                        */
+/* ------------------------------------------------------------------ */
+
+/* Com viewport-fit=cover o conteúdo não pode ficar sob o notch em paisagem. */
+body {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Safari do iOS dá zoom automático ao focar campos com fonte < 16px (o Android não).
+   -webkit-touch-callout só existe no WebKit do iOS, então a regra não afeta outros navegadores. */
+@supports (-webkit-touch-callout: none) {
+  @media (pointer: coarse) and (max-width: 767px) {
+    :is(input, textarea, select):is(.text-xs, .text-sm, [class*="text-[1"]) {
+      font-size: 16px;
+    }
+  }
+}
+
+/* App instalado (definido por components/pwa/PwaProvider.tsx). */
+html[data-display-mode="standalone"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html[data-display-mode="standalone"] :is(nav a, [data-slot="button"]) {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 /* Scrollbar fina e moderna */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
