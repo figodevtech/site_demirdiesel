@@ -71,10 +71,20 @@ export async function GET(request: Request) {
     const user = await getAuthenticatedUser(request);
     if (!user) return NextResponse.json({ message: "Faça login para continuar." }, { status: 401 });
 
+    const customer = await customerForUser(user.id);
+    const currentCustomer = await findAsaasCustomer(
+      cleanCpfCnpj(String(customer.cpfcnpj || "")),
+      `LOJA-CLIENTE-${customer.id}`,
+    );
+    // Tokens cannot be moved between Asaas accounts or customer registrations.
+    if (!currentCustomer) return NextResponse.json({ cards: [] });
+
     const { data, error } = await supabaseAdmin
       .from("customer_payment_card")
       .select("id, brand, last_four, holder_name, expiry_month, expiry_year, is_default, created_at")
       .eq("user_id", user.id)
+      .eq("cliente_id", customer.id)
+      .eq("provider_customer_id", currentCustomer.id)
       .order("is_default", { ascending: false })
       .order("created_at", { ascending: false });
     if (error) throw error;
@@ -122,11 +132,11 @@ export async function POST(request: Request) {
     const document = cleanCpfCnpj(String(customer.cpfcnpj || ""));
     const phone = String(customer.telefone || "").replace(/\D/g, "");
     const externalReference = `LOJA-CLIENTE-${customer.id}`;
-    let asaasCustomerId = String(customer.asaas_customer_id || "").trim();
+    const existing = await findAsaasCustomer(document, externalReference);
+    let asaasCustomerId = existing?.id || "";
 
     if (!asaasCustomerId) {
-      const existing = await findAsaasCustomer(document, externalReference);
-      const asaasCustomer = existing || await createAsaasCustomer({
+      const asaasCustomer = await createAsaasCustomer({
         name: customer.nomerazaosocial,
         cpfCnpj: document,
         email: customer.email,
@@ -140,6 +150,8 @@ export async function POST(request: Request) {
         notificationDisabled: false,
       });
       asaasCustomerId = asaasCustomer.id;
+    }
+    if (asaasCustomerId !== String(customer.asaas_customer_id || "").trim()) {
       const { error } = await supabaseAdmin
         .from("cliente")
         .update({ asaas_customer_id: asaasCustomerId, updatedat: new Date().toISOString() })
@@ -167,7 +179,8 @@ export async function POST(request: Request) {
     const { count } = await supabaseAdmin
       .from("customer_payment_card")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .eq("provider_customer_id", asaasCustomerId);
 
     const { data: saved, error: saveError } = await supabaseAdmin
       .from("customer_payment_card")

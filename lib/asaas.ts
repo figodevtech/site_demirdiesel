@@ -138,3 +138,11 @@ export async function tokenizeAsaasCreditCard(payload: Record<string, unknown>) 
 export async function getAsaasPayment(paymentId: string) {
   return asaasRequest<AsaasPayment>(`/payments/${encodeURIComponent(paymentId)}`);
 }
+
+export async function refundAsaasPayment(paymentId: string, description: string) {
+  return asaasRequest<AsaasPayment>(`/payments/${encodeURIComponent(paymentId)}/refund`, {
+    method: "POST",
+    body: JSON.stringify({ description }),
+    signal: AbortSignal.timeout(60_000),
+  });
+}

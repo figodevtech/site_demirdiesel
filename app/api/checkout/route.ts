@@ -425,12 +425,13 @@ export async function POST(request: Request) {
 
     try {
       const externalCustomerReference = `LOJA-CLIENTE-${cliente.id}`;
-      let asaasCustomerId = String(cliente.asaas_customer_id || "").trim();
+      // Customer IDs belong to the authenticated account/environment. Resolve
+      // against that account instead of trusting a link saved with older keys.
+      const existingCustomer = await findAsaasCustomer(cleanDoc, externalCustomerReference);
+      let asaasCustomerId = existingCustomer?.id || "";
 
       if (!asaasCustomerId) {
-        const existingCustomer = await findAsaasCustomer(cleanDoc, externalCustomerReference);
         const asaasCustomer =
-          existingCustomer ||
           (await createAsaasCustomer({
             name: customerName,
             cpfCnpj: cleanDoc,
@@ -446,6 +447,9 @@ export async function POST(request: Request) {
           }));
 
         asaasCustomerId = asaasCustomer.id;
+      }
+
+      if (asaasCustomerId !== String(cliente.asaas_customer_id || "").trim()) {
         const { error: customerUpdateError } = await supabaseAdmin
           .from("cliente")
           .update({ asaas_customer_id: asaasCustomerId, updatedat: new Date().toISOString() })
@@ -457,7 +461,7 @@ export async function POST(request: Request) {
       }
 
       if (savedCard && savedCard.provider_customer_id !== asaasCustomerId) {
-        throw new Error("O cartão salvo não pertence ao cadastro de cobrança atual.");
+        throw new Error("Este cartão foi salvo em outro cadastro de pagamento. Adicione o cartão novamente para usar nesta conta.");
       }
 
       const paymentConfig = await getStorePaymentConfig();
@@ -486,7 +490,7 @@ export async function POST(request: Request) {
       if (savedCard) {
         paymentPayload.creditCardToken = savedCard.provider_card_token;
         paymentPayload.remoteIp = clientIp(request);
-      } else {
+      } else if (new URL(returnUrl).protocol === "https:") {
         paymentPayload.callback = {
           successUrl: returnUrl,
           autoRedirect: true,
