@@ -1,3 +1,4 @@
+import { AsaasApiError, getAsaasPayment, refundAsaasPayment } from "@/lib/asaas";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -78,4 +79,94 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
   if (!data) return NextResponse.json({ error: "PEDIDO_NAO_ENCONTRADO" }, { status: 404 });
   return NextResponse.json({ ok: true, data });
+}
+
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!isAuthorized(request)) return NextResponse.json({ error: "NAO_AUTORIZADO" }, { status: 401 });
+  try {
+    const orderId = Number((await params).id);
+    const body = await request.json();
+    const reason = String(body.reason || "").trim();
+    if (!Number.isSafeInteger(orderId) || orderId <= 0 || reason.length < 3 || reason.length > 500) {
+      return NextResponse.json({ error: "Pedido ou motivo inválido." }, { status: 400 });
+    }
+    const { data: order, error } = await supabaseAdmin.from("venda")
+      .select("id, gateway_payment_id, payment_provider, status")
+      .eq("id", orderId).eq("canal", "ONLINE").maybeSingle();
+    if (error) throw error;
+    if (!order || order.payment_provider !== "ASAAS" || !order.gateway_payment_id) {
+      return NextResponse.json({ error: "Pedido sem cobrança Asaas." }, { status: 409 });
+    }
+    let payment = await getAsaasPayment(order.gateway_payment_id);
+    if (String(payment.externalReference) !== String(orderId)) throw new Error("Cobrança divergente do pedido.");
+    if (payment.status !== "REFUNDED") {
+      if (!["PIX", "CREDIT_CARD"].includes(payment.billingType || "")) {
+        return NextResponse.json({ error: "Estorno automático disponível para Pix e cartão. Boleto exige o fluxo de devolução no Asaas." }, { status: 409 });
+      }
+      if (["RECEIVED", "CONFIRMED"].includes(payment.status || "")) {
+        const { error: claimError } = await supabaseAdmin.from("site_order_refund_request")
+          .insert({ order_id: orderId, payment_id: payment.id, reason });
+        if (claimError && claimError.code !== "23505") throw claimError;
+        if (!claimError) {
+          try {
+            payment = await refundAsaasPayment(payment.id, reason);
+          } catch (refundError) {
+            // Definitive rejection may be retried; uncertain network results
+            // stay claimed to prevent issuing a second financial operation.
+            if (refundError instanceof AsaasApiError && refundError.status < 500) {
+              await supabaseAdmin.from("site_order_refund_request").delete().eq("order_id", orderId);
+            }
+            throw refundError;
+          }
+        }
+      }
+      payment = await getAsaasPayment(payment.id);
+    }
+    if (payment.status !== "REFUNDED") {
+      return NextResponse.json({ ok: true, pending: true, gatewayStatus: payment.status,
+        message: "Estorno ainda não confirmado. O estoque será devolvido após a confirmação." });
+    }
+    const { error: processError } = await supabaseAdmin.rpc("fn_processar_evento_pagamento_asaas", {
+      p_event_id: `ERP-REFUND-${payment.id}`, p_event_type: "PAYMENT_REFUNDED",
+      p_payment_id: payment.id, p_venda_id: orderId, p_gateway_status: payment.status,
+      p_novo_status: "CANCELADO", p_forma_pagamento: payment.billingType || "Asaas",
+    });
+    if (processError) throw processError;
+    return NextResponse.json({ ok: true, pending: false, gatewayStatus: payment.status });
+  } catch (error) {
+    const databaseError = error as { code?: string; message?: string } | null;
+    console.error("[erp/orders/refund]", { code: databaseError?.code, message: databaseError?.message });
+    const missingControl = databaseError?.code === "PGRST205" && databaseError?.message?.includes("site_order_refund_request");
+    return NextResponse.json({ error: missingControl
+      ? "Falta aplicar a migration 20261006_site_order_refund_request.sql no banco da loja Demir. O estorno foi bloqueado para evitar duplicidade."
+      : error instanceof Error ? error.message : "Falha ao estornar pedido. Consulte o log da loja." }, { status: missingControl ? 503 : 502 });
+  }
+}
+
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!isAuthorized(request)) return NextResponse.json({ error: "NAO_AUTORIZADO" }, { status: 401 });
+  try {
+    const orderId = Number((await params).id);
+    if (!Number.isSafeInteger(orderId) || orderId <= 0) return NextResponse.json({ error: "PEDIDO_INVALIDO" }, { status: 400 });
+    const { data: order, error } = await supabaseAdmin.from("venda").select("gateway_payment_id").eq("id", orderId).eq("canal", "ONLINE").maybeSingle();
+    if (error) throw error;
+    if (!order?.gateway_payment_id) return NextResponse.json({ error: "Pedido sem cobrança." }, { status: 404 });
+    const payment = await getAsaasPayment(order.gateway_payment_id);
+    if (String(payment.externalReference) !== String(orderId)) throw new Error("Cobrança divergente.");
+    const { data: refund, error: refundError } = await supabaseAdmin.from("site_order_refund_request").select("reason, created_at").eq("order_id", orderId).maybeSingle();
+    if (refundError) throw refundError;
+    if (payment.status === "REFUNDED") {
+      const {error: processError} = await supabaseAdmin.rpc("fn_processar_evento_pagamento_asaas", {
+        p_event_id:`ERP-REFUND-${payment.id}`,p_event_type:"PAYMENT_REFUNDED",p_payment_id:payment.id,
+        p_venda_id:orderId,p_gateway_status:payment.status,p_novo_status:"CANCELADO",p_forma_pagamento:payment.billingType || "Asaas",
+      });
+      if(processError) throw processError;
+    }
+    return NextResponse.json({ gatewayStatus: payment.status, requestedAt: refund?.created_at || null, reason: refund?.reason || null });
+  } catch (error) {
+    const databaseError = error as { code?: string; message?: string } | null;
+    console.error("[erp/orders/refund-status]", { code: databaseError?.code, message: databaseError?.message });
+    const missingControl = databaseError?.code === "PGRST205" && databaseError?.message?.includes("site_order_refund_request");
+    return NextResponse.json({ error: missingControl ? "Falta aplicar a migration de controle de estornos no banco da loja Demir." : error instanceof Error ? error.message : "Falha ao consultar estorno." }, { status: missingControl ? 503 : 502 });
+  }
 }

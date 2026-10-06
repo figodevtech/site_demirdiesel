@@ -66,7 +66,8 @@ export async function GET(request: NextRequest) {
   }
 
   const limit = Math.min(100, Math.max(1, Number(request.nextUrl.searchParams.get("limit") || 50)));
-  const { data, error } = await supabaseAdmin
+  const orderId = Number(request.nextUrl.searchParams.get("orderId") || 0);
+  let query = supabaseAdmin
     .from("venda")
     .select(`
       id, status, sub_total, valortotal, forma_pagamento, endereco_entrega_snapshot,
@@ -84,6 +85,11 @@ export async function GET(request: NextRequest) {
     .eq("canal", "ONLINE")
     .order("datavenda", { ascending: true })
     .limit(limit);
+  if(orderId) {
+    if(!Number.isSafeInteger(orderId) || orderId <= 0) return NextResponse.json({error:"PEDIDO_INVALIDO"},{status:400});
+    query = query.eq("id",orderId);
+  }
+  const {data,error} = await query;
 
   if (error) {
     console.error("[erp/orders] Falha ao listar pedidos pagos:", error);

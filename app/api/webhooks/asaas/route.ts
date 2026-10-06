@@ -23,7 +23,6 @@ function localStatus(asaasStatus: string) {
   if (
     [
       "REFUNDED",
-      "REFUND_REQUESTED",
       "CHARGEBACK_REQUESTED",
       "CHARGEBACK_DISPUTE",
       "DELETED",
@@ -89,6 +88,16 @@ export async function POST(request: Request) {
     if (error) {
       console.error("[webhook/asaas] Falha transacional:", error);
       return NextResponse.json({ error: "Falha ao processar evento" }, { status: 500 });
+    }
+
+    // Run even for duplicate events: a previous ERP delivery may have failed.
+    const erpWebhookUrl = process.env.ERP_ORDER_WEBHOOK_URL?.trim();
+    if (erpWebhookUrl && ["PAGO", "CANCELADO"].includes(localStatus(gatewayStatus))) {
+      const erpResponse = await fetch(erpWebhookUrl, {
+        method: "POST", headers: { Authorization: `Bearer ${process.env.ERP_ORDER_SYNC_SECRET?.trim() || ""}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }), cache: "no-store", signal: AbortSignal.timeout(60_000),
+      });
+      if (!erpResponse.ok) return NextResponse.json({ error: "Pagamento atualizado; sincronização ERP pendente." }, { status: 502 });
     }
 
     return NextResponse.json({
