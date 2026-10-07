@@ -95,7 +95,17 @@ export async function POST(request: Request) {
         method: "POST", headers: { Authorization: `Bearer ${process.env.ERP_ORDER_SYNC_SECRET?.trim() || ""}`, "Content-Type": "application/json" },
         body: JSON.stringify({ orderId }), cache: "no-store", signal: AbortSignal.timeout(60_000),
       });
-      if (!erpResponse.ok) return NextResponse.json({ error: "Pagamento atualizado; sincronização ERP pendente." }, { status: 502 });
+      if (!erpResponse.ok) {
+        const erpError = await erpResponse.json().catch(() => null);
+        console.error("[webhook/asaas] Falha na entrega ao ERP", {
+          eventId, orderId, erpStatus: erpResponse.status,
+          error: typeof erpError?.error === "string" ? erpError.error : "Resposta sem erro JSON",
+        });
+        return NextResponse.json({
+          error: "Pagamento atualizado; sincronização ERP pendente.",
+          erpStatus: erpResponse.status,
+        }, { status: 502 });
+      }
     }
 
     return NextResponse.json({
