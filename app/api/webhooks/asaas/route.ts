@@ -88,6 +88,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Falha ao processar evento" }, { status: 500 });
     }
 
+    if (eventType === "PAYMENT_REFUND_DENIED" && gatewayStatus !== "REFUNDED") {
+      // Asaas dateCreated has no offset and uses Brasilia time.
+      const rawDate = String(payload.dateCreated || "");
+      const deniedAt = new Date(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(rawDate) ? rawDate.replace(" ", "T") + "-03:00" : rawDate);
+      if (!Number.isFinite(deniedAt.getTime())) throw new Error("Data de recusa invalida.");
+      const { error: denialError } = await supabaseAdmin.rpc("fn_registrar_recusa_estorno_site", {
+        p_order_id: orderId, p_payment_id: paymentId,
+        p_reason: String(payload.additionalInfo?.denialReason || "Estorno recusado pelo Asaas"),
+        p_denied_at: deniedAt.toISOString(),
+      });
+      if (denialError) throw denialError;
+    }
+
     // Run even for duplicate events: a previous ERP delivery may have failed.
     const erpWebhookUrl = process.env.ERP_ORDER_WEBHOOK_URL?.trim();
     if (erpWebhookUrl && ["PAGO", "CANCELADO"].includes(localStatus(gatewayStatus))) {

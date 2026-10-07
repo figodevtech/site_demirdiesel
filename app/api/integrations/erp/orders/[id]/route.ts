@@ -115,6 +115,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const { error: claimError } = await supabaseAdmin.from("site_order_refund_request")
           .insert({ order_id: orderId, payment_id: payment.id, reason });
         if (claimError && claimError.code !== "23505") throw claimError;
+        if (claimError?.code === "23505") {
+          const { data: previous, error: previousError } = await supabaseAdmin.from("site_order_refund_request")
+            .select("denied_at, denial_reason").eq("order_id", orderId).maybeSingle();
+          if (previousError) throw previousError;
+          if (previous?.denied_at) return NextResponse.json({ error: `Estorno recusado: ${previous.denial_reason || "Motivo nao informado"}. Verifique a recusa no Asaas antes de liberar outra tentativa.` }, { status: 409 });
+        }
         if (!claimError) {
           try {
             payment = await refundAsaasPayment(payment.id, reason);
@@ -161,7 +167,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (!order?.gateway_payment_id) return NextResponse.json({ error: "Pedido sem cobrança." }, { status: 404 });
     const payment = await getAsaasPayment(order.gateway_payment_id);
     if (String(payment.externalReference) !== String(orderId)) throw new Error("Cobrança divergente.");
-    const { data: refund, error: refundError } = await supabaseAdmin.from("site_order_refund_request").select("reason, created_at").eq("order_id", orderId).maybeSingle();
+    const { data: refund, error: refundError } = await supabaseAdmin.from("site_order_refund_request").select("reason, created_at, denial_reason, denied_at").eq("order_id", orderId).maybeSingle();
     if (refundError) throw refundError;
     if (payment.status === "REFUNDED") {
       const {error: processError} = await supabaseAdmin.rpc("fn_processar_evento_pagamento_asaas", {
@@ -170,7 +176,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       });
       if(processError) throw processError;
     }
-    return NextResponse.json({ requiresPhysicalReturn: ["ENVIADO", "ENTREGUE"].includes(String(order.status_entrega)) || Boolean(order.enviado_em || order.entregue_em), gatewayStatus: payment.status, requestedAt: refund?.created_at || null, reason: refund?.reason || null });
+    return NextResponse.json({ requiresPhysicalReturn: ["ENVIADO", "ENTREGUE"].includes(String(order.status_entrega)) || Boolean(order.enviado_em || order.entregue_em), refundStatus: payment.status === "REFUNDED" ? "REFUNDED" : refund?.denied_at ? "DENIED" : payment.status, denialReason: payment.status !== "REFUNDED" ? refund?.denial_reason || null : null, gatewayStatus: payment.status, requestedAt: refund?.created_at || null, reason: refund?.reason || null });
   } catch (error) {
     const databaseError = error as { code?: string; message?: string } | null;
     console.error("[erp/orders/refund-status]", { code: databaseError?.code, message: databaseError?.message });

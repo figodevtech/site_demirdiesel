@@ -6,7 +6,12 @@
     "dev": "node scripts/next-dev.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:status": "node --use-system-ca scripts/db/migrate.mjs status",
+    "db:dry-run": "node --use-system-ca scripts/db/migrate.mjs dry-run",
+    "db:deploy": "node --use-system-ca scripts/db/migrate.mjs deploy",
+    "db:baseline": "node --use-system-ca scripts/db/migrate.mjs baseline",
+    "db:test": "node --test scripts/db/migrate.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
