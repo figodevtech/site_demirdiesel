@@ -23,8 +23,6 @@ function localStatus(asaasStatus: string) {
   if (
     [
       "REFUNDED",
-      "CHARGEBACK_REQUESTED",
-      "CHARGEBACK_DISPUTE",
       "DELETED",
     ].includes(status)
   ) {

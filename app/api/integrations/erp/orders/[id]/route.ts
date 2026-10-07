@@ -45,6 +45,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "DADOS_INVALIDOS", details: parsed.error.flatten() }, { status: 400 });
   }
 
+  const { data: refundRequest, error: refundRequestError } = await supabaseAdmin.from("site_order_refund_request")
+    .select("order_id").eq("order_id", orderId).maybeSingle();
+  if (refundRequestError) return NextResponse.json({ error: "Nao foi possivel verificar o bloqueio de estorno." }, { status: 503 });
+  if (refundRequest) return NextResponse.json({ error: "Pedido com estorno solicitado nao pode ter o andamento atualizado." }, { status: 409 });
+
   const value = parsed.data;
   const now = new Date().toISOString();
   const payload: Record<string, unknown> = { updatedat: now };
@@ -91,11 +96,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Pedido ou motivo inválido." }, { status: 400 });
     }
     const { data: order, error } = await supabaseAdmin.from("venda")
-      .select("id, gateway_payment_id, payment_provider, status")
+      .select("id, gateway_payment_id, payment_provider, status, status_entrega, enviado_em, entregue_em")
       .eq("id", orderId).eq("canal", "ONLINE").maybeSingle();
     if (error) throw error;
     if (!order || order.payment_provider !== "ASAAS" || !order.gateway_payment_id) {
       return NextResponse.json({ error: "Pedido sem cobrança Asaas." }, { status: 409 });
+    }
+    if (["ENVIADO", "ENTREGUE"].includes(String(order.status_entrega)) || order.enviado_em || order.entregue_em) {
+      return NextResponse.json({ error: "Pedido enviado ou entregue exige devolucao fisica conferida. O cancelamento automatico foi bloqueado." }, { status: 409 });
     }
     let payment = await getAsaasPayment(order.gateway_payment_id);
     if (String(payment.externalReference) !== String(orderId)) throw new Error("Cobrança divergente do pedido.");
@@ -148,7 +156,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const orderId = Number((await params).id);
     if (!Number.isSafeInteger(orderId) || orderId <= 0) return NextResponse.json({ error: "PEDIDO_INVALIDO" }, { status: 400 });
-    const { data: order, error } = await supabaseAdmin.from("venda").select("gateway_payment_id").eq("id", orderId).eq("canal", "ONLINE").maybeSingle();
+    const { data: order, error } = await supabaseAdmin.from("venda").select("gateway_payment_id, status_entrega, enviado_em, entregue_em").eq("id", orderId).eq("canal", "ONLINE").maybeSingle();
     if (error) throw error;
     if (!order?.gateway_payment_id) return NextResponse.json({ error: "Pedido sem cobrança." }, { status: 404 });
     const payment = await getAsaasPayment(order.gateway_payment_id);
@@ -162,7 +170,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       });
       if(processError) throw processError;
     }
-    return NextResponse.json({ gatewayStatus: payment.status, requestedAt: refund?.created_at || null, reason: refund?.reason || null });
+    return NextResponse.json({ requiresPhysicalReturn: ["ENVIADO", "ENTREGUE"].includes(String(order.status_entrega)) || Boolean(order.enviado_em || order.entregue_em), gatewayStatus: payment.status, requestedAt: refund?.created_at || null, reason: refund?.reason || null });
   } catch (error) {
     const databaseError = error as { code?: string; message?: string } | null;
     console.error("[erp/orders/refund-status]", { code: databaseError?.code, message: databaseError?.message });
