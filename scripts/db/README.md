@@ -1,21 +1,14 @@
-# Migrations da loja Demir
+# Migrations do projeto
 
-Execute na raiz de `site_demirdiesel`. O runner usa somente `supabase/migrations`, sem buscar arquivos no ERP, Central ou `supabase/storefront`.
+Execute os comandos na raiz deste projeto, nao na raiz do ERP.
 
-## Configuração
-
-Copie `.env.migrations.example` para `.env.migrations.local` e preencha:
+Configure apenas a URL PostgreSQL com usuario e senha em `.env.migrations` ou `.env.migrations.local`:
 
 ```ini
-MIGRATIONS_PROJECT_REF=referencia_do_projeto_supabase_da_loja
-MIGRATIONS_DATABASE_URL=postgresql://postgres.REFERENCIA:SENHA@HOST_DO_SESSION_POOLER:5432/postgres
+DATABASE_URL=postgresql://postgres.REFERENCIA:SENHA@HOST_DO_SESSION_POOLER:5432/postgres
 ```
 
-Use a conexão PostgreSQL fornecida em Supabase → Connect → Session pooler (porta 5432) ou Direct Connection. Codifique caracteres especiais da senha na URL. A service-role key e a chave Asaas não substituem a senha PostgreSQL. Esse arquivo é ignorado pelo Git e não precisa ser publicado na Vercel.
-
-O runner verifica a referência do projeto antes de conectar. Não use credenciais do ERP na loja.
-
-## Comandos
+Aceita tambem o nome anterior `MIGRATIONS_DATABASE_URL`. A referencia usada para confirmar o banco e extraida da URL. Os arquivos reais de ambiente sao ignorados pelo Git; codifique caracteres especiais da senha na URL. Nao use API key nem service-role key como senha PostgreSQL.
 
 ```bash
 npm run db:status
@@ -24,30 +17,16 @@ npm run db:deploy
 npm run db:test
 ```
 
-`status` e `dry-run` são somente leitura. O dry-run mostra pendências e verifica checksums; não executa SQL nem comprova que o schema aceitará a migration.
+O script compara os arquivos de `supabase/migrations` com `supabase_migrations.schema_migrations`, o historico oficial da nuvem, por versao (prefixo numerico do arquivo). Mostra pendentes, aplicadas e versoes somente na nuvem. Nao usa o historico separado da primeira versao deste runner. Nao baixa automaticamente os arquivos remotos nem compara o schema completo como a auditoria de multiplos bancos do ERP.
 
-`deploy` lista as pendências e pede que você digite a referência do projeto. Cada arquivo é aplicado com o registro de histórico na mesma transação; falhas interrompem a execução e revertem aquele arquivo. Arquivos anteriores já concluídos permanecem aplicados. Um lock impede duas execuções simultâneas.
+Status e dry-run nao alteram o banco; dry-run lista o plano, sem executar o SQL. Deploy usa a conexao configurada sem pedir confirmacao digitada, aplica cada arquivo em transacao junto com seu registro oficial e para em caso de erro. Migrations so na nuvem ou versoes duplicadas bloqueiam escritas para evitar repetir ou ignorar SQL. Recupere os arquivos remotos e concilie as versoes antes do deploy.
 
-## Banco já atualizado manualmente: primeiro baseline
-
-Este runner mantém histórico próprio em `project_migrations.history`, por nome completo e checksum. Não utiliza nem modifica `supabase_migrations.schema_migrations`. Isso permite distinguir arquivos com a mesma data no nome. Não alterne runners sem reconciliar os respectivos históricos.
-
-Na primeira utilização, todos os arquivos aparecem pendentes até que o histórico próprio seja inicializado. Antes do primeiro deploy, registre **somente os arquivos que você já aplicou e conferiu**:
+SQL aplicado manualmente pelo SQL Editor nao cria registro no historico oficial e nao pode ser deduzido automaticamente pelos arquivos. Registre somente arquivos ja aplicados e conferidos:
 
 ```bash
-npm run db:baseline -- 20261006_site_order_refund_request.sql 20261007_refund_physical_stock_guard.sql
+npm run db:baseline -- NOME_EXATO_DA_MIGRATION.sql
 ```
 
-O exemplo não representa toda a situação do banco: inclua também as outras migrations já aplicadas. Baseline registra o checksum sem executar SQL e sem verificar os objetos; não use para migrations pendentes. O comando exige confirmação da referência. Depois rode `db:status` e confira a lista restante antes do deploy.
+Baseline nao executa SQL nem comprova os objetos. Para banco realmente novo, inicialize com `npm run db:baseline -- --empty`. O schema inicial pode precisar existir antes das migrations desta pasta. Arquivos com a mesma data devem receber versoes distintas, conciliando primeiro registros existentes; nunca renomeie migrations registradas sem revisar o historico.
 
-Para um banco realmente novo, sem migrations anteriores:
-
-```bash
-npm run db:baseline -- --empty
-```
-
-As migrations desta pasta podem depender do schema inicial de `supabase/storefront`; este comando não cria esse schema automaticamente.
-
-Automação com autorização prévia pode adicionar `-- --yes` ao deploy. Não edite um arquivo já registrado: crie uma nova migration. O runner interrompe diante de checksum divergente ou arquivo aplicado ausente.
-
-Nenhuma conexão real ou baseline é criada automaticamente pela instalação dos scripts.
+A opcao `-- --yes` dispensa a confirmacao para automacao previamente autorizada. Nenhuma migration e aplicada automaticamente ao instalar estes scripts.

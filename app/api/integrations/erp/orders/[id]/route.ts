@@ -114,14 +114,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (["RECEIVED", "CONFIRMED"].includes(payment.status || "")) {
         const { error: claimError } = await supabaseAdmin.from("site_order_refund_request")
           .insert({ order_id: orderId, payment_id: payment.id, reason });
+        let claimed = !claimError;
         if (claimError && claimError.code !== "23505") throw claimError;
         if (claimError?.code === "23505") {
           const { data: previous, error: previousError } = await supabaseAdmin.from("site_order_refund_request")
             .select("denied_at, denial_reason").eq("order_id", orderId).maybeSingle();
           if (previousError) throw previousError;
-          if (previous?.denied_at) return NextResponse.json({ error: `Estorno recusado: ${previous.denial_reason || "Motivo nao informado"}. Verifique a recusa no Asaas antes de liberar outra tentativa.` }, { status: 409 });
+          if (previous?.denied_at) {
+            if ((payment.refunds || []).some(refund => !["DENIED", "FAILED", "CANCELLED"].includes(String(refund.status)))) {
+              return NextResponse.json({ error: "O Asaas possui outro reembolso registrado. Consulte antes de repetir o estorno." }, { status: 409 });
+            }
+            const { data: reopened, error: reopenError } = await supabaseAdmin.rpc("fn_reabrir_estorno_recusado_site", {
+              p_order_id: orderId, p_payment_id: payment.id, p_expected_denied_at: previous.denied_at, p_reason: reason,
+            });
+            if (reopenError) throw reopenError;
+            claimed = reopened === true;
+          }
         }
-        if (!claimError) {
+        if (claimed) {
           try {
             payment = await refundAsaasPayment(payment.id, reason);
           } catch (refundError) {
