@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { listMigrations, transactionSql } from './migrate.mjs';
+import { listMigrations, transactionSql, connectionConfiguration, compareHistory } from './migrate.mjs';
 
 test('same-day files remain distinct and CRLF does not change checksum', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-test-'));
@@ -29,4 +29,15 @@ test('removes outer transaction, keeps PL/pgSQL block and comments', () => {
   assert.ok(!result.includes('begin;'));
   assert.ok(!result.includes('commit;'));
   assert.equal(transactionSql('select 1;'), 'select 1;');
+});
+
+
+test('extracts reference from one URL and compares official cloud history', () => {
+  assert.equal(connectionConfiguration('postgresql://postgres:secret@db.abc.supabase.co:5432/postgres').ref, 'abc');
+  assert.equal(connectionConfiguration('postgresql://postgres.abc:secret@aws-0-sa-east-1.pooler.supabase.com:5432/postgres').ref, 'abc');
+  assert.throws(() => connectionConfiguration('https://example.com'));
+  const result = compareHistory([{version:'1',name:'1_a.sql'},{version:'2',name:'2_b.sql'}],[{version:'1'},{version:'3'}]);
+  assert.deepEqual(result.pending.map(x=>x.version), ['2']);
+  assert.deepEqual(result.remoteOnly.map(x=>x.version), ['3']);
+  assert.deepEqual(compareHistory([{version:'1'},{version:'1'}],[]).duplicateVersions,['1']);
 });

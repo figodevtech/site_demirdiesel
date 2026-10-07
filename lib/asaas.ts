@@ -19,6 +19,7 @@ export interface AsaasCustomer {
 }
 
 export interface AsaasPayment {
+  refunds?: Array<{ status?: string }> | null;
   id: string;
   customer?: string;
   billingType?: string;
