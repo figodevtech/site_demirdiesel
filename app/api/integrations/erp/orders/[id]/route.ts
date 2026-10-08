@@ -147,8 +147,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       payment = await getAsaasPayment(payment.id);
     }
     if (payment.status !== "REFUNDED") {
-      return NextResponse.json({ ok: true, pending: true, gatewayStatus: payment.status,
-        message: "Estorno ainda não confirmado. O estoque será devolvido após a confirmação." });
+      const authorizationPending = (payment.refunds || []).some(refund => refund.status === "AWAITING_CRITICAL_ACTION_AUTHORIZATION");
+      return NextResponse.json({ ok: true, pending: true, refundStatus: authorizationPending ? "AWAITING_CRITICAL_ACTION_AUTHORIZATION" : payment.status, gatewayStatus: payment.status,
+        message: authorizationPending ? "O reembolso aguarda autorizacao na conta Asaas da Demir. Autorize a acao pendente antes de consultar novamente." : "Estorno ainda não confirmado. O estoque será devolvido após a confirmação." });
     }
     const { error: processError } = await supabaseAdmin.rpc("fn_processar_evento_pagamento_asaas", {
       p_event_id: `ERP-REFUND-${payment.id}`, p_event_type: "PAYMENT_REFUNDED",
@@ -186,7 +187,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       });
       if(processError) throw processError;
     }
-    return NextResponse.json({ requiresPhysicalReturn: ["ENVIADO", "ENTREGUE"].includes(String(order.status_entrega)) || Boolean(order.enviado_em || order.entregue_em), refundStatus: payment.status === "REFUNDED" ? "REFUNDED" : refund?.denied_at ? "DENIED" : payment.status, denialReason: payment.status !== "REFUNDED" ? refund?.denial_reason || null : null, gatewayStatus: payment.status, requestedAt: refund?.created_at || null, reason: refund?.reason || null });
+    return NextResponse.json({ requiresPhysicalReturn: ["ENVIADO", "ENTREGUE"].includes(String(order.status_entrega)) || Boolean(order.enviado_em || order.entregue_em), refundStatus: payment.status === "REFUNDED" ? "REFUNDED" : (payment.refunds || []).some(item => item.status === "AWAITING_CRITICAL_ACTION_AUTHORIZATION") ? "AWAITING_CRITICAL_ACTION_AUTHORIZATION" : refund?.denied_at ? "DENIED" : payment.status, denialReason: payment.status !== "REFUNDED" ? refund?.denial_reason || null : null, gatewayStatus: payment.status, requestedAt: refund?.created_at || null, reason: refund?.reason || null });
   } catch (error) {
     const databaseError = error as { code?: string; message?: string } | null;
     console.error("[erp/orders/refund-status]", { code: databaseError?.code, message: databaseError?.message });
