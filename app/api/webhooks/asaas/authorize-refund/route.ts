@@ -70,8 +70,16 @@ export async function POST(request: Request) {
     if (error) throw error;
     if (approved !== true) return refused("Nao corresponde a um estorno integral ativo solicitado pelo ERP antes do envio.");
     return NextResponse.json({ status: "APPROVED" });
-  } catch {
-    console.error("[asaas/authorize-refund] Nao foi possivel validar a operacao. Nenhuma aprovacao foi emitida.");
-    return NextResponse.json({ error: "Validacao temporariamente indisponivel." }, { status: 503 });
+  } catch (error) {
+    const dependencyError = error as { status?: number; details?: { errors?: Array<{ code?: string }> }; code?: string };
+    const code = dependencyError.details?.errors?.[0]?.code || dependencyError.code;
+    console.error("[asaas/authorize-refund] Validacao falhou; nenhuma aprovacao emitida.", {
+      upstreamStatus: dependencyError.status, code,
+    });
+    return NextResponse.json({
+      error: code === "insufficient_permission"
+        ? "A chave Asaas da loja nao possui permissao para consultar a transacao Pix usada na autorizacao. Revise as permissoes da chave."
+        : "Validacao temporariamente indisponivel.",
+    }, { status: 503 });
   }
 }
