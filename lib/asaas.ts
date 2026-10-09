@@ -147,3 +147,9 @@ export async function refundAsaasPayment(paymentId: string, description: string)
     signal: AbortSignal.timeout(60_000),
   });
 }
+
+export async function refundAsaasBankSlip(paymentId: string) {
+  return asaasRequest<{ requestUrl: string }>(`/payments/${encodeURIComponent(paymentId)}/bankSlip/refund`, {
+    method: "POST", body: JSON.stringify({}), signal: AbortSignal.timeout(60_000),
+  });
+}

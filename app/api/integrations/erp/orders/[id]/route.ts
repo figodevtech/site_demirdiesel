@@ -1,4 +1,4 @@
-import { AsaasApiError, getAsaasPayment, refundAsaasPayment } from "@/lib/asaas";
+import { AsaasApiError, getAsaasPayment, refundAsaasPayment, refundAsaasBankSlip } from "@/lib/asaas";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -49,6 +49,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .select("order_id").eq("order_id", orderId).maybeSingle();
   if (refundRequestError) return NextResponse.json({ error: "Nao foi possivel verificar o bloqueio de estorno." }, { status: 503 });
   if (refundRequest) return NextResponse.json({ error: "Pedido com estorno solicitado nao pode ter o andamento atualizado." }, { status: 409 });
+  const { data: physicalReturn, error: returnError } = await supabaseAdmin.from("site_order_return").select("order_id").eq("order_id", orderId).maybeSingle();
+  if (returnError) return NextResponse.json({ error: "Falha ao verificar devolução." }, { status: 503 });
+  if (physicalReturn) return NextResponse.json({ error: "Pedido em devolução não pode ter o andamento atualizado." }, { status: 409 });
 
   const value = parsed.data;
   const now = new Date().toISOString();
@@ -102,13 +105,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!order || order.payment_provider !== "ASAAS" || !order.gateway_payment_id) {
       return NextResponse.json({ error: "Pedido sem cobrança Asaas." }, { status: 409 });
     }
-    if (["ENVIADO", "ENTREGUE"].includes(String(order.status_entrega)) || order.enviado_em || order.entregue_em) {
+    const { data: physicalReturn, error: returnError } = await supabaseAdmin.from("site_order_return").select("received_at").eq("order_id", orderId).maybeSingle();
+    if (returnError) throw returnError;
+    if ((["ENVIADO", "ENTREGUE"].includes(String(order.status_entrega)) || order.enviado_em || order.entregue_em) && !physicalReturn?.received_at) {
       return NextResponse.json({ error: "Pedido enviado ou entregue exige devolucao fisica conferida. O cancelamento automatico foi bloqueado." }, { status: 409 });
     }
     let payment = await getAsaasPayment(order.gateway_payment_id);
     if (String(payment.externalReference) !== String(orderId)) throw new Error("Cobrança divergente do pedido.");
+    if (payment.billingType === "BOLETO" && !["RECEIVED", "CONFIRMED", "REFUNDED", "REFUND_REQUESTED", "REFUND_IN_PROGRESS"].includes(payment.status || "")) {
+      return NextResponse.json({ error: "Boleto ainda não pago. Cancele a cobrança pendente; não há valor para reembolsar." }, { status: 409 });
+    }
     if (payment.status !== "REFUNDED") {
-      if (!["PIX", "CREDIT_CARD"].includes(payment.billingType || "")) {
+      if (!["PIX", "CREDIT_CARD", "BOLETO"].includes(payment.billingType || "")) {
         return NextResponse.json({ error: "Estorno automático disponível para Pix e cartão. Boleto exige o fluxo de devolução no Asaas." }, { status: 409 });
       }
       if (["RECEIVED", "CONFIRMED"].includes(payment.status || "")) {
@@ -133,7 +141,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         }
         if (claimed) {
           try {
-            payment = await refundAsaasPayment(payment.id, reason);
+            if (payment.billingType === "BOLETO") {
+              const result = await refundAsaasBankSlip(payment.id);
+              const url = new URL(result.requestUrl);
+              if (url.protocol !== "https:" || !["asaas.com", "www.asaas.com", "sandbox.asaas.com"].includes(url.hostname)) throw new Error("Link de reembolso Asaas inválido.");
+              const { error: urlError } = await supabaseAdmin.from("site_order_refund_request").update({request_url: url.href}).eq("order_id", orderId);
+              if (urlError) throw urlError;
+            } else payment = await refundAsaasPayment(payment.id, reason);
           } catch (refundError) {
             // Definitive rejection may be retried; uncertain network results
             // stay claimed to prevent issuing a second financial operation.
@@ -148,8 +162,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     if (payment.status !== "REFUNDED") {
       const authorizationPending = (payment.refunds || []).some(refund => refund.status === "AWAITING_CRITICAL_ACTION_AUTHORIZATION");
-      return NextResponse.json({ ok: true, pending: true, refundStatus: authorizationPending ? "AWAITING_CRITICAL_ACTION_AUTHORIZATION" : payment.status, gatewayStatus: payment.status,
-        message: authorizationPending ? "O reembolso aguarda autorizacao na conta Asaas da Demir. Autorize a acao pendente antes de consultar novamente." : "Estorno ainda não confirmado. O estoque será devolvido após a confirmação." });
+      const { data: savedRequest, error: savedError } = await supabaseAdmin.from("site_order_refund_request").select("request_url").eq("order_id",orderId).maybeSingle();
+      if (savedError) throw savedError;
+      return NextResponse.json({ ok: true, pending: true, requestUrl: savedRequest?.request_url || null, refundStatus: savedRequest?.request_url ? "AWAITING_CUSTOMER" : authorizationPending ? "AWAITING_CRITICAL_ACTION_AUTHORIZATION" : payment.status, gatewayStatus: payment.status,
+        message: savedRequest?.request_url ? "Boleto: cliente deve preencher os dados e documentos no link do Asaas. Reembolso ainda não concluído." : authorizationPending ? "O reembolso aguarda autorizacao na conta Asaas da Demir. Autorize a acao pendente antes de consultar novamente." : "Estorno ainda não confirmado. O estoque será devolvido após a confirmação." });
     }
     const { error: processError } = await supabaseAdmin.rpc("fn_processar_evento_pagamento_asaas", {
       p_event_id: `ERP-REFUND-${payment.id}`, p_event_type: "PAYMENT_REFUNDED",
@@ -178,7 +194,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (!order?.gateway_payment_id) return NextResponse.json({ error: "Pedido sem cobrança." }, { status: 404 });
     const payment = await getAsaasPayment(order.gateway_payment_id);
     if (String(payment.externalReference) !== String(orderId)) throw new Error("Cobrança divergente.");
-    const { data: refund, error: refundError } = await supabaseAdmin.from("site_order_refund_request").select("reason, created_at, denial_reason, denied_at").eq("order_id", orderId).maybeSingle();
+    const { data: refund, error: refundError } = await supabaseAdmin.from("site_order_refund_request").select("reason, created_at, denial_reason, denied_at, request_url").eq("order_id", orderId).maybeSingle();
     if (refundError) throw refundError;
     if (payment.status === "REFUNDED") {
       const {error: processError} = await supabaseAdmin.rpc("fn_processar_evento_pagamento_asaas", {
@@ -187,11 +203,35 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       });
       if(processError) throw processError;
     }
-    return NextResponse.json({ requiresPhysicalReturn: ["ENVIADO", "ENTREGUE"].includes(String(order.status_entrega)) || Boolean(order.enviado_em || order.entregue_em), refundStatus: payment.status === "REFUNDED" ? "REFUNDED" : (payment.refunds || []).some(item => item.status === "AWAITING_CRITICAL_ACTION_AUTHORIZATION") ? "AWAITING_CRITICAL_ACTION_AUTHORIZATION" : refund?.denied_at ? "DENIED" : payment.status, denialReason: payment.status !== "REFUNDED" ? refund?.denial_reason || null : null, gatewayStatus: payment.status, requestedAt: refund?.created_at || null, reason: refund?.reason || null });
+    const { data: physicalReturn, error: returnError } = await supabaseAdmin.from("site_order_return").select("requested_at, received_at, restocked_at").eq("order_id",orderId).maybeSingle();
+    if (returnError) throw returnError;
+    return NextResponse.json({ physicalReturn, requestUrl: refund?.request_url || null, requiresPhysicalReturn: !physicalReturn?.received_at && ( ["ENVIADO", "ENTREGUE"].includes(String(order.status_entrega)) || Boolean(order.enviado_em || order.entregue_em)), refundStatus: payment.status === "REFUNDED" ? "REFUNDED" : (payment.refunds || []).some(item => item.status === "AWAITING_CRITICAL_ACTION_AUTHORIZATION") ? "AWAITING_CRITICAL_ACTION_AUTHORIZATION" : refund?.denied_at ? "DENIED" : refund?.request_url ? "AWAITING_CUSTOMER" : payment.status, denialReason: payment.status !== "REFUNDED" ? refund?.denial_reason || null : null, gatewayStatus: payment.status, requestedAt: refund?.created_at || null, reason: refund?.reason || null });
   } catch (error) {
     const databaseError = error as { code?: string; message?: string } | null;
     console.error("[erp/orders/refund-status]", { code: databaseError?.code, message: databaseError?.message });
     const missingControl = databaseError?.code === "PGRST205" && databaseError?.message?.includes("site_order_refund_request");
     return NextResponse.json({ error: missingControl ? "Falta aplicar a migration de controle de estornos no banco da loja Demir." : error instanceof Error ? error.message : "Falha ao consultar estorno." }, { status: missingControl ? 503 : 502 });
   }
+}
+
+// Entire-order return only: partial or damaged returns must not use this action.
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+ if (!isAuthorized(request)) return NextResponse.json({error:"NAO_AUTORIZADO"},{status:401});
+ try {
+  const orderId=Number((await params).id);
+  const parsed=z.object({action:z.enum(["REQUEST_RETURN","RECEIVE_RETURN"]),reason:z.string().trim().min(3).max(500),operator:z.string().trim().min(1).max(100),allItemsApproved:z.literal(true).optional(),reverseTracking:z.string().trim().max(160).optional()}).safeParse(await request.json());
+  if(!Number.isSafeInteger(orderId)||orderId<=0||!parsed.success) return NextResponse.json({error:"Dados inválidos."},{status:400});
+  const {data:order,error}=await supabaseAdmin.from("venda").select("id,status,status_entrega,enviado_em,entregue_em").eq("id",orderId).eq("canal","ONLINE").maybeSingle();
+  if(error) throw error;
+  if(!order||!(["ENVIADO","ENTREGUE"].includes(String(order.status_entrega))||order.enviado_em||order.entregue_em)) return NextResponse.json({error:"Pedido não possui saída física registrada."},{status:409});
+  if(parsed.data.action==="REQUEST_RETURN") {
+   const {error:saveError}=await supabaseAdmin.from("site_order_return").upsert({order_id:orderId,reason:parsed.data.reason,requested_by:parsed.data.operator,reverse_tracking:parsed.data.reverseTracking||null},{onConflict:"order_id",ignoreDuplicates:true});
+   if(saveError) throw saveError;
+  } else {
+   if(!parsed.data.allItemsApproved) return NextResponse.json({error:"Confira todos os itens e quantidades, em condição de retornar ao estoque."},{status:400});
+   const {error:receiveError}=await supabaseAdmin.rpc("fn_receber_devolucao_site",{p_order_id:orderId,p_operator:parsed.data.operator,p_note:parsed.data.reason});
+   if(receiveError) throw receiveError;
+  }
+  return NextResponse.json({ok:true});
+ } catch(error) { return NextResponse.json({error:error instanceof Error?error.message:"Falha ao registrar devolução."},{status:502}); }
 }
