@@ -53,7 +53,7 @@ async function getPublishedProductCounts() {
       .eq("is_deleted", false)
       .eq("visible", true)
       .not("imgUrl", "is", null)
-      .neq("imgUrl", "")
+      .not("imgUrl", "match", "^[[:space:]]*$")
       .range(from, from + pageSize - 1);
 
     if (error) throw error;

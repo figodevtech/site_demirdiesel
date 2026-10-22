@@ -112,7 +112,8 @@ export async function POST(request: Request) {
       referencia: product.reference || null,
       fabricante: product.manufacturer || null,
       grupo_produto_id: product.categoryId || null,
-      imgUrl: product.imageUrl || null,
+      // A gallery photo can also serve as the catalog cover.
+      imgUrl: product.imageUrl?.trim() || product.images[0]?.url.trim() || null,
       conservacao: product.condition || null,
       destaque: product.featured,
       visible: product.visible,

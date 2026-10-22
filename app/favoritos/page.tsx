@@ -76,7 +76,7 @@ export default function FavoritosPage() {
 
       if (error) throw error;
 
-      const formatted = ((data || []) as unknown as FavoriteRelation[]).map((item) => {
+      const formatted = ((data || []) as unknown as FavoriteRelation[]).filter((item) => item.produto?.imgUrl?.trim()).map((item) => {
         const p = item.produto;
         const stock = Number(p?.estoque) || 0;
         return {

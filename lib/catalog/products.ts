@@ -218,7 +218,7 @@ export async function getFeaturedProducts(limit = 8): Promise<PublicProduct[]> {
       .eq("destaque", true)
       .gt("estoque", 0)
       .not("imgUrl", "is", null)
-      .neq("imgUrl", "")
+      .not("imgUrl", "match", "^[[:space:]]*$")
       .order("id", { ascending: false })
       .limit(limit);
 
@@ -236,7 +236,7 @@ export async function getFeaturedProducts(limit = 8): Promise<PublicProduct[]> {
       .eq("visible", true)
       .gt("estoque", 0)
       .not("imgUrl", "is", null)
-      .neq("imgUrl", "")
+      .not("imgUrl", "match", "^[[:space:]]*$")
       .order("id", { ascending: false })
       .limit(limit);
 
@@ -253,7 +253,7 @@ export async function getFeaturedProducts(limit = 8): Promise<PublicProduct[]> {
       .eq("is_deleted", false)
       .eq("visible", true)
       .not("imgUrl", "is", null)
-      .neq("imgUrl", "")
+      .not("imgUrl", "match", "^[[:space:]]*$")
       .order("em_estoque", { ascending: false })
       .order("id", { ascending: false })
       .limit(limit);
@@ -305,7 +305,7 @@ export async function getBestSellerProducts(limit = 8): Promise<PublicProduct[]>
         .eq("visible", true)
         .gt("estoque", 0)
         .not("imgUrl", "is", null)
-        .neq("imgUrl", "");
+        .not("imgUrl", "match", "^[[:space:]]*$");
 
       const prodMap = new Map((productsData || []).map((p) => [p.id, p]));
 
@@ -367,7 +367,7 @@ export async function getProductById(idOrSlug: string): Promise<PublicProduct | 
       .eq("is_deleted", false)
       .eq("visible", true)
       .not("imgUrl", "is", null)
-      .neq("imgUrl", "")
+      .not("imgUrl", "match", "^[[:space:]]*$")
       .single();
 
     if (productError || !productRow || !productRow.imgUrl || !productRow.imgUrl.trim()) {
@@ -407,7 +407,7 @@ export async function getPaginatedProducts(
       .eq("is_deleted", false)
       .eq("visible", true)
       .not("imgUrl", "is", null)
-      .neq("imgUrl", "");
+      .not("imgUrl", "match", "^[[:space:]]*$");
 
     // Categoria
     if (options.categoryId) {
@@ -557,7 +557,7 @@ export async function getAvailableBrands(): Promise<string[]> {
       .eq("is_deleted", false)
       .eq("visible", true)
       .not("imgUrl", "is", null)
-      .neq("imgUrl", "")
+      .not("imgUrl", "match", "^[[:space:]]*$")
       .not("fabricante", "is", null);
 
     if (!data) return [];
@@ -586,7 +586,7 @@ export async function getAvailablePriceRange(): Promise<{ min: number; max: numb
         .eq("is_deleted", false)
         .eq("visible", true)
         .not("imgUrl", "is", null)
-        .neq("imgUrl", "")
+        .not("imgUrl", "match", "^[[:space:]]*$")
         .gte("precovenda", 0)
         .order("precovenda", { ascending })
         .limit(1)
@@ -630,7 +630,7 @@ export async function getAllProductsForSitemap(): Promise<Array<{ id: number; sl
         .eq("is_deleted", false)
         .eq("visible", true)
         .not("imgUrl", "is", null)
-        .neq("imgUrl", "")
+        .not("imgUrl", "match", "^[[:space:]]*$")
         .order("id", { ascending: true })
         .range(from, to);
 
