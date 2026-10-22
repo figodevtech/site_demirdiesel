@@ -8,6 +8,7 @@ import { CheckCircle2, Clock, AlertTriangle, ArrowRight, Package, Home, RefreshC
 import { motion } from "motion/react";
 import { haptic } from "@/lib/haptics";
 import { useCart } from "@/components/providers/CartContext";
+import {forgetCheckoutAttempt} from '@/lib/checkout-attempt-client';
 import { supabase } from "@/lib/supabase";
 
 function SucessoContent() {
@@ -59,6 +60,7 @@ function SucessoContent() {
         if (data.isPaid) {
           if (!clearedRef.current) {
             clearedRef.current = true;
+            if(sessionData?.session?.user?.id) forgetCheckoutAttempt(sessionData.session.user.id);
             clearCart();
           }
 

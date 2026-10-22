@@ -5,6 +5,7 @@ import Navbar from "@/components/layout/Navbar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import Footer from "@/components/layout/Footer";
 import { AuthProvider } from "@/components/providers/AuthContext";
+import { Toaster } from '@/components/ui/sonner';
 import { RouteShell } from "@/components/layout/RouteShell";
 import { Analytics } from "@vercel/analytics/next";
 import { PwaProvider } from "@/components/pwa/PwaProvider";
@@ -130,6 +131,7 @@ export default function RootLayout({
             {children}
           </RouteShell>
           <PwaProvider />
+          <Toaster richColors position="top-center" />
         </AuthProvider>
         <Analytics />
       </body>

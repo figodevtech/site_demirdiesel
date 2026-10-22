@@ -113,12 +113,12 @@ export default function FavoritosPage() {
     setFavorites((prev) => prev.filter((p) => p.id !== productId));
   };
 
-  const handleAddToCart = (item: FavoriteItem) => {
+  const handleAddToCart = async (item: FavoriteItem) => {
     if (item.price <= 0) {
       toast.info("Este item é sob consulta. Entre em contato pelo WhatsApp para consultar o valor.");
       return;
     }
-    addToCart(
+    await addToCart(
       {
         id: item.id,
         name: item.title,
@@ -129,7 +129,7 @@ export default function FavoritosPage() {
       },
       1
     );
-    toast.success("Item adicionado ao carrinho!");
+
   };
 
   const formatCurrency = (val: number) =>

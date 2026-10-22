@@ -1,3 +1,5 @@
+import { attemptIdentity, resumeCheckout, bindCheckoutPayment, checkoutFailed } from '@/lib/checkout-attempt';
+import { erpCheckout, InventoryError } from '@/lib/erp-checkout';
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -249,6 +251,10 @@ export async function POST(request: Request) {
       consolidatedMap.set(numId, (consolidatedMap.get(numId) || 0) + qty);
     }
 
+    const identity = attemptIdentity(body.checkoutAttemptId, Number(cliente.id), addressId, deliveryMethod, billingType, savedCardId, consolidatedMap);
+    const resumed = await resumeCheckout(identity.attempt, Number(cliente.id), identity.hash);
+    if (resumed) return resumed;
+
     const uniqueProductIds = Array.from(consolidatedMap.keys());
     if (uniqueProductIds.length === 0) {
       return NextResponse.json(
@@ -355,7 +361,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 7. CRIAÇÃO DE PEDIDO ATÔMICA VIA RPC (Prioridade 3)
+    // 7. REGISTRA A TENTATIVA ATOMICAMENTE, SEM CRIAR VENDA OU ITENS.
     const enderecoSnapshot = {
       id: addressRow.id,
       logradouro: addressRow.logradouro,
@@ -379,16 +385,20 @@ export async function POST(request: Request) {
       tipo_desconto: null,
     }));
 
-    const { data: orderId, error: rpcError } = await supabaseAdmin.rpc("fn_criar_pedido_site", {
-      p_cliente_id: cliente.id,
-      p_endereco_snapshot: enderecoSnapshot,
-      p_itens: orderItemsPayload,
+    const { data: attemptResult, error: rpcError } = await supabaseAdmin.rpc("fn_start_checkout", {
+      p_attempt: identity.attempt,
+      p_cliente: cliente.id,
+      p_hash: identity.hash,
+      p_billing: billingType,
+      p_address: enderecoSnapshot,
+      p_items: orderItemsPayload,
       p_subtotal: serverSubtotal,
       p_total: serverTotal,
-      p_canal: "ONLINE",
-      p_forma_pagamento: paymentMethodLabel,
+      p_method: paymentMethodLabel,
     });
 
+    const orderId = Number(attemptResult?.orderId);
+    if (rpcError?.message?.includes('CHECKOUT_CUTOVER_PENDING')) return NextResponse.json({message:'O checkout está em atualização. Tente novamente em instantes.'},{status:503});
     if (rpcError || !orderId) {
       console.error("[checkout] Erro crítico ao criar pedido atômico (RPC):", rpcError);
       return NextResponse.json(
@@ -400,7 +410,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // 8. CRIA A COBRANÇA NO ASAAS SOMENTE APÓS O PEDIDO LOCAL SER REGISTRADO
+    if (!attemptResult.started) {
+      const existing = await resumeCheckout(attemptResult.attemptId || identity.attempt, Number(cliente.id), identity.hash);
+      if (existing) return existing;
+      throw new Error('Não foi possível retomar o pedido. Consulte seus pedidos.');
+    }
+
+    // 8. CRIA A COBRANÇA APÓS REGISTRAR A TENTATIVA E RESERVAR NO ERP.
     // SEGURANÇA: return_url estritamente ancorado na URL oficial configurada do site.
     // Allowlist explícita por ambiente para suportar homologação/desenvolvimento sem permitir domínios arbitrários.
     const configuredBaseUrl = siteConfig.url.replace(/\/+$/, "");
@@ -424,6 +440,7 @@ export async function POST(request: Request) {
     const returnUrl = `${safeBaseUrl}/sucesso?orderId=${orderId}`;
 
     try {
+      await erpCheckout({action:'reserve',orderId,items:validatedItems.map(item=>({productId:item.id,quantity:item.quantity,unitPrice:item.unitPrice}))});
       const externalCustomerReference = `LOJA-CLIENTE-${cliente.id}`;
       // Customer IDs belong to the authenticated account/environment. Resolve
       // against that account instead of trusting a link saved with older keys.
@@ -483,7 +500,7 @@ export async function POST(request: Request) {
         dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
           .toISOString()
           .slice(0, 10),
-        description: `Demir Diesel - Pedido #${orderId}`,
+        description: `Demir Diesel - Compra #${orderId}`,
         externalReference: String(orderId),
       };
 
@@ -506,29 +523,16 @@ export async function POST(request: Request) {
         ];
       }
 
+      const {error: metadataError}=await supabaseAdmin.from('checkout_attempt').update({payment_meta:{commission_percent:splitEnabled?commissionPercent:0,commission_wallet_id:splitEnabled?commissionWalletId:null,commission_config_revision:paymentConfig.revision}}).eq('order_id',orderId).eq('phase','PREPARING');
+      if(metadataError)throw metadataError;
+      if (billingType === 'BOLETO') paymentPayload.daysAfterDueDateToRegistrationCancellation = 0;
+      const { error: sendingError } = await supabaseAdmin.rpc('fn_checkout_sending', {p_order:orderId,p_customer:asaasCustomerId});
+      if (sendingError) throw sendingError;
+      // Never retry this POST blindly: an HTTP timeout does not prove failure.
       const payment = await createAsaasPayment(paymentPayload);
+      await bindCheckoutPayment(orderId,payment);
       if (!payment.id || (!savedCard && !payment.invoiceUrl)) {
         throw new Error("O Asaas não retornou os dados necessários da cobrança.");
-      }
-
-      const { error: paymentUpdateError } = await supabaseAdmin
-        .from("venda")
-        .update({
-          payment_provider: "ASAAS",
-          gateway_payment_id: payment.id,
-          gateway_checkout_url: payment.invoiceUrl || null,
-          gateway_status: payment.status || "PENDING",
-          gateway_due_date: payment.dueDate || null,
-          forma_pagamento: paymentMethodLabel,
-          commission_percent: splitEnabled ? commissionPercent : 0,
-          commission_wallet_id: splitEnabled ? commissionWalletId : null,
-          commission_config_revision: paymentConfig.revision,
-          updatedat: new Date().toISOString(),
-        })
-        .eq("id", orderId);
-
-      if (paymentUpdateError) {
-        throw new Error("Cobrança criada, mas não foi possível conciliá-la com o pedido local.");
       }
 
       return NextResponse.json({
@@ -542,6 +546,10 @@ export async function POST(request: Request) {
         paymentMethod: paymentMethodLabel,
       });
     } catch (paymentError) {
+      let retryable = false;
+      try { retryable = await checkoutFailed(orderId, paymentError instanceof AsaasApiError && [400,422].includes(paymentError.status)); }
+      catch { console.error('[checkout] Conciliação de estoque pendente', {orderId}); }
+      if (paymentError instanceof InventoryError) return NextResponse.json({error:'DISPONIBILIDADE',message:paymentError.message,orderId,retryable},{status:paymentError.status});
       const message =
         paymentError instanceof Error
           ? paymentError.message
@@ -549,12 +557,12 @@ export async function POST(request: Request) {
 
       console.error("[checkout] Erro ao criar cobrança no Asaas:", paymentError);
       await supabaseAdmin
-        .from("venda")
+        .from("checkout_attempt")
         .update({
-          observacao: `[Asaas Erro Cobrança] ${new Date().toISOString()} - ${message}`,
-          updatedat: new Date().toISOString(),
+          last_error: `[Asaas Erro Cobrança] ${new Date().toISOString()} - ${message}`,
+          updated_at: new Date().toISOString(),
         })
-        .eq("id", orderId);
+        .eq("order_id", orderId);
 
       const status =
         paymentError instanceof AsaasApiError &&
@@ -566,6 +574,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: "ERRO_ASAAS",
+          retryable,
           message,
           orderId,
         },

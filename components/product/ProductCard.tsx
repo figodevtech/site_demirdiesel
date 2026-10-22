@@ -29,10 +29,10 @@ export function ProductCard({
   const [justAdded, setJustAdded] = useState(false);
   const hasValidImage = product.image && product.image.trim() !== "" && !imageError;
 
-  const handleQuickAdd = (e: React.MouseEvent) => {
+  const handleQuickAdd = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (product.isAvailable && product.price > 0 && addToCart(product, 1) > 0) {
+    if (product.isAvailable && product.price > 0 && (await addToCart(product, 1)) > 0) {
       setJustAdded(true);
       window.setTimeout(() => setJustAdded(false), 1400);
     }

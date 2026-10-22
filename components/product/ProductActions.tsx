@@ -29,7 +29,7 @@ export function ProductActions({ product }: { product: PublicProduct }) {
   const isAvailable = product.isAvailable && maxStock > 0;
   const hasPrice = product.price > 0;
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!isAvailable) {
       toast.error("Produto sem estoque no momento.");
       return;
@@ -39,7 +39,7 @@ export function ProductActions({ product }: { product: PublicProduct }) {
       return;
     }
     // Feedback (toast "Ver carrinho" + haptic) vem do CartContext.
-    if (addToCart(product, quantity) <= 0) return;
+    if ((await addToCart(product, quantity)) <= 0) return;
     setIsAdded(true);
     window.setTimeout(() => setIsAdded(false), 1800);
   };

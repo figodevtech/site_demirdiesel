@@ -21,13 +21,6 @@ interface HeaderProps {
   categories: PublicCategory[];
 }
 
-const FALLBACK_CATEGORIES: PublicCategory[] = [
-  { id: -1, name: "Módulos eletrônicos", slug: "modulos", description: null },
-  { id: -2, name: "Injeção e bombas", slug: "injecao", description: null },
-  { id: -3, name: "Componentes de motor", slug: "motor", description: null },
-  { id: -4, name: "Filtros", slug: "filtros", description: null },
-];
-
 export function Header({ categories }: HeaderProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -42,7 +35,7 @@ export function Header({ categories }: HeaderProps) {
   const isDrawerOpenRef = useRef(false);
   const isSearchActiveRef = useRef(false);
   const headerRef = useRef<HTMLElement>(null);
-  const storeCategories = categories.length > 0 ? categories : FALLBACK_CATEGORIES;
+  const storeCategories = categories;
 
   const handleDrawerOpenChange = (open: boolean) => {
     isDrawerOpenRef.current = open;

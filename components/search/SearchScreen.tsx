@@ -222,8 +222,8 @@ function ResultRow({ product, onOpen }: { product: PublicProduct; onOpen: () => 
   const href = `/produto/${product.slug || product.id}`;
   const canBuy = product.price > 0 && product.isAvailable;
 
-  const handleAdd = () => {
-    if (addToCart(product, 1) > 0) {
+  const handleAdd = async () => {
+    if ((await addToCart(product, 1)) > 0) {
       setJustAdded(true);
       window.setTimeout(() => setJustAdded(false), 1400);
     }

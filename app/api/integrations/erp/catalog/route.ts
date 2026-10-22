@@ -42,8 +42,8 @@ const productSchema = z.object({
 
 const payloadSchema = z.object({
   categories: z.array(categorySchema).max(500).default([]),
-  products: z.array(productSchema).min(1).max(500),
-});
+  products: z.array(productSchema).max(500).default([]),
+}).refine(payload => payload.categories.length > 0 || payload.products.length > 0, { message: "Envie categorias ou produtos." });
 
 function safeEqual(received: string, expected: string): boolean {
   const receivedBuffer = Buffer.from(received);
@@ -100,6 +100,7 @@ export async function POST(request: Request) {
     }
   }
 
+  if (products.length > 0) {
   const { error: productsError } = await supabaseAdmin.from("produto").upsert(
     products.map((product) => ({
       id: product.id,
@@ -128,6 +129,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "ERRO_PRODUTOS" }, { status: 500 });
   }
 
+  }
   const syncedProductIds = products.map((product) => product.id);
 
   if (syncedProductIds.length > 0) {

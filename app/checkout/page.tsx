@@ -1,5 +1,7 @@
 "use client";
 
+import {checkoutAttempt,forgetCheckoutAttempt} from '@/lib/checkout-attempt-client';
+
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -305,10 +307,18 @@ export default function CheckoutPage() {
 
       if (res.ok) {
         const data = await res.json();
+        if (data.isCancelled) {
+          if(user?.id) forgetCheckoutAttempt(user.id);
+          setIsWaitingPayment(false);
+          setCurrentOrderId(null);
+          toast.info('O pagamento foi encerrado. Revise o carrinho antes de tentar novamente.');
+          return;
+        }
         if (data.isPaid) {
           setPaymentStatus("paid");
           if (!clearedRef.current) {
             clearedRef.current = true;
+            if(user?.id) forgetCheckoutAttempt(user.id);
             clearCart();
           }
         }
@@ -316,7 +326,7 @@ export default function CheckoutPage() {
     } catch (err) {
       console.error("Polling order error:", err);
     }
-  }, [currentOrderId, clearCart]);
+  }, [currentOrderId, clearCart, user]);
 
   // Tempo real via Supabase
   useEffect(() => {
@@ -332,7 +342,8 @@ export default function CheckoutPage() {
             setPaymentStatus("paid");
             if (!clearedRef.current) {
               clearedRef.current = true;
-              clearCart();
+              if(user?.id) forgetCheckoutAttempt(user.id);
+            clearCart();
             }
           }
         }
@@ -342,7 +353,7 @@ export default function CheckoutPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentOrderId, isWaitingPayment, paymentStatus, clearCart]);
+  }, [currentOrderId, isWaitingPayment, paymentStatus, clearCart, user]);
 
   // Mensagem enviada pelo popup com validação estrita de origem (Regra 14)
   useEffect(() => {
@@ -412,18 +423,25 @@ export default function CheckoutPage() {
         })),
       };
 
-      const response = await fetch("/api/checkout", {
+      let attemptId=checkoutAttempt(sessionData?.session?.user?.id || 'anonymous',checkoutData);
+      const existing=await fetch('/api/checkout/attempt?id='+encodeURIComponent(attemptId),{credentials:'include',cache:'no-store',headers:token?{Authorization:'Bearer '+token}:{}});
+      const existingResult=await existing.clone().json().catch(()=>null);
+      if(existingResult?.retryable){forgetCheckoutAttempt(sessionData?.session?.user?.id || 'anonymous');attemptId=checkoutAttempt(sessionData?.session?.user?.id || 'anonymous',checkoutData);}
+      if(!existing.ok && ![404,409].includes(existing.status))throw new Error(existingResult?.message||'Não foi possível consultar a tentativa de pagamento.');
+
+      const response = existing.ok ? existing : await fetch("/api/checkout", {
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(checkoutData),
+        body: JSON.stringify({...checkoutData,checkoutAttemptId:attemptId}),
       });
 
       const result = await response.json();
       if (!response.ok) {
+        if (result.retryable) forgetCheckoutAttempt(sessionData?.session?.user?.id || 'anonymous');
         throw new Error(result.message || result.error || "Erro ao processar checkout");
       }
 

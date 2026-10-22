@@ -2,10 +2,15 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
-import { HOME_HIGHLIGHT_CATEGORIES } from "@/lib/catalog/categories";
+import { getCategories, HOME_HIGHLIGHT_CATEGORIES } from "@/lib/catalog/categories";
 
-export function CategoryShortcuts() {
-  const categories = HOME_HIGHLIGHT_CATEGORIES.slice(0, 6);
+export async function CategoryShortcuts() {
+  const published = await getCategories();
+  const categories = published.slice(0, 6).map(category => ({
+    ...category,
+    image: HOME_HIGHLIGHT_CATEGORIES.find(highlight => highlight.slug === category.slug)?.image || "/images/categories/motor.jpg",
+  }));
+  if (!categories.length) return null;
 
   return (
     <section className="container mx-auto px-4 py-6 sm:py-8">

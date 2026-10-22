@@ -1,3 +1,5 @@
+import { reconcileCheckout } from '@/lib/checkout-reconcile';
+import { pendingCheckoutStatus } from '@/lib/checkout-pending-status';
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -99,6 +101,9 @@ export async function GET(request: Request) {
       .maybeSingle();
 
     if (error || !order) {
+      if(error)throw error;
+      const pending=await pendingCheckoutStatus(orderId,Number(cliente.id));
+      if(pending)return NextResponse.json(pending);
       // Se não pertencer ao usuário: 404, nunca retornar dados da venda
       return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
     }
@@ -110,7 +115,13 @@ export async function GET(request: Request) {
         const payment = await getAsaasPayment(order.gateway_payment_id);
         const gatewayStatus = String(payment.status || "PENDING").trim().toUpperCase();
         const nextStatus = localStatus(gatewayStatus);
-        if (nextStatus !== "PENDENTE") {
+        const central=await reconcileCheckout(order.id,payment);
+        if(central) {
+          const {data:updated,error:readError}=await supabaseAdmin.from('venda').select('status').eq('id',order.id).eq('clienteid',cliente.id).single();
+          if(readError)throw readError;
+          normalizedStatus=String(updated.status).toUpperCase();
+        }
+        if (!central && nextStatus !== "PENDENTE") {
           const { error: syncError } = await supabaseAdmin.rpc("fn_processar_evento_pagamento_asaas", {
             p_event_id: `STATUS-CHECK-${payment.id}-${gatewayStatus}`,
             p_event_type: "STATUS_CHECK",

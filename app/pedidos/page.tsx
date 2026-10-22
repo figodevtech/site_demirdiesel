@@ -194,16 +194,18 @@ export default function PedidosPage() {
     } finally {
       setLoading(false);
     }
-  }, [profile?.id]);
+  }, [profile]);
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
       router.replace("/login?redirect=/pedidos");
     } else if (profile?.id) {
-      void fetchOrders();
+      const timer = window.setTimeout(() => { void fetchOrders(); }, 0);
+      return () => window.clearTimeout(timer);
     } else {
-      setLoading(false);
+      const timer = window.setTimeout(() => setLoading(false), 0);
+      return () => window.clearTimeout(timer);
     }
   }, [authLoading, fetchOrders, profile?.id, router, user]);
 
@@ -291,18 +293,10 @@ export default function PedidosPage() {
                 className="overflow-hidden rounded-2xl bg-card shadow-lg shadow-slate-900/8 transition-all dark:shadow-black/25"
               >
                 {/* Header do Card de Pedido */}
-                <div
-                  role="button"
-                  tabIndex={0}
+                <Button type="button" variant="ghost"
                   aria-expanded={isExpanded}
                   onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      setExpandedOrderId(isExpanded ? null : order.id);
-                    }
-                  }}
-                  className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 cursor-pointer select-none hover:bg-slate-50/50 active:bg-slate-100/70 dark:hover:bg-slate-800/40 transition-colors"
+                  className="h-auto w-full whitespace-normal text-left p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 cursor-pointer select-none hover:bg-slate-50/50 active:bg-slate-100/70 dark:hover:bg-slate-800/40 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
@@ -338,12 +332,12 @@ export default function PedidosPage() {
                       <ChevronDown className={`size-4 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                     </span>
                   </div>
-                </div>
+                </Button>
 
                 {/* Detalhes Expansíveis dos Itens */}
                 {isExpanded && (
                   <div className="p-4 sm:p-5 border-t border-border/60 bg-slate-50/30 dark:bg-slate-900/30 space-y-4 animate-in fade-in-50 slide-in-from-top-1 duration-200">
-                    <OrderTimeline order={order} />
+                    {isOrderPaid(order.status) ? <OrderTimeline order={order} /> : <p className="text-sm text-muted-foreground">{isOrderCancelled(order.status) ? "Este pedido foi cancelado." : "Aguardando confirmação do pagamento."}</p>}
 
                     <div className="space-y-3">
                       <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -355,7 +349,7 @@ export default function PedidosPage() {
                           <div key={item.id} className="py-2.5 first:pt-0 flex items-center justify-between gap-4">
                             <div className="min-w-0 flex-1">
                               <span className="font-semibold text-foreground truncate block">
-                                {item.produto?.tituloMarketplace || item.produto?.titulo || "Componente Diesel"}
+                                {item.produto?.tituloMarketplace || item.produto?.titulo || "Produto"}
                               </span>
                               <span className="text-[11px] text-muted-foreground block">
                                 {item.produto?.fabricante ? `Fabricante: ${item.produto.fabricante} • ` : ""}Qtd: {item.quantidade}

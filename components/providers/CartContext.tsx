@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { usePathname, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { haptic } from '@/lib/haptics';
+import { availableStock } from '@/lib/stock-client';
 
 export interface CartProduct {
     id: string;
@@ -28,7 +29,7 @@ interface CartContextType {
     /** false até o carrinho salvo no aparelho ser lido (evita mostrar "vazio" por um instante). */
     isLoaded: boolean;
     /** Retorna a quantidade efetivamente adicionada (0 se não havia estoque). */
-    addToCart: (product: CartProduct, quantity: number, options?: { silent?: boolean }) => number;
+    addToCart: (product: CartProduct, quantity: number, options?: { silent?: boolean }) => Promise<number>;
     removeFromCart: (productId: string, options?: { silent?: boolean }) => void;
     updateQuantity: (productId: string, quantity: number) => void;
     clearCart: () => void;
@@ -56,6 +57,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
     const itemsRef = useRef(items);
+    const pending = useRef(new Set<string>());
+    const revision = useRef(0);
 
     useEffect(() => {
         itemsRef.current = items;
@@ -103,8 +106,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
     }, [shippingInfo, isLoaded]);
 
-    const addToCart = (product: CartProduct, quantity: number, options?: { silent?: boolean }) => {
-        const stock = Number(product?.stock ?? 0);
+    const addToCart = async (product: CartProduct, quantity: number, options?: { silent?: boolean }) => {
+        if(pending.current.has(product.id)) return 0;
+        pending.current.add(product.id);
+        const startedRevision=revision.current;
+        try {
+        const stock = await availableStock(product.id);
+        if(startedRevision!==revision.current) return 0;
+        product={...product,stock};
         const q = Math.max(1, Number(quantity) || 1);
         const current = itemsRef.current;
         const existing = current.find(item => item.product.id === product.id);
@@ -147,14 +156,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
 
         return willAdd;
+        } catch(error) {toast.error(error instanceof Error?error.message:'Não foi possível consultar o estoque.');return 0;}
+        finally {pending.current.delete(product.id);}
     };
 
-    const updateQuantity = (productId: string, quantity: number) => {
+    const updateQuantity = async (productId: string, quantity: number) => {
+        if(pending.current.has(productId)) return;
+        pending.current.add(productId);
+        const startedRevision=revision.current;
+        try {
         const q = Math.max(1, Number(quantity) || 1);
+        const stock = await availableStock(productId);
+        if(startedRevision!==revision.current) return;
         const item = itemsRef.current.find(entry => entry.product.id === productId);
         if (!item) return;
 
-        const stock = Number(item.product?.stock ?? 0);
         if (Number.isFinite(stock) && stock <= 0) {
             toast.error('Produto sem estoque.');
             removeFromCart(productId, { silent: true });
@@ -167,13 +183,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
         haptic('selection');
         const next = itemsRef.current.map(entry =>
-            entry.product.id === productId ? { ...entry, quantity: clamped } : entry
+            entry.product.id === productId ? { ...entry, product:{...entry.product,stock}, quantity: clamped } : entry
         );
         itemsRef.current = next;
         setItems(next);
+        } catch(error) {toast.error(error instanceof Error?error.message:'Não foi possível consultar o estoque.');}
+        finally {pending.current.delete(productId);}
     };
 
     const removeFromCart = (productId: string, options?: { silent?: boolean }) => {
+        revision.current++;
         const current = itemsRef.current;
         const index = current.findIndex(item => item.product.id === productId);
         if (index < 0) return;
@@ -202,6 +221,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     };
 
     const clearCart = () => {
+        revision.current++;
         itemsRef.current = [];
         setItems([]);
     };

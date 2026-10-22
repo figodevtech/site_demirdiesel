@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 type StoreOrderRow = {
   id: number;
   status: string;
+  central_inventory?: boolean;
   sub_total: number;
   valortotal: number;
   forma_pagamento?: string | null;
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
   let query = supabaseAdmin
     .from("venda")
     .select(`
-      id, status, sub_total, valortotal, forma_pagamento, endereco_entrega_snapshot,
+      id, status, central_inventory, sub_total, valortotal, forma_pagamento, endereco_entrega_snapshot,
       canal, status_entrega, codigo_rastreio, transportadora, url_rastreio,
       nfe_numero, nfe_serie, nfe_chave_acesso, danfe_url,
       separacao_em, faturado_em, enviado_em, entregue_em,
@@ -99,6 +100,7 @@ export async function GET(request: NextRequest) {
   const orders = ((data ?? []) as unknown as StoreOrderRow[]).map((order) => ({
     id: Number(order.id),
     status: order.status,
+    centralInventory: Boolean(order.central_inventory),
     subtotal: Number(order.sub_total || 0),
     total: Number(order.valortotal || 0),
     paymentMethod: order.forma_pagamento || "Asaas",

@@ -19,6 +19,7 @@ export interface AsaasCustomer {
 }
 
 export interface AsaasPayment {
+  deleted?: boolean;
   refunds?: Array<{ status?: string }> | null;
   id: string;
   customer?: string;
@@ -78,6 +79,7 @@ export async function asaasRequest<T>(path: string, init: RequestInit = {}): Pro
 
   const response = await fetch(`${asaasApiUrl}${path}`, {
     ...init,
+    signal: init.signal || AbortSignal.timeout(30_000),
     cache: "no-store",
     headers: {
       Accept: "application/json",
@@ -124,6 +126,7 @@ export async function createAsaasCustomer(payload: Record<string, unknown>) {
 
 export async function createAsaasPayment(payload: Record<string, unknown>) {
   return asaasRequest<AsaasPayment>("/payments", {
+    signal: AbortSignal.timeout(90_000),
     method: "POST",
     body: JSON.stringify(payload),
   });

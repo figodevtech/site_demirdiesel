@@ -1,3 +1,4 @@
+import { reconcileCheckout } from '@/lib/checkout-reconcile';
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { getAsaasPayment } from "@/lib/asaas";
@@ -60,6 +61,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Evento incompleto" }, { status: 400 });
     }
 
+    const {error:inboxError}=await supabaseAdmin.from('checkout_gateway_event').upsert({event_id:eventId,event_type:eventType,payment_id:paymentId},{onConflict:'event_id',ignoreDuplicates:true});
+    if(inboxError)throw inboxError;
+
     // O payload identifica o recurso, mas o estado financeiro é relido na API oficial.
     const payment = await getAsaasPayment(paymentId);
     const orderId = Number(payment.externalReference);
@@ -70,7 +74,8 @@ export async function POST(request: Request) {
     }
 
     const gatewayStatus = String(payment.status || "PENDING").trim().toUpperCase();
-    const { data: result, error } = await supabaseAdmin.rpc(
+    const centrallyHandled = await reconcileCheckout(orderId,payment,eventType);
+    const { data: result, error } = centrallyHandled ? {data:null,error:null} : await supabaseAdmin.rpc(
       "fn_processar_evento_pagamento_asaas",
       {
         p_event_id: eventId,
@@ -103,7 +108,7 @@ export async function POST(request: Request) {
 
     // Run even for duplicate events: a previous ERP delivery may have failed.
     const erpWebhookUrl = process.env.ERP_ORDER_WEBHOOK_URL?.trim();
-    if (erpWebhookUrl && ["PAGO", "CANCELADO"].includes(localStatus(gatewayStatus))) {
+    if (!centrallyHandled && erpWebhookUrl && ["PAGO", "CANCELADO"].includes(localStatus(gatewayStatus))) {
       const erpResponse = await fetch(erpWebhookUrl, {
         method: "POST", headers: { Authorization: `Bearer ${process.env.ERP_ORDER_SYNC_SECRET?.trim() || ""}`, "Content-Type": "application/json" },
         body: JSON.stringify({ orderId }), cache: "no-store", signal: AbortSignal.timeout(60_000),
@@ -121,6 +126,8 @@ export async function POST(request: Request) {
       }
     }
 
+    const {error:processedError}=await supabaseAdmin.from('checkout_gateway_event').update({processed_at:new Date().toISOString()}).eq('event_id',eventId);
+    if(processedError)throw processedError;
     return NextResponse.json({
       received: true,
       result,
