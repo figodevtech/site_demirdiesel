@@ -128,7 +128,7 @@ export default function CheckoutPage() {
   const [isWaitingPayment, setIsWaitingPayment] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<number | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid">("pending");
-  const [paymentMethod, setPaymentMethod] = useState<AsaasBillingType>("PIX");
+  const [paymentMethod, setPaymentMethod] = useState<AsaasBillingType | "">("");
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [loadingCards, setLoadingCards] = useState(false);
   const [selectedSavedCardId, setSelectedSavedCardId] = useState("new");
@@ -380,6 +380,10 @@ export default function CheckoutPage() {
   }, [isWaitingPayment, currentOrderId, paymentStatus, checkOrderStatus]);
 
   const handleCheckout = async () => {
+    if (!paymentMethod) {
+      toast.error("Selecione uma forma de pagamento.");
+      return;
+    }
     if (!selectedAddressId) {
       toast.error("Selecione um endereço de entrega.");
       return;
@@ -473,9 +477,9 @@ export default function CheckoutPage() {
   };
 
   const finalTotal = subtotal;
-  const canPay = !isProcessing && Boolean(selectedAddressId) && items.length > 0;
+  const canPay = Boolean(paymentMethod) && !isProcessing && Boolean(selectedAddressId) && items.length > 0;
   const selectedPaymentOption =
-    PAYMENT_OPTIONS.find((option) => option.value === paymentMethod) ?? PAYMENT_OPTIONS[0];
+    PAYMENT_OPTIONS.find((option) => option.value === paymentMethod);
 
   // Tela de Pagamento Aprovado
   if (paymentStatus === "paid") {
@@ -687,7 +691,7 @@ export default function CheckoutPage() {
                   <Loader2 className="w-5 h-5 animate-spin" />
                 </div>
                 <h3 className="font-bold text-base text-foreground">
-                  Aguardando confirma&ccedil;&atilde;o por {PAYMENT_METHOD_LABELS[paymentMethod]}
+                  Aguardando confirma&ccedil;&atilde;o por {paymentMethod ? PAYMENT_METHOD_LABELS[paymentMethod] : "pagamento"}
                 </h3>
                 <p className="text-xs text-muted-foreground max-w-md mx-auto">
                   {paymentUrl
@@ -846,7 +850,7 @@ export default function CheckoutPage() {
                       <Loader2 className="w-4 h-4 animate-spin" /> Processando Pedido...
                     </>
                   ) : (
-                    <span>Pagar com {selectedPaymentOption ? PAYMENT_METHOD_LABELS[selectedPaymentOption.value] : "Asaas"}</span>
+                    <span>{selectedPaymentOption ? `Pagar com ${PAYMENT_METHOD_LABELS[selectedPaymentOption.value]}` : "Escolha como pagar"}</span>
                   )}
                 </Button>
               </div>
@@ -928,7 +932,7 @@ export default function CheckoutPage() {
                 haptic("medium");
                 void handleCheckout();
               }}
-              disabled={isProcessing || items.length === 0}
+              disabled={!canPay}
               className="h-12 min-w-40 shrink-0 gap-2 rounded-xl px-5 text-sm font-bold shadow-md shadow-primary/25"
             >
               {isProcessing ? (
@@ -938,7 +942,7 @@ export default function CheckoutPage() {
               ) : (
                 <>
                   <Lock className="size-4" />
-                  Pagar com {PAYMENT_METHOD_LABELS[selectedPaymentOption.value]}
+                  {selectedPaymentOption ? `Pagar com ${PAYMENT_METHOD_LABELS[selectedPaymentOption.value]}` : "Escolha como pagar"}
                 </>
               )}
             </Button>
