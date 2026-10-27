@@ -144,11 +144,11 @@ export async function POST(request: Request) {
     const billingType = body?.billingType;
     const savedCardId = String(body?.savedCardId || "").trim();
 
-    if (!isAsaasBillingType(billingType)) {
+    if (!isAsaasBillingType(billingType) || billingType === "BOLETO") {
       return NextResponse.json(
         {
           error: "FORMA_PAGAMENTO_INVALIDA",
-          message: "Selecione Pix, cart\u00e3o de cr\u00e9dito ou boleto para continuar.",
+          message: "Selecione Pix ou cart\u00e3o de cr\u00e9dito para continuar.",
         },
         { status: 400 },
       );
@@ -525,7 +525,6 @@ export async function POST(request: Request) {
 
       const {error: metadataError}=await supabaseAdmin.from('checkout_attempt').update({payment_meta:{commission_percent:splitEnabled?commissionPercent:0,commission_wallet_id:splitEnabled?commissionWalletId:null,commission_config_revision:paymentConfig.revision}}).eq('order_id',orderId).eq('phase','PREPARING');
       if(metadataError)throw metadataError;
-      if (billingType === 'BOLETO') paymentPayload.daysAfterDueDateToRegistrationCancellation = 0;
       const { error: sendingError } = await supabaseAdmin.rpc('fn_checkout_sending', {p_order:orderId,p_customer:asaasCustomerId});
       if (sendingError) throw sendingError;
       // Never retry this POST blindly: an HTTP timeout does not prove failure.

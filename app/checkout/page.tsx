@@ -24,7 +24,6 @@ import {
   Info,
   QrCode,
   CreditCard,
-  Barcode,
   Zap,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -70,12 +69,6 @@ const PAYMENT_OPTIONS: Array<{
     description: "Pagamento protegido pelo Asaas",
     detail: "Informe os dados do cart\u00e3o no ambiente seguro.",
     icon: CreditCard,
-  },
-  {
-    value: "BOLETO",
-    description: "Vencimento em at\u00e9 3 dias",
-    detail: "A compensa\u00e7\u00e3o pode levar at\u00e9 3 dias \u00fateis.",
-    icon: Barcode,
   },
 ];
 
