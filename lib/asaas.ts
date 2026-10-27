@@ -16,6 +16,7 @@ export interface AsaasCustomer {
   name?: string;
   cpfCnpj?: string;
   externalReference?: string;
+  notificationDisabled?: boolean;
 }
 
 export interface AsaasPayment {
@@ -120,7 +121,14 @@ export async function findAsaasCustomer(cpfCnpj: string, externalReference: stri
 export async function createAsaasCustomer(payload: Record<string, unknown>) {
   return asaasRequest<AsaasCustomer>("/customers", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, notificationDisabled: true }),
+  });
+}
+
+export async function disableAsaasCustomerNotifications(customerId: string) {
+  return asaasRequest<AsaasCustomer>(`/customers/${encodeURIComponent(customerId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ notificationDisabled: true }),
   });
 }
 

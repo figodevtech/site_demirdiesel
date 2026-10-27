@@ -147,7 +147,7 @@ export async function POST(request: Request) {
         province: address.bairro,
         postalCode: String(address.cep || "").replace(/\D/g, ""),
         externalReference,
-        notificationDisabled: false,
+        notificationDisabled: true,
       });
       asaasCustomerId = asaasCustomer.id;
     }
