@@ -1,7 +1,11 @@
 "use client";
+import { CheckoutTerms,useCheckoutTerms } from '@/components/product/CheckoutTerms';
+import { ShippingChoices,useShippingQuote } from '@/components/product/ShippingSimulator';
 
 import {checkoutAttempt,forgetCheckoutAttempt} from '@/lib/checkout-attempt-client';
 
+import { CheckoutCardFields } from '@/components/product/CheckoutCardFields';
+import { emptyCheckoutCard } from '@/lib/checkout-card';
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -51,7 +55,7 @@ import {
 } from "@/lib/payment-methods";
 
 const PAYMENT_OPTIONS: Array<{
-  value: AsaasBillingType;
+  value: AsaasBillingType | "DEBIT_CARD";
   description: string;
   detail: string;
   icon: typeof QrCode;
@@ -70,6 +74,7 @@ const PAYMENT_OPTIONS: Array<{
     detail: "Informe os dados do cart\u00e3o no ambiente seguro.",
     icon: CreditCard,
   },
+  {value:'DEBIT_CARD',description:'Pagamento à vista no débito',detail:'Continue na página segura do Asaas, nesta mesma aba.',icon:CreditCard},
 ];
 
 interface CustomerAddress {
@@ -117,11 +122,16 @@ export default function CheckoutPage() {
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>("delivery");
 
   // Pagamento
+  const [card,setCard]=useState({...emptyCheckoutCard});
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [isWaitingPayment, setIsWaitingPayment] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<number | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid">("pending");
-  const [paymentMethod, setPaymentMethod] = useState<AsaasBillingType | "">("");
+  const [paymentMethod, setPaymentMethod] = useState<AsaasBillingType | "DEBIT_CARD" | "">("");
+  const shippingQuote=useShippingQuote(addresses.find(a=>a.id===selectedAddressId)?.cep||'',items.map(it=>({productId:Number(it.product.id),quantity:it.quantity})),deliveryMethod==='delivery'&&!isWaitingPayment);
+  const shippingPrice=deliveryMethod==='delivery'?(shippingQuote.option?.price||0):0;
+  const shippingReady=deliveryMethod==='pickup'||Boolean(shippingQuote.option)||shippingQuote.result?.manual===true;
+  const terms=useCheckoutTerms(items.map(it=>({productId:Number(it.product.id),total:it.product.price*it.quantity})),shippingPrice);
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [loadingCards, setLoadingCards] = useState(false);
   const [selectedSavedCardId, setSelectedSavedCardId] = useState("new");
@@ -373,6 +383,8 @@ export default function CheckoutPage() {
   }, [isWaitingPayment, currentOrderId, paymentStatus, checkOrderStatus]);
 
   const handleCheckout = async () => {
+    if(!shippingReady){toast.error('Selecione um serviço de entrega após calcular o frete.');return;}
+    if(paymentMethod==='CREDIT_CARD'&&!terms.quote){toast.error('Atualize as condições do cartão antes de pagar.');return;}
     if (!paymentMethod) {
       toast.error("Selecione uma forma de pagamento.");
       return;
@@ -395,7 +407,7 @@ export default function CheckoutPage() {
     const height = 750;
     const left = window.screen.width / 2 - width / 2;
     const top = window.screen.height / 2 - height / 2;
-    const paymentWindow = useSavedCard || openInSameWindow
+    const paymentWindow = useSavedCard || paymentMethod==='CREDIT_CARD' || paymentMethod==='DEBIT_CARD' || openInSameWindow
       ? null
       : window.open(
           "",
@@ -413,6 +425,13 @@ export default function CheckoutPage() {
         addressId: selectedAddressId,
         deliveryMethod,
         billingType: paymentMethod,
+        installmentCount:paymentMethod==='CREDIT_CARD'?terms.count:1,
+        expectedTotal:paymentMethod==='CREDIT_CARD'?(terms.quote?.total??subtotal+shippingPrice):subtotal+shippingPrice,
+        shippingServiceId:deliveryMethod==='delivery'?shippingQuote.option?.id:undefined,
+        expectedShipping:deliveryMethod==='delivery'?shippingQuote.option?.price:undefined,
+        saveCard:paymentMethod==='CREDIT_CARD'&&!useSavedCard&&terms.saveCard,
+        transparent:paymentMethod==='CREDIT_CARD',
+        card:paymentMethod==='CREDIT_CARD'&&!useSavedCard?card:undefined,
         savedCardId: useSavedCard ? selectedSavedCardId : undefined,
         items: items.map((it) => ({
           productId: it.product.id,
@@ -438,20 +457,24 @@ export default function CheckoutPage() {
 
       const result = await response.json();
       if (!response.ok) {
+        if(response.status===409){shippingQuote.refresh();terms.refresh();}
         if (result.retryable) forgetCheckoutAttempt(sessionData?.session?.user?.id || 'anonymous');
         throw new Error(result.message || result.error || "Erro ao processar checkout");
       }
 
+      if(result.cardSaveRequested&&!result.cardSaved)toast.warning('Pagamento iniciado, mas não foi possível salvar o cartão.');
+      if(paymentMethod==='DEBIT_CARD'&&result.url){window.location.assign(result.url);return;}
       if (result.url || result.directPayment) {
+        setCard({...emptyCheckoutCard});
         setPaymentUrl(result.url || null);
         setIsWaitingPayment(true);
         if (result.orderId) {
           setCurrentOrderId(result.orderId);
         }
 
-        if (result.url && paymentWindow) {
+        if (result.url && !result.directPayment && paymentWindow) {
           paymentWindow.location.href = result.url;
-        } else if (result.url) {
+        } else if (result.url && !result.directPayment) {
           window.location.assign(result.url);
         } else {
           void checkOrderStatus();
@@ -465,12 +488,13 @@ export default function CheckoutPage() {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Erro ao processar o pagamento.");
     } finally {
+      setCard(current=>({...current,ccv:''}));
       setIsProcessing(false);
     }
   };
 
-  const finalTotal = subtotal;
-  const canPay = Boolean(paymentMethod) && !isProcessing && Boolean(selectedAddressId) && items.length > 0;
+  const finalTotal = paymentMethod==='CREDIT_CARD' ? (terms.quote?.total??subtotal+shippingPrice) : subtotal+shippingPrice;
+  const canPay = shippingReady && (paymentMethod!=='CREDIT_CARD'||Boolean(terms.quote)) && Boolean(paymentMethod) && !isProcessing && Boolean(selectedAddressId) && items.length > 0;
   const selectedPaymentOption =
     PAYMENT_OPTIONS.find((option) => option.value === paymentMethod);
 
@@ -638,7 +662,7 @@ export default function CheckoutPage() {
                 <RadioGroupItem id="delivery-method" value="delivery" className="mt-0.5" />
                 <span className="grid gap-1">
                   <span className="flex items-center gap-2 text-sm font-bold"><Truck className="size-4 text-primary" /> Receber no endereço</span>
-                  <span className="text-xs font-normal leading-relaxed text-muted-foreground">Frete e prazo confirmados após análise do pedido.</span>
+                  <span className="text-xs font-normal leading-relaxed text-muted-foreground">Frete calculado pelo endereço selecionado, quando a integração estiver habilitada.</span>
                 </span>
               </Label>
 
@@ -717,7 +741,7 @@ export default function CheckoutPage() {
               <div className="space-y-4">
                 <RadioGroup
                   value={paymentMethod}
-                  onValueChange={(value) => setPaymentMethod(value as AsaasBillingType)}
+                  onValueChange={(value) => setPaymentMethod(value as AsaasBillingType | "DEBIT_CARD")}
                   className="grid gap-3 md:grid-cols-3"
                 >
                   {PAYMENT_OPTIONS.map((option) => {
@@ -778,6 +802,7 @@ export default function CheckoutPage() {
                       </Button>
                     </div>
 
+                    <CheckoutTerms terms={terms} newCard={selectedSavedCardId==='new'} disabled={isProcessing}/>
                     {loadingCards ? (
                       <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
                         <Loader2 className="size-4 animate-spin" /> Carregando cartões...
@@ -822,6 +847,7 @@ export default function CheckoutPage() {
                         </Label>
                       </RadioGroup>
                     )}
+                    {selectedSavedCardId==='new'&&<CheckoutCardFields value={card} onChange={setCard} disabled={isProcessing} saveCard={terms.saveCard}/>}
                   </div>
                 )}
 
@@ -831,6 +857,8 @@ export default function CheckoutPage() {
                     A Demir Diesel n&atilde;o armazena os dados do seu cart&atilde;o. O pagamento &eacute; processado diretamente pelo Asaas.
                   </span>
                 </div>
+
+                {deliveryMethod==='delivery'&&<section className="space-y-3 rounded-xl border p-4"><h3 className="text-sm font-semibold">Frete para o endereço selecionado</h3>{selectedAddress?<ShippingChoices quote={shippingQuote} disabled={isProcessing}/>:<p className="text-sm text-muted-foreground">Selecione o endereço para calcular o frete.</p>}</section>}
 
                 <Button
                   size="lg"
@@ -884,7 +912,7 @@ export default function CheckoutPage() {
               <div className="flex justify-between text-muted-foreground">
                 <span>Frete</span>
                 <span className="font-semibold text-primary">
-                  {deliveryMethod === "pickup" ? "Retirada grátis" : "A calcular (análise de carga)"}
+                  {deliveryMethod === "pickup" ? "Retirada grátis" : shippingQuote.option ? formatCurrency(shippingPrice) : "A combinar com a loja"}
                 </span>
               </div>
               <div className="flex justify-between items-baseline pt-3 border-t border-border/60 text-base">
@@ -910,7 +938,7 @@ export default function CheckoutPage() {
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
             <div className="min-w-0">
               <span className="block text-[11px] text-muted-foreground">
-                {deliveryMethod === "pickup" ? "Total · retirada grátis" : "Total · frete a calcular"}
+                {deliveryMethod === "pickup" ? "Total · retirada grátis" : shippingQuote.option ? "Total com frete" : "Total · frete a combinar"}
               </span>
               <span className="block text-lg font-extrabold tabular-nums text-foreground">{formatCurrency(finalTotal)}</span>
             </div>

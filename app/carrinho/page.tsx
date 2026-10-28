@@ -313,7 +313,7 @@ export default function CarrinhoPage() {
                       {formatCurrency(finalTotal)}
                     </span>
                     <span className="text-[10px] text-muted-foreground block">
-                      Em até 12x no cartão de crédito
+                      Condições do cartão calculadas no checkout
                     </span>
                   </div>
                 </div>

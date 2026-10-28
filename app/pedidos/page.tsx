@@ -63,6 +63,7 @@ interface CustomerOrder {
     deliveryMethod?: "delivery" | "pickup" | string | null;
     deliveryLabel?: string | null;
     pickupAddress?: string | null;
+    shipping?: {mode?:string;company?:string;name?:string;price?:number|null;days?:number};
   } | null;
   items: OrderItem[];
 }
@@ -362,6 +363,8 @@ export default function PedidosPage() {
                         ))}
                       </div>
                     </div>
+
+                    {order.endereco_entrega_snapshot?.shipping?.mode==='melhor_envio'&&<div className="rounded-xl bg-card p-4 text-xs shadow-sm ring-1 ring-border/60"><strong className="block">Frete escolhido: {order.endereco_entrega_snapshot.shipping.company} · {order.endereco_entrega_snapshot.shipping.name}</strong><p className="mt-1 text-muted-foreground">Valor incluído no total: {formatCurrency(Number(order.endereco_entrega_snapshot.shipping.price)||0)}. Prazo estimado: {order.endereco_entrega_snapshot.shipping.days} dias úteis após postagem.</p></div>}
 
                     {order.endereco_entrega_snapshot?.deliveryMethod === "pickup" ? (
                       <div className="flex items-start gap-2 rounded-xl bg-primary/5 p-4 text-xs shadow-sm ring-1 ring-primary/15">

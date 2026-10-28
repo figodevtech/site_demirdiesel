@@ -2,28 +2,24 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Truck, Loader2, Check, Plus, Minus } from "lucide-react";
+import { ShoppingCart, Check, Plus, Minus } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCart } from "@/components/providers/CartContext";
 import { toast } from "sonner";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WhatsAppButton } from "./WhatsAppButton";
 import { FavoriteButton } from "./FavoriteButton";
-import { cepDigits, formatCep, mobileInput } from "@/lib/forms/mobile-inputs";
-import { haptic } from "@/lib/haptics";
 import { PublicProduct } from "@/lib/catalog/types";
-import { getShippingEstimate, ShippingQuoteResult } from "@/lib/shipping";
+import { ProductPaymentTerms } from "./ProductPaymentTerms";
+import { ShippingSimulator } from "./ShippingSimulator";
+import { haptic } from '@/lib/haptics';
 import { useVirtualKeyboardOpen } from "@/hooks/use-virtual-keyboard";
 
 export function ProductActions({ product }: { product: PublicProduct }) {
   const { addToCart } = useCart();
   const [quantity, setQuantity] = useState(1);
   const isKeyboardOpen = useVirtualKeyboardOpen();
-  const [cep, setCep] = useState("");
-  const [isSimulating, setIsSimulating] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
-  const [shippingQuote, setShippingQuote] = useState<ShippingQuoteResult | null>(null);
 
   const maxStock = Math.max(0, Number(product.stock) || 0);
   const isAvailable = product.isAvailable && maxStock > 0;
@@ -44,36 +40,9 @@ export function ProductActions({ product }: { product: PublicProduct }) {
     window.setTimeout(() => setIsAdded(false), 1800);
   };
 
-  const handleShippingSim = async (event?: React.FormEvent) => {
-    event?.preventDefault();
-    const cleanCep = cepDigits(cep);
-    if (cleanCep.length < 8) {
-      haptic("error");
-      toast.warning("Digite um CEP válido com 8 dígitos.");
-      return;
-    }
-    (document.activeElement as HTMLElement | null)?.blur();
-
-    setIsSimulating(true);
-    setShippingQuote(null);
-
-    try {
-      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-      const location = response.ok ? await response.json() : null;
-      const quote = getShippingEstimate(cleanCep, {
-        city: location?.localidade,
-        state: location?.uf,
-      });
-      setShippingQuote(quote);
-    } catch {
-      toast.error("Não foi possível consultar as condições de envio.");
-    } finally {
-      setIsSimulating(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
+      <ProductPaymentTerms productId={Number(product.id)} price={product.price} quantity={quantity}/>
       <div className="flex flex-col gap-4">
         {isAvailable && hasPrice ? (
           <div className="space-y-3">
@@ -212,51 +181,7 @@ export function ProductActions({ product }: { product: PublicProduct }) {
         )}
       </div>
 
-      {/* Simulação de Frete & Entrega */}
-      <div className="pt-4 border-t border-border/60 space-y-3">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          <Truck className="w-4 h-4 text-primary" />
-          <span>Calcular Frete & Prazo de Entrega</span>
-        </div>
-
-        <form onSubmit={handleShippingSim} className="flex gap-2 max-w-sm">
-          <Input
-            {...mobileInput.cep}
-            enterKeyHint="go"
-            aria-label="CEP para calcular o frete"
-            placeholder="00000-000"
-            value={cep}
-            onChange={(e) => setCep(formatCep(e.target.value))}
-            className="h-11 text-sm font-mono tracking-wide"
-          />
-          <Button
-            type="submit"
-            variant="secondary"
-            disabled={isSimulating}
-            className="h-11 min-w-24 font-semibold px-4 text-sm"
-          >
-            {isSimulating ? <Loader2 className="size-4 animate-spin" /> : "Calcular"}
-          </Button>
-        </form>
-
-        {shippingQuote && (
-          <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-xs shadow-md shadow-slate-900/7 dark:bg-slate-900/60 dark:shadow-black/25">
-            <p className="text-[11px] text-muted-foreground font-medium pb-1 border-b border-border/40">
-              {shippingQuote.message}
-            </p>
-            {shippingQuote.options.map((res, idx) => (
-              <div key={idx} className="flex justify-between items-center py-1.5 border-b border-border/40 last:border-0">
-                <div>
-                  <span className="font-semibold text-foreground block">{res.type}</span>
-                  <span className="text-[11px] text-muted-foreground">{res.daysText}</span>
-                  {res.id === "pickup" && <span className="mt-0.5 block text-[10px] text-muted-foreground">{res.description}</span>}
-                </div>
-                <span className="font-bold text-primary">{res.formattedPrice}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <ShippingSimulator productIds={[Number(product.id)]} items={[{productId:Number(product.id),quantity}]}/>
 
       {/* Mobile Sticky Bottom CTA Bar */}
       <div

@@ -1,3 +1,10 @@
+import { automaticShippingEnabled } from '@/lib/melhor-envio-oauth';
+import { getCardFees } from '@/lib/asaas-fees';
+import { quoteShipping, ShippingQuoteError } from '@/lib/shipping-quote';
+import { parseCheckoutCard } from "@/lib/checkout-card";
+import { getCheckoutPolicy } from '@/lib/erp-checkout-policy';
+import { installmentQuoteForItems } from '@/lib/checkout-policy';
+import { saveCheckoutCard } from '@/lib/save-checkout-card';
 import { attemptIdentity, resumeCheckout, bindCheckoutPayment, checkoutFailed } from '@/lib/checkout-attempt';
 import { erpCheckout, InventoryError } from '@/lib/erp-checkout';
 import { NextResponse } from "next/server";
@@ -142,7 +149,10 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const { addressId, items } = body || {};
     const deliveryMethod: DeliveryMethod = body?.deliveryMethod === "pickup" ? "pickup" : "delivery";
-    const billingType = body?.billingType;
+    const debit = body?.billingType === 'DEBIT_CARD';
+    const billingType = debit ? 'CREDIT_CARD' : body?.billingType;
+    const installmentCount = body?.installmentCount ?? 1;
+    if(!Number.isInteger(installmentCount)||installmentCount<1||installmentCount>12||(installmentCount>1&&(billingType!=='CREDIT_CARD'||debit)))return NextResponse.json({message:'Quantidade de parcelas indisponivel.'},{status:422});
     const savedCardId = String(body?.savedCardId || "").trim();
 
     if (!isAsaasBillingType(billingType) || billingType === "BOLETO") {
@@ -155,9 +165,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const paymentMethodLabel = PAYMENT_METHOD_LABELS[billingType];
+    const transparent = !debit && body?.transparent === true;
+    const card = billingType === 'CREDIT_CARD' && !savedCardId && transparent ? parseCheckoutCard(body.card) : null;
+    if(billingType==='CREDIT_CARD'&&!savedCardId&&transparent&&!card)return NextResponse.json({message:'Confira os dados do cartao.'},{status:422});
+    const paymentMethodLabel = debit ? 'Cartão de débito' : PAYMENT_METHOD_LABELS[billingType];
 
-    if (savedCardId && billingType !== "CREDIT_CARD") {
+    if (savedCardId && (billingType !== "CREDIT_CARD" || debit)) {
       return NextResponse.json(
         { error: "CARTAO_INVALIDO", message: "Cartão salvo só pode ser usado no pagamento com cartão de crédito." },
         { status: 400 },
@@ -252,7 +265,7 @@ export async function POST(request: Request) {
       consolidatedMap.set(numId, (consolidatedMap.get(numId) || 0) + qty);
     }
 
-    const identity = attemptIdentity(body.checkoutAttemptId, Number(cliente.id), addressId, deliveryMethod, billingType, savedCardId, consolidatedMap);
+    const identity = attemptIdentity(body.checkoutAttemptId, Number(cliente.id), addressId, deliveryMethod, billingType, savedCardId, consolidatedMap, body.shippingServiceId ? {installmentCount,debit,shippingServiceId:body.shippingServiceId,expectedShipping:body.expectedShipping} : installmentCount>1||debit ? {installmentCount,debit} : undefined);
     const resumed = await resumeCheckout(identity.attempt, Number(cliente.id), identity.hash);
     if (resumed) return resumed;
 
@@ -351,8 +364,28 @@ export async function POST(request: Request) {
 
     // 6. RECALCULA SUBTOTAL E TOTAL NO SERVIDOR
     const serverSubtotal = validatedItems.reduce((acc, it) => acc + it.subtotal, 0);
-    const serverShipping = 0;
-    const serverTotal = serverSubtotal + serverShipping;
+    const {policies,revision:policyRevision,available:policyAvailable}=await getCheckoutPolicy(validatedItems.map(it=>it.id));
+    if(billingType==='CREDIT_CARD'&&!debit&&!policyAvailable)return NextResponse.json({message:'Não foi possível conferir as regras do cartão. Tente novamente ou escolha Pix.'},{status:503});
+    let shipping: {mode:string;id?:number;name?:string;company?:string;price:number|null;days?:number;quotedAt?:string}={mode:deliveryMethod==='pickup'?'pickup':'manual',price:deliveryMethod==='pickup'?0:null};
+    if(deliveryMethod==='delivery'&&await automaticShippingEnabled()){
+      try{
+        const result=await quoteShipping(String(addressRow.cep||'').replace(/\D/g,''),validatedItems.map(it=>({productId:it.id,quantity:it.quantity})));
+        if(result.environment==='sandbox'&&process.env.ASAAS_ENVIRONMENT?.trim()==='production')return NextResponse.json({message:'O frete de teste não pode ser usado em uma compra de produção. Consulte a loja.'},{status:503});
+        const selected=result.options.find(option=>option.id===body.shippingServiceId);
+        if(!selected||!Number.isFinite(body.expectedShipping)||Math.round(selected.price*100)!==Math.round(body.expectedShipping*100))return NextResponse.json({message:'O frete mudou. Atualize a cotação e selecione novamente o serviço antes de pagar.'},{status:409});
+        shipping={mode:'melhor_envio',...selected,quotedAt:result.quotedAt};
+      }catch(error){return NextResponse.json({message:error instanceof ShippingQuoteError?error.message:'Não foi possível conferir o frete.'},{status:error instanceof ShippingQuoteError?error.status:503});}
+    }
+    // Pix and hosted debit do not use the credit-card fee policy.
+    const paymentPolicies=billingType==='CREDIT_CARD'&&!debit?policies:Object.fromEntries(Object.entries(policies).map(([id,policy])=>[id,{...policy,feeMode:'absorbed' as const}]));
+    let fees=null;
+    if(Object.values(paymentPolicies).some(p=>p.feeMode!=='absorbed')){
+      try{fees=await getCardFees();}catch{return NextResponse.json({message:'Não foi possível conferir as taxas do cartão. Tente novamente ou escolha Pix.'},{status:503});}
+    }
+    let quote;
+    try{quote=installmentQuoteForItems(validatedItems.map(it=>({productId:it.id,total:it.subtotal})),installmentCount,paymentPolicies,fees,shipping.price||0);}catch{return NextResponse.json({message:'As parcelas selecionadas não estão disponíveis. Atualize as opções.'},{status:422});}
+    if((installmentCount>1||fees||shipping.mode==='melhor_envio')&&(!Number.isFinite(body.expectedTotal)||Math.round(body.expectedTotal*100)!==Math.round(quote.total*100)))return NextResponse.json({message:'As condições mudaram. Confira o novo total antes de pagar.'},{status:409});
+    const serverTotal = quote.total;
     const totalCents = Math.round(serverTotal * 100);
 
     if (totalCents <= 0) {
@@ -373,6 +406,7 @@ export async function POST(request: Request) {
       estado: addressRow.estado,
       cep: addressRow.cep,
       deliveryMethod,
+      shipping,
       deliveryLabel: deliveryMethod === "pickup" ? "Retirada no local" : "Entrega no endereço",
       pickupAddress: deliveryMethod === "pickup" ? siteConfig.address.full : null,
     };
@@ -508,10 +542,15 @@ export async function POST(request: Request) {
         externalReference: String(orderId),
       };
 
+      if(installmentCount>1){delete paymentPayload.value;paymentPayload.installmentCount=installmentCount;paymentPayload.totalValue=serverTotal;}
       if (savedCard) {
         paymentPayload.creditCardToken = savedCard.provider_card_token;
         paymentPayload.remoteIp = clientIp(request);
-      } else if (new URL(returnUrl).protocol === "https:") {
+      } else if (card) {
+        paymentPayload.creditCard=card;
+        paymentPayload.creditCardHolderInfo={name:customerName,email:customerEmail,cpfCnpj:cleanDoc,postalCode:String(addressRow.cep||'').replace(/\D/g,''),addressNumber:addressRow.numero,addressComplement:addressRow.complemento||undefined,phone:cleanPhone,mobilePhone:cleanPhone};
+        paymentPayload.remoteIp=clientIp(request);
+      } else if (!transparent && new URL(returnUrl).protocol === "https:") {
         paymentPayload.callback = {
           successUrl: returnUrl,
           autoRedirect: true,
@@ -527,21 +566,26 @@ export async function POST(request: Request) {
         ];
       }
 
-      const {error: metadataError}=await supabaseAdmin.from('checkout_attempt').update({payment_meta:{commission_percent:splitEnabled?commissionPercent:0,commission_wallet_id:splitEnabled?commissionWalletId:null,commission_config_revision:paymentConfig.revision}}).eq('order_id',orderId).eq('phase','PREPARING');
+      const {error: metadataError}=await supabaseAdmin.from('checkout_attempt').update({payment_meta:{installment_count:installmentCount,interest_amount:quote.interest,shipping,card_fee_snapshot:fees,checkout_policy_revision:policyRevision,debit,commission_percent:splitEnabled?commissionPercent:0,commission_wallet_id:splitEnabled?commissionWalletId:null,commission_config_revision:paymentConfig.revision}}).eq('order_id',orderId).eq('phase','PREPARING');
       if(metadataError)throw metadataError;
       const { error: sendingError } = await supabaseAdmin.rpc('fn_checkout_sending', {p_order:orderId,p_customer:asaasCustomerId});
       if (sendingError) throw sendingError;
       // Never retry this POST blindly: an HTTP timeout does not prove failure.
       const payment = await createAsaasPayment(paymentPayload);
       await bindCheckoutPayment(orderId,payment);
-      if (!payment.id || (!savedCard && !payment.invoiceUrl)) {
+      const cardSaved=body.saveCard===true&&card ? await saveCheckoutCard(user.id,Number(cliente.id),asaasCustomerId,card,payment) : false;
+      if (!payment.id || (!transparent && !savedCard && !payment.invoiceUrl)) {
         throw new Error("O Asaas não retornou os dados necessários da cobrança.");
       }
 
       return NextResponse.json({
         url: payment.invoiceUrl || null,
-        directPayment: Boolean(savedCard),
+        directPayment: transparent || Boolean(savedCard),
         gatewayStatus: payment.status || "PENDING",
+        cardSaved,
+        cardSaveRequested: body.saveCard===true&&Boolean(card),
+        installmentCount,
+        interest:quote.interest,
         orderId,
         total: serverTotal,
         subtotal: serverSubtotal,

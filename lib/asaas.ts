@@ -20,6 +20,10 @@ export interface AsaasCustomer {
 }
 
 export interface AsaasPayment {
+  installment?: string;
+  installmentGroupDeleted?: boolean;
+  installmentNumber?: number;
+  creditCard?: { creditCardToken?: string; creditCardBrand?: string; creditCardNumber?: string };
   deleted?: boolean;
   refunds?: Array<{ status?: string }> | null;
   id: string;
@@ -30,6 +34,7 @@ export interface AsaasPayment {
   netValue?: number;
   dueDate?: string;
   invoiceUrl?: string;
+  bankSlipUrl?: string;
   externalReference?: string;
 }
 
@@ -85,7 +90,7 @@ export async function asaasRequest<T>(path: string, init: RequestInit = {}): Pro
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      "User-Agent": "DemirDieselStore/1.0",
+      "User-Agent": "StorefrontERP/1.0",
       access_token: apiKey,
       ...(init.headers || {}),
     },
@@ -133,11 +138,12 @@ export async function disableAsaasCustomerNotifications(customerId: string) {
 }
 
 export async function createAsaasPayment(payload: Record<string, unknown>) {
-  return asaasRequest<AsaasPayment>("/payments", {
+  const payment = await asaasRequest<AsaasPayment>("/payments", {
     signal: AbortSignal.timeout(90_000),
     method: "POST",
     body: JSON.stringify(payload),
   });
+  return normalizeInstallmentPayment(payment);
 }
 
 export async function tokenizeAsaasCreditCard(payload: Record<string, unknown>) {
@@ -147,11 +153,37 @@ export async function tokenizeAsaasCreditCard(payload: Record<string, unknown>) 
   });
 }
 
-export async function getAsaasPayment(paymentId: string) {
-  return asaasRequest<AsaasPayment>(`/payments/${encodeURIComponent(paymentId)}`);
+async function normalizeInstallmentPayment(payment:AsaasPayment):Promise<AsaasPayment> {
+  if(!payment.installment)return payment.billingType==='DEBIT_CARD'?{...payment,billingType:'CREDIT_CARD'}:payment;
+  let group:AsaasList<AsaasPayment>&{hasMore?:boolean};
+  try{group=await asaasRequest<AsaasList<AsaasPayment>&{hasMore?:boolean}>(`/installments/${encodeURIComponent(payment.installment)}/payments?limit=100`);}
+  catch(error){if(payment.deleted&&error instanceof AsaasApiError&&error.status===404)return {...payment,installmentGroupDeleted:true};throw error;}
+  const rows=group.data||[];
+  if(group.hasMore||rows.length<2||rows.length>21||rows.some(p=>p.installment!==payment.installment||p.customer!==payment.customer||p.externalReference!==payment.externalReference||p.billingType!=='CREDIT_CARD'||!Number.isFinite(p.value)||Number(p.value)<=0))throw new Error('Parcelamento inconsistente; aguarde a conciliacao.');
+  const first=rows.find(p=>p.installmentNumber===1);
+  if(!first)throw new Error('Primeira parcela nao encontrada.');
+  const total=rows.reduce((sum,p)=>sum+Math.round(Number(p.value)*100),0)/100;
+  const refunded=rows.filter(p=>p.status==='REFUNDED').length;
+  const status=refunded===rows.length?'REFUNDED':refunded>0?'PARTIALLY_REFUNDED':first.status;
+  return {...first,value:total,status,creditCard:payment.creditCard||first.creditCard};
 }
-
+export async function getAsaasPayment(paymentId: string) {
+  return normalizeInstallmentPayment(await asaasRequest<AsaasPayment>(`/payments/${encodeURIComponent(paymentId)}`));
+}
+export async function cancelAsaasPayment(payment:AsaasPayment){
+  const resource=payment.installment?`/installments/${encodeURIComponent(payment.installment)}`:`/payments/${encodeURIComponent(payment.id)}`;
+  const removed=await asaasRequest<{deleted?:boolean}>(resource,{method:'DELETE',signal:AbortSignal.timeout(60_000)});
+  if(!removed.deleted)throw new Error('Cancelamento nao confirmado.');
+  const latest=await asaasRequest<AsaasPayment>(`/payments/${encodeURIComponent(payment.id)}`);
+  if(!latest.deleted||['RECEIVED','CONFIRMED','RECEIVED_IN_CASH'].includes(latest.status||''))throw new Error('Cancelamento inconclusivo.');
+  return {...payment,deleted:true,status:latest.status};
+}
 export async function refundAsaasPayment(paymentId: string, description: string) {
+  const payment=await getAsaasPayment(paymentId);
+  if(payment.installment){
+    await asaasRequest(`/installments/${encodeURIComponent(payment.installment)}/refund`,{method:'POST',body:JSON.stringify({}),signal:AbortSignal.timeout(60_000)});
+    return getAsaasPayment(payment.id);
+  }
   return asaasRequest<AsaasPayment>(`/payments/${encodeURIComponent(paymentId)}/refund`, {
     method: "POST",
     body: JSON.stringify({ description }),
@@ -163,4 +195,11 @@ export async function refundAsaasBankSlip(paymentId: string) {
   return asaasRequest<{ requestUrl: string }>(`/payments/${encodeURIComponent(paymentId)}/bankSlip/refund`, {
     method: "POST", body: JSON.stringify({}), signal: AbortSignal.timeout(60_000),
   });
+}
+
+export async function getAsaasPixQrCode(paymentId: string) {
+  return asaasRequest<{ encodedImage: string; payload: string; expirationDate: string }>(`/payments/${encodeURIComponent(paymentId)}/pixQrCode`, { signal: AbortSignal.timeout(15_000) });
+}
+export async function getAsaasBoletoLine(paymentId: string) {
+  return asaasRequest<{ identificationField: string }>(`/payments/${encodeURIComponent(paymentId)}/identificationField`, { signal: AbortSignal.timeout(15_000) });
 }
