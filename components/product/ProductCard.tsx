@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { ProductCardPaymentTerms } from "./ProductCardPaymentTerms";
 import Link from "next/link";
 import Image from "next/image";
 import { Check, Plus, ShoppingCart } from "lucide-react";
@@ -161,6 +162,7 @@ export function ProductCard({
                   <span className="text-base font-bold tracking-tight text-foreground sm:text-lg">
                     {product.formattedPrice}
                   </span>
+                  <ProductCardPaymentTerms productId={Number(product.id)} price={product.price} initialQuote={product.cardPaymentTerms}/>
                 </>
               ) : (
                 <Link

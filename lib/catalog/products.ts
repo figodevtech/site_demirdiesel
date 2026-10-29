@@ -1,3 +1,4 @@
+import { withCardPaymentTerms } from "./card-payment-terms";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { PublicProduct, ProductFilterOptions, PaginatedProducts, ProductCondition } from "./types";
 import { slugify } from "@/lib/utils";
@@ -207,7 +208,7 @@ function normalizeStockStatus(
  * Regra 10 do prompt: se nenhum produto estiver com destaque=true, usa
  * produtos ativos com estoque e imagem mais recentes.
  */
-export async function getFeaturedProducts(limit = 8): Promise<PublicProduct[]> {
+async function loadFeaturedProducts(limit = 8): Promise<PublicProduct[]> {
   try {
     // 1. Tenta buscar marcados como destaque=true com estoque e com imagem pública válida
     const { data: featuredData } = await supabaseAdmin
@@ -271,7 +272,7 @@ export async function getFeaturedProducts(limit = 8): Promise<PublicProduct[]> {
  * Busca os produtos mais vendidos com base nas vendas reais (vendaproduto),
  * preservando o ranking e priorizando produtos ativos com estoque e imagem.
  */
-export async function getBestSellerProducts(limit = 8): Promise<PublicProduct[]> {
+async function loadBestSellerProducts(limit = 8): Promise<PublicProduct[]> {
   try {
     // 1. Agrupa vendas da tabela vendaproduto
     const { data: salesData } = await supabaseAdmin
@@ -393,7 +394,7 @@ export async function getProductById(idOrSlug: string): Promise<PublicProduct | 
 /**
  * Busca paginada e filtrada para o catálogo
  */
-export async function getPaginatedProducts(
+async function loadPaginatedProducts(
   options: ProductFilterOptions = {}
 ): Promise<PaginatedProducts> {
   try {
@@ -668,3 +669,7 @@ export async function getAllProductsForSitemap(): Promise<Array<{ id: number; sl
   }
 }
 
+
+export async function getFeaturedProducts(limit=8):Promise<PublicProduct[]>{return withCardPaymentTerms(await loadFeaturedProducts(limit),product=>product.price);}
+export async function getBestSellerProducts(limit=8):Promise<PublicProduct[]>{return withCardPaymentTerms(await loadBestSellerProducts(limit),product=>product.price);}
+export async function getPaginatedProducts(options:ProductFilterOptions={}):Promise<PaginatedProducts>{const result=await loadPaginatedProducts(options);return {...result,products:await withCardPaymentTerms(result.products,product=>product.price)};}

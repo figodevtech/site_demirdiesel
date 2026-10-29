@@ -1,3 +1,4 @@
+import { getProductPaymentPolicy } from "@/lib/catalog/card-payment-terms";
 import React from "react";
 import { Metadata } from "next";
 import Link from "next/link";
@@ -66,11 +67,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
   if (!product) {
     notFound();
   }
-
-  // Busca produtos relacionados da mesma categoria
-  const relatedResult = product.categorySlug
-    ? await getPaginatedProducts({ categorySlug: product.categorySlug, pageSize: 4 })
-    : { products: [] };
+  const [initialPaymentPolicy,relatedResult]=await Promise.all([
+    product.price>0?getProductPaymentPolicy(Number(product.id)):Promise.resolve(null),
+    product.categorySlug?getPaginatedProducts({categorySlug:product.categorySlug,pageSize:4}):Promise.resolve({products:[]}),
+  ]);
 
   const relatedProducts = relatedResult.products.filter((p) => p.id !== product.id).slice(0, 4);
 
@@ -244,7 +244,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           </div>
 
           {/* Ações (Adicionar ao carrinho, WhatsApp, simulação de frete) */}
-          <ProductActions product={product} />
+          <ProductActions product={product} initialPaymentPolicy={initialPaymentPolicy}/>
 
           {/* Selos de Confiança Técnica */}
           <div className="grid grid-cols-2 gap-3 pt-2 text-xs">

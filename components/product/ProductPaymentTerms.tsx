@@ -1,12 +1,13 @@
 "use client";
+import type { CardPaymentPolicy } from '@/lib/card-payment-policies';
 import { useCheckoutTerms } from './CheckoutTerms';
 import { Button } from '@/components/ui/button';
 import { Popover,PopoverTrigger,PopoverContent } from '@/components/ui/popover';
 import { Table,TableHeader,TableBody,TableHead,TableRow,TableCell } from '@/components/ui/table';
 
 const money=(value:number)=>value.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-export function ProductPaymentTerms({productId,price,quantity=1}:{productId:number;price:number;quantity?:number}){
- const terms=useCheckoutTerms(price>0?[{productId,total:price*quantity}]:[]);
+export function ProductPaymentTerms({productId,price,quantity=1,initialPolicy}:{productId:number;price:number;quantity?:number;initialPolicy?:CardPaymentPolicy|null}){
+ const terms=useCheckoutTerms(price>0?[{productId,total:price*quantity}]:[],0,initialPolicy===undefined?undefined:{ids:String(productId),value:initialPolicy});
  if(!(price>0))return null;
  if(!terms.loaded)return <p role="status" className="text-xs text-muted-foreground">Consultando condições de pagamento…</p>;
  const best=terms.options.at(-1);

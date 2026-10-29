@@ -3,11 +3,14 @@ import { shippingAccessToken,ShippingAuthError } from '@/lib/melhor-envio-oauth'
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getCheckoutPolicy } from '@/lib/erp-checkout-policy';
 
-export type ShippingOption={id:number;name:string;company:string;price:number;days:number};
-export class ShippingQuoteError extends Error { constructor(message:string,public status=422){super(message);} }
+export const FREE_SHIPPING_ID=999999;
+export function freeShippingOption(){return {id:FREE_SHIPPING_ID,name:'Frete grátis',company:'Envio escolhido pela loja',price:0,days:0,merchantSelected:true};}
+export type ShippingOption={id:number;name:string;company:string;price:number;days:number;merchantSelected?:boolean};
+export const SHIPPING_UNAVAILABLE_MESSAGE='Não foi possível calcular o frete agora. Tente novamente em instantes ou fale com a loja.';
+export class ShippingQuoteError extends Error { constructor(message:string,public status=422,public publicMessage=message){super(message);} }
 export async function quoteShipping(cep:string,items:{productId:number;quantity:number}[]){
  let access;
- try{access=await shippingAccessToken();}catch(error){throw new ShippingQuoteError(error instanceof ShippingAuthError?error.message:'Não foi possível autorizar a consulta de frete.',503);}
+ try{access=await shippingAccessToken();}catch(error){throw new ShippingQuoteError(error instanceof ShippingAuthError?error.message:'Não foi possível autorizar a consulta de frete.',503,SHIPPING_UNAVAILABLE_MESSAGE);}
  const {token,environment}=access;
  if(!/^\d{8}$/.test(cep)||!items.length||items.length>100||items.some(i=>!Number.isInteger(i.productId)||i.productId<=0||!Number.isInteger(i.quantity)||i.quantity<1||i.quantity>999))throw new ShippingQuoteError('Confira o CEP e os produtos para calcular o frete.');
  const quantities=new Map<number,number>();
@@ -15,16 +18,18 @@ export async function quoteShipping(cep:string,items:{productId:number;quantity:
  if([...quantities.values()].some(q=>q>999))throw new ShippingQuoteError('Quantidade acima do limite de cotação.');
  const ids=[...quantities.keys()];
  const [config,catalog]=await Promise.all([getCheckoutPolicy(ids),supabaseAdmin.from('produto').select('id,precovenda,visible,is_deleted').in('id',ids)]);
- if(!config.available||!config.originCep)throw new ShippingQuoteError('A loja precisa conferir o CEP em Configurações → Empresa antes de calcular o frete.',503);
+ if(!config.available||!config.originCep)throw new ShippingQuoteError('A loja precisa conferir o CEP em Configurações → Empresa antes de calcular o frete.',503,SHIPPING_UNAVAILABLE_MESSAGE);
  if(catalog.error)throw new ShippingQuoteError('Não foi possível consultar os produtos para envio.',503);
- const products=ids.map(id=>{
+ const chargedIds=ids.filter(id=>config.policies[String(id)]?.freeShipping!==true);
+ if(!chargedIds.length)return {options:[freeShippingOption()],quotedAt:new Date().toISOString(),environment:null};
+ const products=chargedIds.map(id=>{
   const product=catalog.data?.find(p=>Number(p.id)===id),pack=config.policies[String(id)]?.shippingPackage;
   if(!product||product.visible===false||product.is_deleted||!(Number(product.precovenda)>0))throw new ShippingQuoteError('Um produto não está disponível para envio. Atualize seu carrinho.');
-  if(!pack)throw new ShippingQuoteError(`O produto #${id} ainda precisa de peso e dimensões para cotação. Consulte a loja.`);
+  if(!pack)throw new ShippingQuoteError(`O produto #${id} ainda precisa de peso e dimensões para cotação. Consulte a loja.`,422,'O frete deste produto precisa ser consultado com a loja.');
   return {id:String(id),...pack,insurance_value:Math.round(Number(product.precovenda)*100)/100,quantity:quantities.get(id)!};
  });
  const email=process.env.NEXT_PUBLIC_COMPANY_EMAIL?.trim();
- if(!email||!email.includes('@'))throw new ShippingQuoteError('A loja precisa conferir o e-mail de contato da integração de frete.',503);
+ if(!email||!email.includes('@'))throw new ShippingQuoteError('A loja precisa conferir o e-mail de contato da integração de frete.',503,SHIPPING_UNAVAILABLE_MESSAGE);
  const base=environment==='production'?'https://melhorenvio.com.br':'https://sandbox.melhorenvio.com.br';
  let response:Response;
  try{response=await fetch(`${base}/api/v2/me/shipment/calculate`,{method:'POST',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(15000),headers:{Authorization:`Bearer ${token}`,Accept:'application/json','Content-Type':'application/json','User-Agent':`StorefrontERP (${email})`},body:JSON.stringify({from:{postal_code:config.originCep},to:{postal_code:cep},products,services:'1,2',options:{receipt:false,own_hand:false}})});}catch{throw new ShippingQuoteError('Não foi possível consultar o frete agora. Tente novamente.',503);}

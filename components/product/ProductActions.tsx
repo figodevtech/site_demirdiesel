@@ -1,5 +1,6 @@
 "use client";
 
+import type { CardPaymentPolicy } from "@/lib/card-payment-policies";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, Check, Plus, Minus } from "lucide-react";
@@ -15,7 +16,7 @@ import { ShippingSimulator } from "./ShippingSimulator";
 import { haptic } from '@/lib/haptics';
 import { useVirtualKeyboardOpen } from "@/hooks/use-virtual-keyboard";
 
-export function ProductActions({ product }: { product: PublicProduct }) {
+export function ProductActions({ product,initialPaymentPolicy }: { product: PublicProduct;initialPaymentPolicy?:CardPaymentPolicy|null }) {
   const { addToCart } = useCart();
   const [quantity, setQuantity] = useState(1);
   const isKeyboardOpen = useVirtualKeyboardOpen();
@@ -42,7 +43,7 @@ export function ProductActions({ product }: { product: PublicProduct }) {
 
   return (
     <div className="space-y-6">
-      <ProductPaymentTerms productId={Number(product.id)} price={product.price} quantity={quantity}/>
+      <ProductPaymentTerms productId={Number(product.id)} price={product.price} quantity={quantity} initialPolicy={initialPaymentPolicy}/>
       <div className="flex flex-col gap-4">
         {isAvailable && hasPrice ? (
           <div className="space-y-3">

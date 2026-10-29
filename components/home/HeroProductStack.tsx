@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { ProductCardPaymentTerms } from "@/components/product/ProductCardPaymentTerms";
 import { ProductFallbackImage } from "@/components/product/ProductFallbackImage";
 import type { PublicProduct } from "@/lib/catalog/types";
 import styles from "./HeroProductCard.module.css";
@@ -78,6 +79,7 @@ export function HeroProductStack({ products }: { products: PublicProduct[] }) {
                       <p className={`${styles.text} mt-3 text-lg font-black text-slate-950 sm:text-xl`}>
                         {product?.price ? product.formattedPrice : "Ver produtos"}
                       </p>
+                      {product&&product.price>0&&<ProductCardPaymentTerms productId={Number(product.id)} price={product.price} initialQuote={product.cardPaymentTerms}/>}
                       <span className={`${styles.cta} mt-3 text-xs font-bold`}>
                         <span className={styles.ctaLabel}>Ver produto</span>
                         <ArrowRight className="relative z-10 size-3.5 shrink-0" />
